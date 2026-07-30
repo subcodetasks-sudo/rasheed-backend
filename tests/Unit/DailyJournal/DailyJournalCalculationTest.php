@@ -1,0 +1,351 @@
+<?php
+
+namespace Tests\Unit\DailyJournal;
+
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Modules\DailyJournal\Actions\UpdateDailyJournalReportsAction;
+use Modules\DailyJournal\DTOs\DailyJournalData;
+use Modules\DailyJournal\Models\DailyJournalEntry;
+use Modules\DailyJournal\Services\DailyJournalCalculationService;
+use Modules\DailyJournal\Workflows\SaveDailyJournalWorkflow;
+use Modules\Project\Enums\OperationalDeductionType;
+use Modules\Project\Enums\ProjectStatus;
+use Modules\Project\Models\Project;
+use Modules\Settings\Services\SettingService;
+use RuntimeException;
+use Tests\TestCase;
+
+class DailyJournalCalculationTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private DailyJournalCalculationService $service;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->service = app(DailyJournalCalculationService::class);
+    }
+
+    public function test_daily_total_equation(): void
+    {
+        $this->assertEquals(
+            780.0,
+            $this->service->calculateDailyTotal(
+                income: 1000,
+                contribution: 50,
+                expense: 100,
+                administrativeExpense: 20,
+                administrativeFee: 120,
+                operationalDeduction: 30,
+            )
+        );
+    }
+
+    public function test_fund_balance_equation(): void
+    {
+        $this->assertEquals(150.0, $this->service->calculateFundBalance(100, 50));
+        $this->assertEquals(-60.0, $this->service->calculateFundBalance(40, -100));
+    }
+
+    public function test_administrative_debt_cases_and_expense_first_allocation(): void
+    {
+        // Case 1: deficit covered by fee (example: income 200 @ 12% → fee 24)
+        $this->assertEquals(
+            24.0,
+            $this->service->calculateAdministrativeDebt(
+                fundBalance: -100,
+                administrativeFee: 24,
+                administrativeExpense: 0,
+            )
+        );
+
+        // Case 1 capped by remaining deficit magnitude
+        $this->assertEquals(
+            10.0,
+            $this->service->calculateAdministrativeDebt(
+                fundBalance: -10,
+                administrativeFee: 24,
+                administrativeExpense: 0,
+            )
+        );
+
+        // Case 2: expense exceeds fee → debt = fee consumed
+        $this->assertEquals(
+            50.0,
+            $this->service->calculateAdministrativeDebt(
+                fundBalance: 10,
+                administrativeFee: 50,
+                administrativeExpense: 80,
+            )
+        );
+
+        // Expense ≤ fee: no Case 2; remaining fee available for Case 1
+        $this->assertEquals(
+            20.0,
+            $this->service->calculateAdministrativeDebt(
+                fundBalance: -100,
+                administrativeFee: 50,
+                administrativeExpense: 30,
+            )
+        );
+
+        // Expense-first overlap cannot spend fee twice (expense 80 takes all fee)
+        $this->assertEquals(
+            50.0,
+            $this->service->calculateAdministrativeDebt(
+                fundBalance: -100,
+                administrativeFee: 50,
+                administrativeExpense: 80,
+            )
+        );
+
+        // Negative balance alone with zero fee → no debt
+        $this->assertEquals(
+            0.0,
+            $this->service->calculateAdministrativeDebt(
+                fundBalance: -60,
+                administrativeFee: 0,
+                administrativeExpense: 0,
+            )
+        );
+
+        // Positive balance, expense ≤ fee → no debt
+        $this->assertEquals(
+            0.0,
+            $this->service->calculateAdministrativeDebt(
+                fundBalance: 25,
+                administrativeFee: 50,
+                administrativeExpense: 30,
+            )
+        );
+    }
+
+    public function test_signed_fund_balance_scenarios(): void
+    {
+        // 1000 + (-300) = 700
+        $this->assertEquals(700.0, $this->service->calculateFundBalance(1000, -300));
+
+        // 300 + (-900) = -600
+        $this->assertEquals(-600.0, $this->service->calculateFundBalance(300, -900));
+
+        // -400 + 250 = -150
+        $this->assertEquals(-150.0, $this->service->calculateFundBalance(-400, 250));
+
+        // -400 + 800 = 400
+        $this->assertEquals(400.0, $this->service->calculateFundBalance(-400, 800));
+    }
+
+    public function test_accumulated_debt_equation(): void
+    {
+        $this->assertEquals(70.0, $this->service->calculateAccumulatedAdministrativeDebt(10, 60));
+        $this->assertEquals(10.0, $this->service->calculateAccumulatedAdministrativeDebt(10, 0));
+    }
+
+    public function test_administrative_fee_uses_project_percentage(): void
+    {
+        $project = Project::factory()->create([
+            'status' => ProjectStatus::Active,
+            'administrative_exempt' => false,
+            'administrative_fee_percentage' => 15,
+            'operational_deduction_type' => OperationalDeductionType::Exempt,
+        ]);
+
+        $entry = new DailyJournalEntry([
+            'project_id' => $project->id,
+            'daily_income' => 1000,
+        ]);
+        $entry->setRelation('project', $project);
+
+        $entries = $this->service->applyAdministrativeFees(collect([$entry]));
+
+        $this->assertEquals(150.0, (float) $entries->first()->administrative_fee);
+    }
+
+    public function test_operational_deduction_relative_fixed_exempt(): void
+    {
+        app(SettingService::class)->update('total_operational_deduction', 1081, 'decimal', true);
+
+        $relative = Project::factory()->create([
+            'status' => ProjectStatus::Active,
+            'operational_deduction_type' => OperationalDeductionType::Relative,
+        ]);
+        $fixed = Project::factory()->fixedDeduction(154)->create(['status' => ProjectStatus::Active]);
+        $exempt = Project::factory()->exempt()->create(['status' => ProjectStatus::Active]);
+
+        $entries = collect([
+            tap(new DailyJournalEntry(['project_id' => $relative->id, 'daily_income' => 1000]), fn ($e) => $e->setRelation('project', $relative)),
+            tap(new DailyJournalEntry(['project_id' => $fixed->id, 'daily_income' => 500]), fn ($e) => $e->setRelation('project', $fixed)),
+            tap(new DailyJournalEntry(['project_id' => $exempt->id, 'daily_income' => 500]), fn ($e) => $e->setRelation('project', $exempt)),
+        ]);
+
+        $result = $this->service->applyOperationalDeductions($entries)->keyBy('project_id');
+
+        $this->assertEquals(1081.0, (float) $result[$relative->id]->operational_deduction);
+        $this->assertEquals(154.0, (float) $result[$fixed->id]->operational_deduction);
+        $this->assertEquals(0.0, (float) $result[$exempt->id]->operational_deduction);
+    }
+
+    public function test_fund_balance_and_administrative_debt_pipeline(): void
+    {
+        $project = Project::factory()->create([
+            'status' => ProjectStatus::Active,
+            'administrative_exempt' => false,
+            'administrative_fee_percentage' => 12,
+            'operational_deduction_type' => OperationalDeductionType::Exempt,
+        ]);
+        $date = now()->startOfDay();
+
+        DailyJournalEntry::factory()->create([
+            'project_id' => $project->id,
+            'journal_date' => $date->copy()->subDay()->toDateString(),
+            'fund_balance' => 40,
+            'accumulated_administrative_debt' => 10,
+        ]);
+
+        $entry = DailyJournalEntry::factory()->make([
+            'project_id' => $project->id,
+            'journal_date' => $date->toDateString(),
+            'daily_total' => -100,
+            'administrative_fee' => 24,
+            'administrative_expense' => 0,
+        ]);
+
+        $previous = $this->service->previousBalances([$project->id], $date);
+        $entries = $this->service->applyFundBalances(collect([$entry]), $previous);
+        $this->assertEquals(-60.0, (float) $entries->first()->fund_balance);
+
+        $entries = $this->service->applyAdministrativeDebt($entries);
+        $this->assertEquals(-60.0, (float) $entries->first()->fund_balance);
+        $this->assertEquals(24.0, (float) $entries->first()->administrative_debt);
+
+        $entries = $this->service->applyAccumulatedAdministrativeDebt($entries, $previous);
+        $this->assertEquals(34.0, (float) $entries->first()->accumulated_administrative_debt);
+    }
+
+    public function test_contribution_adds_to_administrative_debt_from_pre_contribution_base(): void
+    {
+        // Base pinned to fund_balance − contribution (Pass-1 balance).
+        // fund=-1070 with contribution 30 → pre-contribution = -1100; fee 100 → base 100; debt 130
+        $withThirty = new DailyJournalEntry([
+            'contribution' => 30,
+            'fund_balance' => -1070,
+            'administrative_fee' => 100,
+            'administrative_expense' => 0,
+        ]);
+        $this->assertEquals(
+            130.0,
+            (float) $this->service->applyAdministrativeDebt(collect([$withThirty]))->first()->administrative_debt
+        );
+
+        // Re-save contribution 40 against same day math → fund=-1060; base still 100; debt 140 (not 170)
+        $withForty = new DailyJournalEntry([
+            'contribution' => 40,
+            'fund_balance' => -1060,
+            'administrative_fee' => 100,
+            'administrative_expense' => 0,
+        ]);
+        $this->assertEquals(
+            140.0,
+            (float) $this->service->applyAdministrativeDebt(collect([$withForty]))->first()->administrative_debt
+        );
+
+        // Fee 0 (exempt): contribution alone is the debt
+        $exempt = new DailyJournalEntry([
+            'contribution' => 100,
+            'fund_balance' => -50,
+            'administrative_fee' => 0,
+            'administrative_expense' => 0,
+        ]);
+        $this->assertEquals(
+            100.0,
+            (float) $this->service->applyAdministrativeDebt(collect([$exempt]))->first()->administrative_debt
+        );
+    }
+
+    public function test_explicit_repayment_fully_repays_accumulated_debt_from_surplus(): void
+    {
+        $result = $this->service->repayAdministrativeDebtFromSurplus(
+            fundBalance: 150,
+            administrativeDebt: 0,
+            accumulatedAdministrativeDebt: 100,
+        );
+
+        $this->assertSame(
+            [
+                'fund_balance' => 50.0,
+                'administrative_debt' => 0.0,
+                'accumulated_administrative_debt' => 0.0,
+            ],
+            $result
+        );
+    }
+
+    public function test_explicit_repayment_partially_repays_accumulated_debt_from_surplus(): void
+    {
+        $result = $this->service->repayAdministrativeDebtFromSurplus(
+            fundBalance: 40,
+            administrativeDebt: 0,
+            accumulatedAdministrativeDebt: 100,
+        );
+
+        $this->assertSame(
+            [
+                'fund_balance' => 0.0,
+                'administrative_debt' => 0.0,
+                'accumulated_administrative_debt' => 60.0,
+            ],
+            $result
+        );
+    }
+
+    public function test_explicit_repayment_repays_today_debt_before_accumulated(): void
+    {
+        $result = $this->service->repayAdministrativeDebtFromSurplus(
+            fundBalance: 30,
+            administrativeDebt: 20,
+            accumulatedAdministrativeDebt: 50,
+        );
+
+        $this->assertSame(
+            [
+                'fund_balance' => 0.0,
+                'administrative_debt' => 0.0,
+                'accumulated_administrative_debt' => 20.0,
+            ],
+            $result
+        );
+    }
+
+    public function test_save_workflow_rolls_back_on_failure(): void
+    {
+        $project = Project::factory()->create([
+            'status' => ProjectStatus::Active,
+            'operational_deduction_type' => OperationalDeductionType::Exempt,
+            'administrative_exempt' => true,
+        ]);
+
+        $this->mock(UpdateDailyJournalReportsAction::class, function ($mock) {
+            $mock->shouldReceive('execute')->once()->andThrow(new RuntimeException('report failed'));
+        });
+
+        $data = DailyJournalData::fromArray([
+            'journal_date' => now()->toDateString(),
+            'entries' => [
+                ['project_id' => $project->id, 'daily_income' => 100],
+            ],
+        ]);
+
+        try {
+            app(SaveDailyJournalWorkflow::class)->handle($data);
+            $this->fail('Expected exception was not thrown');
+        } catch (RuntimeException $e) {
+            $this->assertSame('report failed', $e->getMessage());
+        }
+
+        $this->assertDatabaseMissing('daily_journal_entries', [
+            'project_id' => $project->id,
+            'journal_date' => now()->toDateString(),
+        ]);
+    }
+}

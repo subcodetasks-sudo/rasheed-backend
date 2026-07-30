@@ -1,0 +1,538 @@
+[
+  {
+    "code": "OP1001",
+    "name": "ثوم",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 180.0,
+    "opening_unit_price": 9.0
+  },
+  {
+    "code": "OP1002",
+    "name": "بصل",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 200.0,
+    "opening_unit_price": 11.0
+  },
+  {
+    "code": "OP1003",
+    "name": "سيرج",
+    "unit": "لتر",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 3648.0,
+    "opening_unit_price": 8.0
+  },
+  {
+    "code": "OP1004",
+    "name": "برغل",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 850.0,
+    "opening_unit_price": 4.0
+  },
+  {
+    "code": "OP1005",
+    "name": "رز عمرة",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 4480.0,
+    "opening_unit_price": 2.5
+  },
+  {
+    "code": "OP1006",
+    "name": "ملح",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 288.0,
+    "opening_unit_price": 4.0
+  },
+  {
+    "code": "OP1007",
+    "name": "ترنقات",
+    "unit": "قطعة",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 200.0,
+    "opening_unit_price": 37.0
+  },
+  {
+    "code": "OP1008",
+    "name": "فول مجروش",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 150.0,
+    "opening_unit_price": 5.0
+  },
+  {
+    "code": "OP1009",
+    "name": "حمص",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 617.0,
+    "opening_unit_price": 5.0
+  },
+  {
+    "code": "OP1010",
+    "name": "حليب أطفال",
+    "unit": "علبة",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 400.0,
+    "opening_unit_price": 20.0
+  },
+  {
+    "code": "OP1011",
+    "name": "صلصة بيونير",
+    "unit": "علبة",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 1044.0,
+    "opening_unit_price": 4.0
+  },
+  {
+    "code": "OP1012",
+    "name": "صلصة 3ك",
+    "unit": "علبة",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 246.0,
+    "opening_unit_price": 27.0
+  },
+  {
+    "code": "OP1013",
+    "name": "صلصة 830",
+    "unit": "علبة",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 60.0,
+    "opening_unit_price": 10.0
+  },
+  {
+    "code": "OP1014",
+    "name": "شوادر",
+    "unit": "قطعة",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 6.0,
+    "opening_unit_price": 120.0
+  },
+  {
+    "code": "OP1015",
+    "name": "سمنة",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 209.0,
+    "opening_unit_price": 9.0
+  },
+  {
+    "code": "OP1016",
+    "name": "فول علب",
+    "unit": "علبة",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 744.0,
+    "opening_unit_price": 2.4
+  },
+  {
+    "code": "OP1017",
+    "name": "جبنة عبور لاند",
+    "unit": "علبة",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 3915.0,
+    "opening_unit_price": 2.0
+  },
+  {
+    "code": "OP1018",
+    "name": "عدس حب",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 2000.0,
+    "opening_unit_price": 5.0
+  },
+  {
+    "code": "OP1019",
+    "name": "فلفل اسود",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 1.0,
+    "opening_unit_price": 45.0
+  },
+  {
+    "code": "OP1020",
+    "name": "سلفان",
+    "unit": "قطعة",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 71.0,
+    "opening_unit_price": 85.0
+  },
+  {
+    "code": "OP1021",
+    "name": "ماجي",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 60.0,
+    "opening_unit_price": 11.0
+  },
+  {
+    "code": "OP1022",
+    "name": "لمون مجفف",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 8.15,
+    "opening_unit_price": 30.0
+  },
+  {
+    "code": "OP1023",
+    "name": "سيرفس",
+    "unit": "قطعة",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 65.0,
+    "opening_unit_price": 1.2
+  },
+  {
+    "code": "OP1024",
+    "name": "ملوخية ناشفة",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 10.0,
+    "opening_unit_price": 55.0
+  },
+  {
+    "code": "OP1025",
+    "name": "عصفر",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 20.0,
+    "opening_unit_price": 35.0
+  },
+  {
+    "code": "OP1026",
+    "name": "سكر",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 1500.0,
+    "opening_unit_price": 4.0
+  },
+  {
+    "code": "OP1027",
+    "name": "خميرة",
+    "unit": "قطعة",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 120.0,
+    "opening_unit_price": 5.0
+  },
+  {
+    "code": "OP1028",
+    "name": "رز الهلال",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 660.0,
+    "opening_unit_price": 1.0
+  },
+  {
+    "code": "OP1029",
+    "name": "عدس احمر",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 2760.0,
+    "opening_unit_price": 4.0
+  },
+  {
+    "code": "OP1030",
+    "name": "تمر",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 25.0,
+    "opening_unit_price": 13.0
+  },
+  {
+    "code": "OP1031",
+    "name": "طحين",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 375.0,
+    "opening_unit_price": 4.0
+  },
+  {
+    "code": "OP1032",
+    "name": "نشأ",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 75.0,
+    "opening_unit_price": 7.0
+  },
+  {
+    "code": "OP1033",
+    "name": "زعتر",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 25.0,
+    "opening_unit_price": 25.0
+  },
+  {
+    "code": "OP1034",
+    "name": "ذرة فشار",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 25.0,
+    "opening_unit_price": 14.0
+  },
+  {
+    "code": "OP1035",
+    "name": "بهار رز",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 85.7,
+    "opening_unit_price": 40.0
+  },
+  {
+    "code": "OP1036",
+    "name": "كمون",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 19.7,
+    "opening_unit_price": 35.0
+  },
+  {
+    "code": "OP1037",
+    "name": "جرادة ناشفة",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 1.5,
+    "opening_unit_price": 35.0
+  },
+  {
+    "code": "OP1038",
+    "name": "نيلون كبير",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 40.0,
+    "opening_unit_price": 25.0
+  },
+  {
+    "code": "OP1039",
+    "name": "نيلون 1ك",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 25.0,
+    "opening_unit_price": 25.0
+  },
+  {
+    "code": "OP1040",
+    "name": "نيلون3ك",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 25.0,
+    "opening_unit_price": 25.0
+  },
+  {
+    "code": "OP1041",
+    "name": "سائل جلي",
+    "unit": "علبة",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 88.0,
+    "opening_unit_price": 10.0
+  },
+  {
+    "code": "OP1042",
+    "name": "سلك",
+    "unit": "قطعة",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 20.0,
+    "opening_unit_price": 5.0
+  },
+  {
+    "code": "OP1043",
+    "name": "زيت زيتون",
+    "unit": "تنكة",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 5.0,
+    "opening_unit_price": 600.0
+  },
+  {
+    "code": "OP1044",
+    "name": "ورق غار",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 3.2,
+    "opening_unit_price": 35.0
+  },
+  {
+    "code": "OP1045",
+    "name": "شطة",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 18.9,
+    "opening_unit_price": 35.0
+  },
+  {
+    "code": "OP1046",
+    "name": "بطاطا",
+    "unit": "كجم",
+    "opening_date": "2026-03-31",
+    "opening_quantity": 510.0,
+    "opening_unit_price": 7.0
+  },
+  {
+    "code": "OP1047",
+    "name": "فلفل اخضر",
+    "unit": "كجم",
+    "opening_date": "2026-04-01",
+    "opening_quantity": 30.0,
+    "opening_unit_price": 21.0
+  },
+  {
+    "code": "OP1048",
+    "name": "تفاح",
+    "unit": "كجم",
+    "opening_date": "2026-04-01",
+    "opening_quantity": 153.0,
+    "opening_unit_price": 12.0
+  },
+  {
+    "code": "OP1049",
+    "name": "باذنجان",
+    "unit": "كجم",
+    "opening_date": "2026-04-01",
+    "opening_quantity": 156.0,
+    "opening_unit_price": 11.0
+  },
+  {
+    "code": "OP1050",
+    "name": "بندورة",
+    "unit": "كجم",
+    "opening_date": "2026-04-01",
+    "opening_quantity": 151.0,
+    "opening_unit_price": 13.0
+  },
+  {
+    "code": "OP1051",
+    "name": "هيل",
+    "unit": "كجم",
+    "opening_date": "2026-04-01",
+    "opening_quantity": 2.0,
+    "opening_unit_price": 150.0
+  },
+  {
+    "code": "OP1052",
+    "name": "شاي",
+    "unit": "علبة",
+    "opening_date": "2026-04-01",
+    "opening_quantity": 20.0,
+    "opening_unit_price": 20.0
+  },
+  {
+    "code": "OP1053",
+    "name": "معالق",
+    "unit": "كرتونة",
+    "opening_date": "2026-04-01",
+    "opening_quantity": 2.0,
+    "opening_unit_price": 225.0
+  },
+  {
+    "code": "OP1054",
+    "name": "اكياس نظافة",
+    "unit": "لفة",
+    "opening_date": "2026-04-01",
+    "opening_quantity": 10.0,
+    "opening_unit_price": 11.0
+  },
+  {
+    "code": "OP1055",
+    "name": "حرامات",
+    "unit": "قطعة",
+    "opening_date": "2026-04-02",
+    "opening_quantity": 15.0,
+    "opening_unit_price": 50.0
+  },
+  {
+    "code": "OP1056",
+    "name": "لحم احمر",
+    "unit": "كجم",
+    "opening_date": "2026-04-02",
+    "opening_quantity": 125.0,
+    "opening_unit_price": 39.0
+  },
+  {
+    "code": "OP1057",
+    "name": "خيام",
+    "unit": "قطعة",
+    "opening_date": "2026-04-05",
+    "opening_quantity": 10.0,
+    "opening_unit_price": 420.0
+  },
+  {
+    "code": "OP1058",
+    "name": "باذنجان",
+    "unit": "كجم",
+    "opening_date": "2026-04-08",
+    "opening_quantity": 108.0,
+    "opening_unit_price": 15.5
+  },
+  {
+    "code": "OP1059",
+    "name": "فلفل اخضر",
+    "unit": "كجم",
+    "opening_date": "2026-04-08",
+    "opening_quantity": 30.0,
+    "opening_unit_price": 22.0
+  },
+  {
+    "code": "OP1060",
+    "name": "خيار",
+    "unit": "كجم",
+    "opening_date": "2026-04-08",
+    "opening_quantity": 110.0,
+    "opening_unit_price": 15.0
+  },
+  {
+    "code": "OP1061",
+    "name": "جزر",
+    "unit": "كجم",
+    "opening_date": "2026-04-08",
+    "opening_quantity": 100.0,
+    "opening_unit_price": 10.0
+  },
+  {
+    "code": "OP1062",
+    "name": "بهار طبيخ",
+    "unit": "كجم",
+    "opening_date": "2026-04-13",
+    "opening_quantity": 25.0,
+    "opening_unit_price": 32.0
+  },
+  {
+    "code": "OP1063",
+    "name": "لمون",
+    "unit": "كجم",
+    "opening_date": "2026-04-14",
+    "opening_quantity": 2.0,
+    "opening_unit_price": 10.0
+  },
+  {
+    "code": "OP1064",
+    "name": "بقدونس",
+    "unit": "كجم",
+    "opening_date": "2026-04-14",
+    "opening_quantity": 6.0,
+    "opening_unit_price": 8.0
+  },
+  {
+    "code": "OP1065",
+    "name": "بازيلاء",
+    "unit": "كجم",
+    "opening_date": "2026-04-14",
+    "opening_quantity": 1000.0,
+    "opening_unit_price": 6.5
+  },
+  {
+    "code": "OP1066",
+    "name": "تفاح",
+    "unit": "كجم",
+    "opening_date": "2026-04-15",
+    "opening_quantity": 152.0,
+    "opening_unit_price": 10.0
+  },
+  {
+    "code": "OP1067",
+    "name": "صدر حبش مجمد",
+    "unit": "كجم",
+    "opening_date": "2026-04-16",
+    "opening_quantity": 308.0,
+    "opening_unit_price": 30.0
+  }
+]

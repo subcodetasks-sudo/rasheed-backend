@@ -1,0 +1,418 @@
+{
+  "headers_row3": [
+    {
+      "col": 1,
+      "letter": "A",
+      "value": "المشروعات"
+    },
+    {
+      "col": 2,
+      "letter": "B",
+      "value": "الجمالي التراكمي"
+    },
+    {
+      "col": 3,
+      "letter": "C",
+      "value": "1"
+    },
+    {
+      "col": 4,
+      "letter": "D",
+      "value": "2"
+    },
+    {
+      "col": 5,
+      "letter": "E",
+      "value": "3"
+    },
+    {
+      "col": 6,
+      "letter": "F",
+      "value": "4"
+    },
+    {
+      "col": 7,
+      "letter": "G",
+      "value": "5"
+    },
+    {
+      "col": 8,
+      "letter": "H",
+      "value": "6"
+    },
+    {
+      "col": 9,
+      "letter": "I",
+      "value": "7"
+    },
+    {
+      "col": 10,
+      "letter": "J",
+      "value": "8"
+    },
+    {
+      "col": 11,
+      "letter": "K",
+      "value": "9"
+    },
+    {
+      "col": 12,
+      "letter": "L",
+      "value": "10"
+    },
+    {
+      "col": 13,
+      "letter": "M",
+      "value": "11"
+    },
+    {
+      "col": 14,
+      "letter": "N",
+      "value": "12"
+    },
+    {
+      "col": 15,
+      "letter": "O",
+      "value": "13"
+    },
+    {
+      "col": 16,
+      "letter": "P",
+      "value": "14"
+    },
+    {
+      "col": 17,
+      "letter": "Q",
+      "value": "15"
+    },
+    {
+      "col": 18,
+      "letter": "R",
+      "value": "16"
+    },
+    {
+      "col": 19,
+      "letter": "S",
+      "value": "17"
+    },
+    {
+      "col": 20,
+      "letter": "T",
+      "value": "18"
+    },
+    {
+      "col": 21,
+      "letter": "U",
+      "value": "19"
+    },
+    {
+      "col": 22,
+      "letter": "V",
+      "value": "20"
+    },
+    {
+      "col": 23,
+      "letter": "W",
+      "value": "21"
+    },
+    {
+      "col": 24,
+      "letter": "X",
+      "value": "22"
+    },
+    {
+      "col": 25,
+      "letter": "Y",
+      "value": "23"
+    },
+    {
+      "col": 26,
+      "letter": "Z",
+      "value": "24"
+    },
+    {
+      "col": 27,
+      "letter": "AA",
+      "value": "25"
+    },
+    {
+      "col": 28,
+      "letter": "AB",
+      "value": "26"
+    },
+    {
+      "col": 29,
+      "letter": "AC",
+      "value": "27"
+    },
+    {
+      "col": 30,
+      "letter": "AD",
+      "value": "28"
+    },
+    {
+      "col": 31,
+      "letter": "AE",
+      "value": "29"
+    },
+    {
+      "col": 32,
+      "letter": "AF",
+      "value": "30"
+    },
+    {
+      "col": 33,
+      "letter": "AG",
+      "value": "31"
+    },
+    {
+      "col": 34,
+      "letter": "AH",
+      "value": "الإجمالي الشهري"
+    },
+    {
+      "col": 35,
+      "letter": "AI",
+      "value": "الدين الإداري الشهري"
+    },
+    {
+      "col": 36,
+      "letter": "AJ",
+      "value": "مساهمة مضافة"
+    },
+    {
+      "col": 37,
+      "letter": "AK",
+      "value": "المشروع المساهم"
+    },
+    {
+      "col": 38,
+      "letter": "AL",
+      "value": "مساهمة مخصومة"
+    },
+    {
+      "col": 39,
+      "letter": "AM",
+      "value": "صافي الصندوق"
+    },
+    {
+      "col": 40,
+      "letter": "AN",
+      "value": "الدين المسدد"
+    },
+    {
+      "col": 41,
+      "letter": "AO",
+      "value": "الدين المتبقي"
+    }
+  ],
+  "top": [
+    {
+      "cell": "A2",
+      "value": "محصلة الصناديق - شهر  - 2026"
+    },
+    {
+      "cell": "A3",
+      "value": "المشروعات"
+    },
+    {
+      "cell": "B3",
+      "value": "الجمالي التراكمي"
+    },
+    {
+      "cell": "C3",
+      "value": "1"
+    },
+    {
+      "cell": "D3",
+      "value": "2"
+    },
+    {
+      "cell": "E3",
+      "value": "3"
+    },
+    {
+      "cell": "F3",
+      "value": "4"
+    },
+    {
+      "cell": "G3",
+      "value": "5"
+    },
+    {
+      "cell": "H3",
+      "value": "6"
+    },
+    {
+      "cell": "I3",
+      "value": "7"
+    },
+    {
+      "cell": "J3",
+      "value": "8"
+    },
+    {
+      "cell": "K3",
+      "value": "9"
+    },
+    {
+      "cell": "L3",
+      "value": "10"
+    },
+    {
+      "cell": "M3",
+      "value": "11"
+    },
+    {
+      "cell": "N3",
+      "value": "12"
+    },
+    {
+      "cell": "O3",
+      "value": "13"
+    },
+    {
+      "cell": "P3",
+      "value": "14"
+    },
+    {
+      "cell": "Q3",
+      "value": "15"
+    },
+    {
+      "cell": "R3",
+      "value": "16"
+    },
+    {
+      "cell": "S3",
+      "value": "17"
+    },
+    {
+      "cell": "T3",
+      "value": "18"
+    },
+    {
+      "cell": "U3",
+      "value": "19"
+    },
+    {
+      "cell": "V3",
+      "value": "20"
+    },
+    {
+      "cell": "W3",
+      "value": "21"
+    },
+    {
+      "cell": "X3",
+      "value": "22"
+    },
+    {
+      "cell": "Y3",
+      "value": "23"
+    },
+    {
+      "cell": "Z3",
+      "value": "24"
+    },
+    {
+      "cell": "AA3",
+      "value": "25"
+    },
+    {
+      "cell": "AB3",
+      "value": "26"
+    },
+    {
+      "cell": "AC3",
+      "value": "27"
+    },
+    {
+      "cell": "AD3",
+      "value": "28"
+    },
+    {
+      "cell": "AE3",
+      "value": "29"
+    },
+    {
+      "cell": "AF3",
+      "value": "30"
+    },
+    {
+      "cell": "AG3",
+      "value": "31"
+    },
+    {
+      "cell": "AH3",
+      "value": "الإجمالي الشهري"
+    },
+    {
+      "cell": "AI3",
+      "value": "الدين الإداري الشهري"
+    },
+    {
+      "cell": "AJ3",
+      "value": "مساهمة مضافة"
+    },
+    {
+      "cell": "AK3",
+      "value": "المشروع المساهم"
+    },
+    {
+      "cell": "AL3",
+      "value": "مساهمة مخصومة"
+    },
+    {
+      "cell": "AM3",
+      "value": "صافي الصندوق"
+    },
+    {
+      "cell": "AN3",
+      "value": "الدين المسدد"
+    },
+    {
+      "cell": "AO3",
+      "value": "الدين المتبقي"
+    }
+  ],
+  "contribution_samples": [
+    {
+      "row": 4,
+      "name": "تكية اطعام",
+      "AJ_added": null,
+      "AK_project": null,
+      "AL_deducted": 4707
+    },
+    {
+      "row": 9,
+      "name": "سلاس خضروات",
+      "AJ_added": 1756,
+      "AK_project": "تكية اطعام",
+      "AL_deducted": 0
+    },
+    {
+      "row": 10,
+      "name": "مواد تموينية",
+      "AJ_added": 2951,
+      "AK_project": "تكية اطعام",
+      "AL_deducted": 0
+    },
+    {
+      "row": 31,
+      "name": null,
+      "AJ_added": null,
+      "AK_project": null,
+      "AL_deducted": "مجموع الفائض في الصناديق"
+    },
+    {
+      "row": 32,
+      "name": null,
+      "AJ_added": null,
+      "AK_project": null,
+      "AL_deducted": "مجموع العجز في الصناديق"
+    }
+  ],
+  "day_sheet_R_nonzero": [],
+  "adjustment_headers": []
+}

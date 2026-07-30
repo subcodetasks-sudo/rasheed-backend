@@ -1,0 +1,11 @@
+{
+    "name": "DailyJournal",
+    "alias": "dailyjournal",
+    "description": "Daily financial journal for project transactions",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\DailyJournal\\Providers\\DailyJournalServiceProvider"
+    ],
+    "files": []
+}

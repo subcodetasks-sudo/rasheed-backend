@@ -1,0 +1,13 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\MediaLibrary\MediaCollections\Models\Media as BaseMedia;
+
+class Media extends BaseMedia
+{
+    use SoftDeletes;
+    
+    protected $dates = ['deleted_at'];
+}

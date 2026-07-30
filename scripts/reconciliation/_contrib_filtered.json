@@ -1,0 +1,1992 @@
+{
+  "day1_col_R": [
+    {
+      "row": 3,
+      "value": "خصم المساهمة"
+    },
+    {
+      "row": 31,
+      "value": "=SUM(R4:R29)"
+    }
+  ],
+  "day1_T_V": [
+    {
+      "cell": "S3",
+      "value": "الدين الإداري"
+    },
+    {
+      "cell": "S4",
+      "value": "=P4+Q4"
+    }
+  ],
+  "filtered_hits": [
+    {
+      "sheet": "النسبة الادارية",
+      "cell": "D5",
+      "value": "مساهمة نقدي صناديق"
+    },
+    {
+      "sheet": "النسبة الادارية",
+      "cell": "E5",
+      "value": "مساهمة نقدي الافراد"
+    },
+    {
+      "sheet": "النسبة الادارية",
+      "cell": "D37",
+      "value": "=SUBTOTAL(109,Table19[مساهمة نقدي صناديق])"
+    },
+    {
+      "sheet": "النسبة الادارية",
+      "cell": "E37",
+      "value": "=SUBTOTAL(109,Table19[مساهمة نقدي الافراد])"
+    },
+    {
+      "sheet": "النسبة الادارية",
+      "cell": "F45",
+      "value": "=Table21[[#Totals],[الإجمالي الشهري]]"
+    },
+    {
+      "sheet": "النسبة الادارية",
+      "cell": "B47",
+      "value": "صافي النسبة الإدارية الشهري "
+    },
+    {
+      "sheet": "النسبة الادارية",
+      "cell": "B54",
+      "value": "اجمالي النسبة الإدارية الشهرية"
+    },
+    {
+      "sheet": "النسبة التشغيلية",
+      "cell": "A39",
+      "value": "صافي النسية الشهري"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AH3",
+      "value": "الإجمالي الشهري"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AI3",
+      "value": "الدين الإداري الشهري"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AJ3",
+      "value": "مساهمة مضافة"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AK3",
+      "value": "المشروع المساهم"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AL3",
+      "value": "مساهمة مخصومة"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AL4",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AM4",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],["
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AN4",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n  "
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AL5",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AM5",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],["
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AN5",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n  "
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AL6",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AM6",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],["
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AN6",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n  "
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AL7",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AM7",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],["
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AN7",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n  "
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AL8",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AM8",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],["
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AN8",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n  "
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AL9",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AM9",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],["
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AN9",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n  "
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AL10",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AM10",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],["
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AN10",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n  "
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AL11",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AM11",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],["
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AN11",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n  "
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AL12",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AM12",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],["
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AN12",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n  "
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AL13",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AM13",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],["
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AN13",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n  "
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AL14",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AM14",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],["
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AN14",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n  "
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AL15",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AM15",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],["
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AN15",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n  "
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AL16",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AM16",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],["
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AN16",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n  "
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AL17",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AM17",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],["
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AN17",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n  "
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AL18",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AM18",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],["
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AN18",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n  "
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AL19",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AM19",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],["
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AN19",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n  "
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AL20",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AM20",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],["
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AN20",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n  "
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AL21",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AM21",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],["
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AN21",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n  "
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AL22",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AM22",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],["
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AN22",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n  "
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AL23",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AM23",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],["
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AN23",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n  "
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AL24",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AM24",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],["
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AN24",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n  "
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AL25",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AM25",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],["
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AN25",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n  "
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AL26",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AM26",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],["
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AN26",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n  "
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AL27",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AM27",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],["
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AN27",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n  "
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AL28",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AM28",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],["
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AN28",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n  "
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AL29",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AM29",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],["
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AN29",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n  "
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AH30",
+      "value": "=SUBTOTAL(109,Table2[الإجمالي الشهري])"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AI30",
+      "value": "=SUBTOTAL(109,Table2[الدين الإداري الشهري])"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AH42",
+      "value": "الإجمالي الشهري"
+    },
+    {
+      "sheet": "محطة الصندوق",
+      "cell": "AH69",
+      "value": "=SUBTOTAL(109,Table21[الإجمالي الشهري])"
+    },
+    {
+      "sheet": "1",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "1",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    },
+    {
+      "sheet": "2",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "2",
+      "cell": "A30",
+      "value": "مساهمة نقدي الافراد"
+    },
+    {
+      "sheet": "3",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "3",
+      "cell": "A30",
+      "value": "مساهمة نقدي الافراد"
+    },
+    {
+      "sheet": "4",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "4",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    },
+    {
+      "sheet": "5",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "5",
+      "cell": "A30",
+      "value": "مساهمة نقدي الافراد"
+    },
+    {
+      "sheet": "6",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "6",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    },
+    {
+      "sheet": "7",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "7",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    },
+    {
+      "sheet": "8",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "8",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    },
+    {
+      "sheet": "9",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "9",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    },
+    {
+      "sheet": "10",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "10",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    },
+    {
+      "sheet": "11",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "11",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    },
+    {
+      "sheet": "12",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "12",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    },
+    {
+      "sheet": "13",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "13",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    },
+    {
+      "sheet": "14",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "14",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    },
+    {
+      "sheet": "15",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "15",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    },
+    {
+      "sheet": "16",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "16",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    },
+    {
+      "sheet": "17",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "17",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    },
+    {
+      "sheet": "18",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "18",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    },
+    {
+      "sheet": "19",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "19",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    },
+    {
+      "sheet": "20",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "20",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    },
+    {
+      "sheet": "21",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "21",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    },
+    {
+      "sheet": "22",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "22",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    },
+    {
+      "sheet": "23",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "23",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    },
+    {
+      "sheet": "24",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "24",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    },
+    {
+      "sheet": "25",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "25",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    },
+    {
+      "sheet": "25",
+      "cell": "J30",
+      "value": "=Table19[[#This Row],[مساهمة نقدي الافراد]]"
+    },
+    {
+      "sheet": "26",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "26",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    },
+    {
+      "sheet": "27",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "27",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    },
+    {
+      "sheet": "28",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "28",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    },
+    {
+      "sheet": "29",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "29",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    },
+    {
+      "sheet": "30",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "30",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    },
+    {
+      "sheet": "31",
+      "cell": "R3",
+      "value": "خصم المساهمة"
+    },
+    {
+      "sheet": "31",
+      "cell": "A30",
+      "value": "مساهمة نقدي افراد"
+    }
+  ],
+  "station_cells": [
+    {
+      "cell": "A2",
+      "value": "محصلة الصناديق - شهر  - 2026"
+    },
+    {
+      "cell": "A3",
+      "value": "المشروعات"
+    },
+    {
+      "cell": "B3",
+      "value": "الجمالي التراكمي"
+    },
+    {
+      "cell": "C3",
+      "value": "1"
+    },
+    {
+      "cell": "D3",
+      "value": "2"
+    },
+    {
+      "cell": "E3",
+      "value": "3"
+    },
+    {
+      "cell": "F3",
+      "value": "4"
+    },
+    {
+      "cell": "G3",
+      "value": "5"
+    },
+    {
+      "cell": "H3",
+      "value": "6"
+    },
+    {
+      "cell": "I3",
+      "value": "7"
+    },
+    {
+      "cell": "J3",
+      "value": "8"
+    },
+    {
+      "cell": "K3",
+      "value": "9"
+    },
+    {
+      "cell": "L3",
+      "value": "10"
+    },
+    {
+      "cell": "M3",
+      "value": "11"
+    },
+    {
+      "cell": "N3",
+      "value": "12"
+    },
+    {
+      "cell": "O3",
+      "value": "13"
+    },
+    {
+      "cell": "P3",
+      "value": "14"
+    },
+    {
+      "cell": "Q3",
+      "value": "15"
+    },
+    {
+      "cell": "R3",
+      "value": "16"
+    },
+    {
+      "cell": "S3",
+      "value": "17"
+    },
+    {
+      "cell": "T3",
+      "value": "18"
+    },
+    {
+      "cell": "U3",
+      "value": "19"
+    },
+    {
+      "cell": "V3",
+      "value": "20"
+    },
+    {
+      "cell": "W3",
+      "value": "21"
+    },
+    {
+      "cell": "X3",
+      "value": "22"
+    },
+    {
+      "cell": "Y3",
+      "value": "23"
+    },
+    {
+      "cell": "Z3",
+      "value": "24"
+    },
+    {
+      "cell": "AA3",
+      "value": "25"
+    },
+    {
+      "cell": "AB3",
+      "value": "26"
+    },
+    {
+      "cell": "AC3",
+      "value": "27"
+    },
+    {
+      "cell": "AD3",
+      "value": "28"
+    },
+    {
+      "cell": "AE3",
+      "value": "29"
+    },
+    {
+      "cell": "AF3",
+      "value": "30"
+    },
+    {
+      "cell": "AG3",
+      "value": "31"
+    },
+    {
+      "cell": "AH3",
+      "value": "الإجمالي الشهري"
+    },
+    {
+      "cell": "AI3",
+      "value": "الدين الإداري الشهري"
+    },
+    {
+      "cell": "AJ3",
+      "value": "مساهمة مضافة"
+    },
+    {
+      "cell": "AK3",
+      "value": "المشروع المساهم"
+    },
+    {
+      "cell": "AL3",
+      "value": "مساهمة مخصومة"
+    },
+    {
+      "cell": "AM3",
+      "value": "صافي الصندوق"
+    },
+    {
+      "cell": "AN3",
+      "value": "الدين المسدد"
+    },
+    {
+      "cell": "A4",
+      "value": "تكية اطعام"
+    },
+    {
+      "cell": "B4",
+      "value": "5087.199999999997"
+    },
+    {
+      "cell": "C4",
+      "value": "=DataTable[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "D4",
+      "value": "=DataTable8[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "E4",
+      "value": "=DataTable10[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "F4",
+      "value": "=DataTable11[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "G4",
+      "value": "=DataTable13[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "H4",
+      "value": "=DataTable14[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "I4",
+      "value": "=DataTable16[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "J4",
+      "value": "=DataTable17[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "K4",
+      "value": "=DataTable19[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "L4",
+      "value": "=DataTable21[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "M4",
+      "value": "=DataTable23[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "N4",
+      "value": "=DataTable25[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "O4",
+      "value": "=DataTable26[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "P4",
+      "value": "=DataTable28[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "Q4",
+      "value": "=DataTable30[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "R4",
+      "value": "=DataTable31[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "S4",
+      "value": "=DataTable32[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "T4",
+      "value": "=DataTable34[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "U4",
+      "value": "=DataTable35[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "V4",
+      "value": "=DataTable37[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "W4",
+      "value": "=DataTable40[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "X4",
+      "value": "=DataTable42[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "Y4",
+      "value": "=DataTable44[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "Z4",
+      "value": "=DataTable45[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "AA4",
+      "value": "=DataTable46[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "AB4",
+      "value": "=DataTable48[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "AC4",
+      "value": "=DataTable50[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "AD4",
+      "value": "=DataTable51[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "AE4",
+      "value": "=DataTable53[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "AF4",
+      "value": "=DataTable54[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "AG4",
+      "value": "=DataTable55[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "AH4",
+      "value": "=IFERROR(LOOKUP(2,1/(B4:AG4<>0),B4:AG4),0)"
+    },
+    {
+      "cell": "AI4",
+      "value": "=AI43"
+    },
+    {
+      "cell": "AL4",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "cell": "AM4",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],[مساهمة مضافة]]<Table"
+    },
+    {
+      "cell": "AN4",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row]"
+    },
+    {
+      "cell": "A5",
+      "value": "سقيا ماء"
+    },
+    {
+      "cell": "B5",
+      "value": "34045"
+    },
+    {
+      "cell": "C5",
+      "value": "=DataTable[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "D5",
+      "value": "=DataTable8[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "E5",
+      "value": "=DataTable10[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "F5",
+      "value": "=DataTable11[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "G5",
+      "value": "=DataTable13[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "H5",
+      "value": "=DataTable14[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "I5",
+      "value": "=DataTable16[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "J5",
+      "value": "=DataTable17[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "K5",
+      "value": "=DataTable19[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "L5",
+      "value": "=DataTable21[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "M5",
+      "value": "=DataTable23[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "N5",
+      "value": "=DataTable25[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "O5",
+      "value": "=DataTable26[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "P5",
+      "value": "=DataTable28[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "Q5",
+      "value": "=DataTable30[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "R5",
+      "value": "=DataTable31[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "S5",
+      "value": "=DataTable32[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "T5",
+      "value": "=DataTable34[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "U5",
+      "value": "=DataTable35[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "V5",
+      "value": "=DataTable37[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "W5",
+      "value": "=DataTable40[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "X5",
+      "value": "=DataTable42[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "Y5",
+      "value": "=DataTable44[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "Z5",
+      "value": "=DataTable45[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "AA5",
+      "value": "=DataTable46[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "AB5",
+      "value": "=DataTable48[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "AC5",
+      "value": "=DataTable50[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "AD5",
+      "value": "=DataTable51[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "AE5",
+      "value": "=DataTable53[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "AF5",
+      "value": "=DataTable54[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "AG5",
+      "value": "=DataTable55[[#This Row],[صافي الصندوق]]"
+    },
+    {
+      "cell": "AH5",
+      "value": "=IFERROR(LOOKUP(2,1/(B5:AG5<>0),B5:AG5),0)"
+    },
+    {
+      "cell": "AI5",
+      "value": "=AI44"
+    },
+    {
+      "cell": "AL5",
+      "value": "=IFERROR(SUMIF(Table2[المشروع المساهم],Table2[[#This Row],[المشروعات]],Table2[مساهمة مضافة]),0)"
+    },
+    {
+      "cell": "AM5",
+      "value": "=IF(Table2[[#This Row],[مساهمة مضافة]]=0,\n   Table2[[#This Row],[الإجمالي الشهري]]-Table2[[#This Row],[الدين المسدد]]-Table2[[#This Row],[مساهمة مخصومة]],\n  IF(Table2[[#This Row],[مساهمة مضافة]]<Table"
+    },
+    {
+      "cell": "AN5",
+      "value": "=IF(Table2[[#This Row],[الإجمالي الشهري]]>0,\nIF(Table2[[#This Row],[الإجمالي الشهري]]>Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row],[الدين الإداري الشهري]],\n    Table2[[#This Row]"
+    },
+    {
+      "cell": "A6",
+      "value": "رغيف خيري"
+    },
+    {
+      "cell": "B6",
+      "value": "9754"
+    },
+    {
+      "cell": "C6",
+      "value": "=DataTable[[#This Row],[صافي الصندوق]]"
+    }
+  ],
+  "totals_cells": [
+    {
+      "cell": "G1",
+      "value": "لا تنسى اضافة حسابات الشمال على الصندوق"
+    },
+    {
+      "cell": "B2",
+      "value": "جماليات الصندوق الفريق - شهر -2026"
+    },
+    {
+      "cell": "B3",
+      "value": "التاريخ"
+    },
+    {
+      "cell": "C3",
+      "value": "اليوم"
+    },
+    {
+      "cell": "D3",
+      "value": "إيراد الصندوق"
+    },
+    {
+      "cell": "E3",
+      "value": "مصروف الصندوق"
+    },
+    {
+      "cell": "F3",
+      "value": "النسبة الإدارية"
+    },
+    {
+      "cell": "G3",
+      "value": "الخصم التشغيلي"
+    },
+    {
+      "cell": "H3",
+      "value": "فائض أو عجز الصندوق"
+    },
+    {
+      "cell": "B4",
+      "value": "2026-02-01 00:00:00"
+    },
+    {
+      "cell": "C4",
+      "value": "الاحد"
+    },
+    {
+      "cell": "D4",
+      "value": "='1'!$C$31"
+    },
+    {
+      "cell": "E4",
+      "value": "='1'!$D$31"
+    },
+    {
+      "cell": "F4",
+      "value": "='1'!$E$31"
+    },
+    {
+      "cell": "G4",
+      "value": "='1'!$G$31"
+    },
+    {
+      "cell": "H4",
+      "value": "=Table1[[#This Row],[إيراد الصندوق]]-SUM(Table1[[#This Row],[مصروف الصندوق]:[الخصم التشغيلي]])"
+    },
+    {
+      "cell": "B5",
+      "value": "2026-02-02 00:00:00"
+    },
+    {
+      "cell": "C5",
+      "value": "الإثنين"
+    },
+    {
+      "cell": "D5",
+      "value": "='2'!$C$31"
+    },
+    {
+      "cell": "E5",
+      "value": "='2'!$D$31"
+    },
+    {
+      "cell": "F5",
+      "value": "='2'!$E$31"
+    },
+    {
+      "cell": "G5",
+      "value": "='2'!$G$31"
+    },
+    {
+      "cell": "H5",
+      "value": "=Table1[[#This Row],[إيراد الصندوق]]-SUM(Table1[[#This Row],[مصروف الصندوق]:[الخصم التشغيلي]])"
+    },
+    {
+      "cell": "B6",
+      "value": "2026-02-03 00:00:00"
+    },
+    {
+      "cell": "C6",
+      "value": "الثلاثاء"
+    },
+    {
+      "cell": "D6",
+      "value": "='3'!$C$31"
+    },
+    {
+      "cell": "E6",
+      "value": "='3'!$D$31"
+    },
+    {
+      "cell": "F6",
+      "value": "='3'!$E$31"
+    },
+    {
+      "cell": "G6",
+      "value": "='3'!$G$31"
+    },
+    {
+      "cell": "H6",
+      "value": "=Table1[[#This Row],[إيراد الصندوق]]-SUM(Table1[[#This Row],[مصروف الصندوق]:[الخصم التشغيلي]])"
+    },
+    {
+      "cell": "B7",
+      "value": "2026-02-04 00:00:00"
+    },
+    {
+      "cell": "C7",
+      "value": "الأربعاء"
+    },
+    {
+      "cell": "D7",
+      "value": "='4'!$C$31"
+    },
+    {
+      "cell": "E7",
+      "value": "='4'!$D$31"
+    },
+    {
+      "cell": "F7",
+      "value": "='4'!$E$31"
+    },
+    {
+      "cell": "G7",
+      "value": "='4'!$G$31"
+    },
+    {
+      "cell": "H7",
+      "value": "=Table1[[#This Row],[إيراد الصندوق]]-SUM(Table1[[#This Row],[مصروف الصندوق]:[الخصم التشغيلي]])"
+    },
+    {
+      "cell": "B8",
+      "value": "2026-02-05 00:00:00"
+    },
+    {
+      "cell": "C8",
+      "value": "الخميس"
+    },
+    {
+      "cell": "D8",
+      "value": "='5'!$C$31"
+    },
+    {
+      "cell": "E8",
+      "value": "='5'!$D$31"
+    },
+    {
+      "cell": "F8",
+      "value": "='5'!$E$31"
+    },
+    {
+      "cell": "G8",
+      "value": "='5'!$G$31"
+    },
+    {
+      "cell": "H8",
+      "value": "=Table1[[#This Row],[إيراد الصندوق]]-SUM(Table1[[#This Row],[مصروف الصندوق]:[الخصم التشغيلي]])"
+    },
+    {
+      "cell": "B9",
+      "value": "2026-02-06 00:00:00"
+    },
+    {
+      "cell": "C9",
+      "value": "الجمعة"
+    },
+    {
+      "cell": "D9",
+      "value": "='6'!$C$31"
+    },
+    {
+      "cell": "E9",
+      "value": "='6'!$D$31"
+    },
+    {
+      "cell": "F9",
+      "value": "='6'!$E$31"
+    },
+    {
+      "cell": "G9",
+      "value": "='6'!$G$31"
+    },
+    {
+      "cell": "H9",
+      "value": "=Table1[[#This Row],[إيراد الصندوق]]-SUM(Table1[[#This Row],[مصروف الصندوق]:[الخصم التشغيلي]])"
+    },
+    {
+      "cell": "B10",
+      "value": "2026-02-07 00:00:00"
+    },
+    {
+      "cell": "C10",
+      "value": "السبت"
+    },
+    {
+      "cell": "D10",
+      "value": "='7'!$C$31"
+    },
+    {
+      "cell": "E10",
+      "value": "='7'!$D$31"
+    },
+    {
+      "cell": "F10",
+      "value": "='7'!$E$31"
+    },
+    {
+      "cell": "G10",
+      "value": "='7'!$G$31"
+    },
+    {
+      "cell": "H10",
+      "value": "=Table1[[#This Row],[إيراد الصندوق]]-SUM(Table1[[#This Row],[مصروف الصندوق]:[الخصم التشغيلي]])"
+    },
+    {
+      "cell": "B11",
+      "value": "2026-02-08 00:00:00"
+    },
+    {
+      "cell": "C11",
+      "value": "الأحد"
+    },
+    {
+      "cell": "D11",
+      "value": "='8'!$C$31"
+    },
+    {
+      "cell": "E11",
+      "value": "='8'!$D$31"
+    },
+    {
+      "cell": "F11",
+      "value": "='8'!$E$31"
+    },
+    {
+      "cell": "G11",
+      "value": "='8'!$G$31"
+    },
+    {
+      "cell": "H11",
+      "value": "=Table1[[#This Row],[إيراد الصندوق]]-SUM(Table1[[#This Row],[مصروف الصندوق]:[الخصم التشغيلي]])"
+    },
+    {
+      "cell": "B12",
+      "value": "2026-02-09 00:00:00"
+    },
+    {
+      "cell": "C12",
+      "value": "الإثنين"
+    },
+    {
+      "cell": "D12",
+      "value": "='9'!$C$31"
+    },
+    {
+      "cell": "E12",
+      "value": "='9'!$D$31"
+    },
+    {
+      "cell": "F12",
+      "value": "='9'!$E$31"
+    },
+    {
+      "cell": "G12",
+      "value": "='9'!$G$31"
+    },
+    {
+      "cell": "H12",
+      "value": "=Table1[[#This Row],[إيراد الصندوق]]-SUM(Table1[[#This Row],[مصروف الصندوق]:[الخصم التشغيلي]])"
+    },
+    {
+      "cell": "B13",
+      "value": "2026-02-10 00:00:00"
+    },
+    {
+      "cell": "C13",
+      "value": "الثلاثاء"
+    },
+    {
+      "cell": "D13",
+      "value": "='10'!$C$31"
+    },
+    {
+      "cell": "E13",
+      "value": "='10'!$D$31"
+    },
+    {
+      "cell": "F13",
+      "value": "='10'!$E$31"
+    },
+    {
+      "cell": "G13",
+      "value": "='10'!$G$31"
+    },
+    {
+      "cell": "H13",
+      "value": "=Table1[[#This Row],[إيراد الصندوق]]-SUM(Table1[[#This Row],[مصروف الصندوق]:[الخصم التشغيلي]])"
+    },
+    {
+      "cell": "B14",
+      "value": "2026-02-11 00:00:00"
+    },
+    {
+      "cell": "C14",
+      "value": "الأربعاء"
+    },
+    {
+      "cell": "D14",
+      "value": "='11'!C$31"
+    },
+    {
+      "cell": "E14",
+      "value": "='11'!$D$31"
+    },
+    {
+      "cell": "F14",
+      "value": "='11'!E$31"
+    },
+    {
+      "cell": "G14",
+      "value": "='11'!G$31"
+    },
+    {
+      "cell": "H14",
+      "value": "=Table1[[#This Row],[إيراد الصندوق]]-SUM(Table1[[#This Row],[مصروف الصندوق]:[الخصم التشغيلي]])"
+    },
+    {
+      "cell": "B15",
+      "value": "2026-02-12 00:00:00"
+    },
+    {
+      "cell": "C15",
+      "value": "الخميس"
+    },
+    {
+      "cell": "D15",
+      "value": "='12'!C$31"
+    },
+    {
+      "cell": "E15",
+      "value": "='12'!D$31"
+    },
+    {
+      "cell": "F15",
+      "value": "='12'!E$31"
+    },
+    {
+      "cell": "G15",
+      "value": "='12'!G$31"
+    },
+    {
+      "cell": "H15",
+      "value": "=Table1[[#This Row],[إيراد الصندوق]]-SUM(Table1[[#This Row],[مصروف الصندوق]:[الخصم التشغيلي]])"
+    }
+  ],
+  "expenses_cells": [
+    {
+      "cell": "A2",
+      "value": "اليوم"
+    },
+    {
+      "cell": "C2",
+      "value": "التاريخ"
+    },
+    {
+      "cell": "A3",
+      "value": "المشروعات"
+    },
+    {
+      "cell": "B3",
+      "value": "1"
+    },
+    {
+      "cell": "C3",
+      "value": "2"
+    },
+    {
+      "cell": "D3",
+      "value": "3"
+    },
+    {
+      "cell": "E3",
+      "value": "4"
+    },
+    {
+      "cell": "F3",
+      "value": "5"
+    },
+    {
+      "cell": "G3",
+      "value": "6"
+    },
+    {
+      "cell": "H3",
+      "value": "7"
+    },
+    {
+      "cell": "I3",
+      "value": "8"
+    },
+    {
+      "cell": "J3",
+      "value": "9"
+    },
+    {
+      "cell": "K3",
+      "value": "10"
+    },
+    {
+      "cell": "L3",
+      "value": "11"
+    },
+    {
+      "cell": "M3",
+      "value": "12"
+    },
+    {
+      "cell": "N3",
+      "value": "13"
+    },
+    {
+      "cell": "O3",
+      "value": "14"
+    },
+    {
+      "cell": "P3",
+      "value": "15"
+    },
+    {
+      "cell": "Q3",
+      "value": "16"
+    },
+    {
+      "cell": "R3",
+      "value": "17"
+    },
+    {
+      "cell": "S3",
+      "value": "18"
+    },
+    {
+      "cell": "T3",
+      "value": "19"
+    },
+    {
+      "cell": "U3",
+      "value": "20"
+    },
+    {
+      "cell": "V3",
+      "value": "21"
+    },
+    {
+      "cell": "W3",
+      "value": "22"
+    },
+    {
+      "cell": "X3",
+      "value": "23"
+    },
+    {
+      "cell": "Y3",
+      "value": "24"
+    },
+    {
+      "cell": "Z3",
+      "value": "25"
+    },
+    {
+      "cell": "AA3",
+      "value": "26"
+    },
+    {
+      "cell": "AB3",
+      "value": "27"
+    },
+    {
+      "cell": "AC3",
+      "value": "28"
+    },
+    {
+      "cell": "AD3",
+      "value": "29"
+    },
+    {
+      "cell": "AE3",
+      "value": "30"
+    },
+    {
+      "cell": "AF3",
+      "value": "31"
+    },
+    {
+      "cell": "AG3",
+      "value": "الإجمالي"
+    },
+    {
+      "cell": "A4",
+      "value": "تكية اطعام"
+    },
+    {
+      "cell": "B4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(B3)-1)&\"'!D\"&ROW(B3)+1)"
+    },
+    {
+      "cell": "C4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(C3)-1)&\"'!D\"&ROW(C3)+1)"
+    },
+    {
+      "cell": "D4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(D3)-1)&\"'!D\"&ROW(D3)+1)"
+    },
+    {
+      "cell": "E4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(E3)-1)&\"'!D\"&ROW(E3)+1)"
+    },
+    {
+      "cell": "F4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(F3)-1)&\"'!D\"&ROW(F3)+1)"
+    },
+    {
+      "cell": "G4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(G3)-1)&\"'!D\"&ROW(G3)+1)"
+    },
+    {
+      "cell": "H4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(H3)-1)&\"'!D\"&ROW(H3)+1)"
+    },
+    {
+      "cell": "I4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(I3)-1)&\"'!D\"&ROW(I3)+1)"
+    },
+    {
+      "cell": "J4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(J3)-1)&\"'!D\"&ROW(J3)+1)"
+    },
+    {
+      "cell": "K4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(K3)-1)&\"'!D\"&ROW(K3)+1)"
+    },
+    {
+      "cell": "L4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(L3)-1)&\"'!D\"&ROW(L3)+1)"
+    },
+    {
+      "cell": "M4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(M3)-1)&\"'!D\"&ROW(M3)+1)"
+    },
+    {
+      "cell": "N4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(N3)-1)&\"'!D\"&ROW(N3)+1)"
+    },
+    {
+      "cell": "O4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(O3)-1)&\"'!D\"&ROW(O3)+1)"
+    },
+    {
+      "cell": "P4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(P3)-1)&\"'!D\"&ROW(P3)+1)"
+    },
+    {
+      "cell": "Q4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(Q3)-1)&\"'!D\"&ROW(Q3)+1)"
+    },
+    {
+      "cell": "R4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(R3)-1)&\"'!D\"&ROW(R3)+1)"
+    },
+    {
+      "cell": "S4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(S3)-1)&\"'!D\"&ROW(S3)+1)"
+    },
+    {
+      "cell": "T4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(T3)-1)&\"'!D\"&ROW(T3)+1)"
+    },
+    {
+      "cell": "U4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(U3)-1)&\"'!D\"&ROW(U3)+1)"
+    },
+    {
+      "cell": "V4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(V3)-1)&\"'!D\"&ROW(V3)+1)"
+    },
+    {
+      "cell": "W4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(W3)-1)&\"'!D\"&ROW(W3)+1)"
+    },
+    {
+      "cell": "X4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(X3)-1)&\"'!D\"&ROW(X3)+1)"
+    },
+    {
+      "cell": "Y4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(Y3)-1)&\"'!D\"&ROW(Y3)+1)"
+    },
+    {
+      "cell": "Z4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(Z3)-1)&\"'!D\"&ROW(Z3)+1)"
+    },
+    {
+      "cell": "AA4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(AA3)-1)&\"'!D\"&ROW(AA3)+1)"
+    },
+    {
+      "cell": "AB4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(AB3)-1)&\"'!D\"&ROW(AB3)+1)"
+    },
+    {
+      "cell": "AC4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(AC3)-1)&\"'!D\"&ROW(AC3)+1)"
+    },
+    {
+      "cell": "AD4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(AD3)-1)&\"'!D\"&ROW(AD3)+1)"
+    },
+    {
+      "cell": "AE4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(AE3)-1)&\"'!D\"&ROW(AE3)+1)"
+    },
+    {
+      "cell": "AF4",
+      "value": "=INDIRECT(\"'\"&(COLUMN(AF3)-1)&\"'!D\"&ROW(AF3)+1)"
+    },
+    {
+      "cell": "AG4",
+      "value": "=SUM(DataTable38[[#This Row],[1]:[31]])"
+    },
+    {
+      "cell": "A5",
+      "value": "سقيا ماء"
+    },
+    {
+      "cell": "B5",
+      "value": "=INDIRECT(\"'\"&(COLUMN(B4)-1)&\"'!D\"&ROW(B4)+1)"
+    },
+    {
+      "cell": "C5",
+      "value": "=INDIRECT(\"'\"&(COLUMN(C4)-1)&\"'!D\"&ROW(C4)+1)"
+    },
+    {
+      "cell": "D5",
+      "value": "=INDIRECT(\"'\"&(COLUMN(D4)-1)&\"'!D\"&ROW(D4)+1)"
+    },
+    {
+      "cell": "E5",
+      "value": "=INDIRECT(\"'\"&(COLUMN(E4)-1)&\"'!D\"&ROW(E4)+1)"
+    },
+    {
+      "cell": "F5",
+      "value": "=INDIRECT(\"'\"&(COLUMN(F4)-1)&\"'!D\"&ROW(F4)+1)"
+    },
+    {
+      "cell": "G5",
+      "value": "=INDIRECT(\"'\"&(COLUMN(G4)-1)&\"'!D\"&ROW(G4)+1)"
+    },
+    {
+      "cell": "H5",
+      "value": "=INDIRECT(\"'\"&(COLUMN(H4)-1)&\"'!D\"&ROW(H4)+1)"
+    },
+    {
+      "cell": "I5",
+      "value": "=INDIRECT(\"'\"&(COLUMN(I4)-1)&\"'!D\"&ROW(I4)+1)"
+    },
+    {
+      "cell": "J5",
+      "value": "=INDIRECT(\"'\"&(COLUMN(J4)-1)&\"'!D\"&ROW(J4)+1)"
+    },
+    {
+      "cell": "K5",
+      "value": "=INDIRECT(\"'\"&(COLUMN(K4)-1)&\"'!D\"&ROW(K4)+1)"
+    },
+    {
+      "cell": "L5",
+      "value": "=INDIRECT(\"'\"&(COLUMN(L4)-1)&\"'!D\"&ROW(L4)+1)"
+    }
+  ]
+}

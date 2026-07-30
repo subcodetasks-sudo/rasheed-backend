@@ -1,0 +1,9 @@
+{
+    "User": true,
+    "Settings": true,
+    "Authorization": true,
+    "Project": true,
+    "DailyJournal": true,
+    "AdministrationRates": true,
+    "Inventory": true
+}

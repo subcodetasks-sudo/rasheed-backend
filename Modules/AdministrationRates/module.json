@@ -1,0 +1,11 @@
+{
+    "name": "AdministrationRates",
+    "alias": "administrationrates",
+    "description": "Read-only monitoring of administrative percentage, income, and debt",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\AdministrationRates\\Providers\\AdministrationRatesServiceProvider"
+    ],
+    "files": []
+}

@@ -1,0 +1,11 @@
+{
+    "name": "Dashboard",
+    "alias": "dashboard",
+    "description": "Read-only home dashboard financial summary cards",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Dashboard\\Providers\\DashboardServiceProvider"
+    ],
+    "files": []
+}

@@ -1,0 +1,28 @@
+{
+    "name": "nwidart/dailyjournal",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {}
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\DailyJournal\\": "app/",
+            "Modules\\DailyJournal\\Database\\Factories\\": "database/factories/",
+            "Modules\\DailyJournal\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\DailyJournal\\Tests\\": "tests/"
+        }
+    }
+}
