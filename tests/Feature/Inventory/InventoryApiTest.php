@@ -205,7 +205,8 @@ class InventoryApiTest extends InventoryFeatureTestCase
 
         $response->assertCreated()
             ->assertJsonPath('data.type', 'outgoing')
-            ->assertJsonPath('data.total_cost', '30.00'); // 10*2 + 2*5
+            ->assertJsonPath('data.total_cost', '30.00') // 10*2 + 2*5
+            ->assertJsonPath('data.unit_price', '2.50'); // FIFO weighted average 30/12
 
         $consumptions = $response->json('data.consumptions');
         $this->assertCount(2, $consumptions);
@@ -447,5 +448,91 @@ class InventoryApiTest extends InventoryFeatureTestCase
         $this->putJson('/api/v1/inventory/movements/'.$movementId, ['quantity' => 9])->assertNotFound();
         $this->patchJson('/api/v1/inventory/movements/'.$movementId, ['quantity' => 9])->assertNotFound();
         $this->deleteJson('/api/v1/inventory/movements/'.$movementId)->assertNotFound();
+    }
+
+    public function test_list_movements_default_sort_and_summary(): void
+    {
+        $this->actAsInventoryUser();
+        $owner = $this->createActiveProject();
+        $beneficiary = $this->createActiveProject();
+
+        $itemId = $this->postJson('/api/v1/inventory/items', [
+            'name' => 'Paper',
+            'category' => 'office',
+            'project_id' => $owner->id,
+            'unit' => 'ream',
+            'opening_price' => 10,
+            'opening_quantity' => 20,
+        ])->json('data.id');
+
+        $incomingId = $this->postJson('/api/v1/inventory/movements/incoming', [
+            'inventory_item_id' => $itemId,
+            'quantity' => 5,
+            'unit_price' => 12,
+        ])->json('data.id');
+
+        $outgoingId = $this->postJson('/api/v1/inventory/movements/outgoing', [
+            'inventory_item_id' => $itemId,
+            'quantity' => 3,
+            'beneficiary_project_id' => $beneficiary->id,
+            'expense_type' => InventoryExpenseType::Operational->value,
+        ])->json('data.id');
+
+        InventoryMovement::query()->whereKey($incomingId)->update([
+            'movement_date' => now()->subDay()->toDateString(),
+            'created_at' => now()->subDay(),
+        ]);
+
+        $response = $this->getJson('/api/v1/inventory/movements')->assertOk();
+
+        $this->assertSame($outgoingId, $response->json('data.0.id'));
+        $this->assertSame($incomingId, $response->json('data.1.id'));
+        $this->assertSame('60.00', $response->json('summary.total_incoming_value'));
+        $this->assertSame('30.00', $response->json('summary.total_outgoing_value'));
+        $this->assertSame('30.00', $response->json('summary.net_movement_value'));
+    }
+
+    public function test_list_movements_date_range_filter_scopes_rows_and_summary(): void
+    {
+        $this->actAsInventoryUser();
+        $owner = $this->createActiveProject();
+        $beneficiary = $this->createActiveProject();
+
+        $itemId = $this->postJson('/api/v1/inventory/items', [
+            'name' => 'Ink',
+            'category' => 'office',
+            'project_id' => $owner->id,
+            'unit' => 'bottle',
+            'opening_price' => 8,
+            'opening_quantity' => 10,
+        ])->json('data.id');
+
+        $oldIncomingId = $this->postJson('/api/v1/inventory/movements/incoming', [
+            'inventory_item_id' => $itemId,
+            'quantity' => 2,
+            'unit_price' => 10,
+        ])->json('data.id');
+
+        $newOutgoingId = $this->postJson('/api/v1/inventory/movements/outgoing', [
+            'inventory_item_id' => $itemId,
+            'quantity' => 1,
+            'beneficiary_project_id' => $beneficiary->id,
+            'expense_type' => InventoryExpenseType::Administrative->value,
+        ])->json('data.id');
+
+        $oldDate = now()->subDays(3)->toDateString();
+        $today = now()->toDateString();
+
+        InventoryMovement::query()->whereKey($oldIncomingId)->update(['movement_date' => $oldDate]);
+
+        $response = $this->getJson('/api/v1/inventory/movements?filter[movement_date_from]='.$today.'&filter[movement_date_to]='.$today)
+            ->assertOk();
+
+        $ids = collect($response->json('data'))->pluck('id')->all();
+        $this->assertContains($newOutgoingId, $ids);
+        $this->assertNotContains($oldIncomingId, $ids);
+        $this->assertSame('0.00', $response->json('summary.total_incoming_value'));
+        $this->assertSame('8.00', $response->json('summary.total_outgoing_value'));
+        $this->assertSame('-8.00', $response->json('summary.net_movement_value'));
     }
 }

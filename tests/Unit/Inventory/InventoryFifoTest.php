@@ -58,6 +58,7 @@ class InventoryFifoTest extends TestCase
         );
 
         $this->assertSame(30.0, (float) $movement->total_cost);
+        $this->assertSame(2.5, (float) $movement->unit_price);
         $this->assertCount(2, $movement->consumptions);
     }
 }

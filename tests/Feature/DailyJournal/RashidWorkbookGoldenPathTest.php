@@ -102,22 +102,25 @@ class RashidWorkbookGoldenPathTest extends TestCase
             );
         }
 
-        // Full-month AdministrationRates aggregate.
+        // Full-month AdministrationRates aggregate (collected = fee - debt + contribution).
         $expectedTotalIncome = 0.0;
-        $expectedTotalFee = 0.0;
+        $expectedTotalCollected = 0.0;
         foreach ($dates as $date) {
             foreach ($projectDefsByName as $name => $def) {
                 if ($def['administrative_exempt']) {
                     continue;
                 }
-                $expectedTotalIncome += $expectedByDate[$date][$name]['daily_income'];
-                $expectedTotalFee += $expectedByDate[$date][$name]['administrative_fee'];
+                $row = $expectedByDate[$date][$name];
+                $expectedTotalIncome += $row['daily_income'];
+                $expectedTotalCollected += $row['administrative_fee']
+                    - $row['administrative_debt']
+                    + ($row['contribution'] ?? 0);
             }
         }
 
         $rates = app(BuildAdministrationRatesAction::class)->execute(4, 2026);
         $this->assertSame(sprintf('%.2f', $expectedTotalIncome), $rates['monthly_totals']['month_total_income']);
-        $this->assertSame(sprintf('%.2f', $expectedTotalFee), $rates['monthly_totals']['month_total_administrative_percentage']);
+        $this->assertSame(sprintf('%.2f', $expectedTotalCollected), $rates['monthly_totals']['month_total_administrative_percentage']);
 
         // Row-count sanity. +1 project accounts for the synthetic inventory-owner
         // project, which EnsureDailyJournalEntriesForActiveProjectsAction also

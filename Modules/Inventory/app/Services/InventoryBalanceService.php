@@ -19,13 +19,11 @@ class InventoryBalanceService
     }
 
     /**
-     * TODO: trigger notification when a notification module exists.
-     * Do not invent notification infrastructure here.
+     * Low-stock state is read live by the dashboard (`low_stock_items`).
+     * Kept as a hook after balance changes; do not invent a notification module here.
      */
     public function checkMinimumStock(InventoryItem $item): void
     {
-        if ((float) $item->current_balance <= (float) $item->minimum_stock_level) {
-            // TODO: notify when notification module exists
-        }
+        // Intentionally empty — dashboard queries current_balance <= minimum_stock_level.
     }
 }

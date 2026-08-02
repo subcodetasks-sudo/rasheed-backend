@@ -142,21 +142,45 @@ class AdministrationRatesApiTest extends TestCase
         $response = $this->getJson(self::ENDPOINT.'?month=7&year=2026');
         $response->assertOk();
 
-        // Summary: only eligible project
+        // Summary: only eligible project (collected = fee - debt + contribution)
         $this->assertSame('1000.00', $response->json('data.summary.total_institution_income'));
-        $this->assertSame('120.00', $response->json('data.summary.total_administrative_percentage'));
+        $this->assertSame('70.00', $response->json('data.summary.total_administrative_percentage'));
         $this->assertSame('50.00', $response->json('data.summary.total_administrative_debt'));
 
         // Monthly totals: same
         $this->assertSame('1000.00', $response->json('data.monthly_totals.month_total_income'));
-        $this->assertSame('120.00', $response->json('data.monthly_totals.month_total_administrative_percentage'));
+        $this->assertSame('70.00', $response->json('data.monthly_totals.month_total_administrative_percentage'));
         $this->assertSame('50.00', $response->json('data.monthly_totals.month_total_administrative_debt'));
 
         // Day 15 should have eligible data only
         $day15 = collect($response->json('data.daily_records'))->firstWhere('date', '2026-07-15');
         $this->assertSame('1000.00', $day15['total_income']);
-        $this->assertSame('120.00', $day15['administrative_percentage']);
+        $this->assertSame('70.00', $day15['administrative_percentage']);
         $this->assertSame('50.00', $day15['administrative_debt']);
+    }
+
+    public function test_contribution_inside_debt_does_not_reduce_collected_percentage(): void
+    {
+        $this->actAs('finance');
+        $project = $this->createProject();
+
+        // fee 120, debt 80 (= 50 fee-consumption + 30 contribution) → collected 70
+        $this->seedEntry($project->id, '2026-07-15', [
+            'daily_income' => 1000,
+            'contribution' => 30,
+            'administrative_fee' => 120,
+            'administrative_debt' => 80,
+        ]);
+
+        $response = $this->getJson(self::ENDPOINT.'?month=7&year=2026');
+        $response->assertOk();
+
+        $this->assertSame('70.00', $response->json('data.summary.total_administrative_percentage'));
+        $this->assertSame('70.00', $response->json('data.monthly_totals.month_total_administrative_percentage'));
+
+        $day15 = collect($response->json('data.daily_records'))->firstWhere('date', '2026-07-15');
+        $this->assertSame('70.00', $day15['administrative_percentage']);
+        $this->assertSame('80.00', $day15['administrative_debt']);
     }
 
     // ---------------------------------------------------------------
@@ -222,14 +246,14 @@ class AdministrationRatesApiTest extends TestCase
         $response = $this->getJson(self::ENDPOINT.'?month=7&year=2026');
         $response->assertOk();
 
-        // All-time: 2000 + 500
+        // All-time collected: (240-100) + (60-20) = 180
         $this->assertSame('2500.00', $response->json('data.summary.total_institution_income'));
-        $this->assertSame('300.00', $response->json('data.summary.total_administrative_percentage'));
+        $this->assertSame('180.00', $response->json('data.summary.total_administrative_percentage'));
         $this->assertSame('120.00', $response->json('data.summary.total_administrative_debt'));
 
-        // Monthly: only July
+        // Monthly: only July collected = 60 - 20
         $this->assertSame('500.00', $response->json('data.monthly_totals.month_total_income'));
-        $this->assertSame('60.00', $response->json('data.monthly_totals.month_total_administrative_percentage'));
+        $this->assertSame('40.00', $response->json('data.monthly_totals.month_total_administrative_percentage'));
         $this->assertSame('20.00', $response->json('data.monthly_totals.month_total_administrative_debt'));
     }
 

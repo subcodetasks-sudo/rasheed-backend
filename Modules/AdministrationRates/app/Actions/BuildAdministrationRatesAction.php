@@ -46,7 +46,7 @@ class BuildAdministrationRatesAction
     {
         $row = $this->eligibleBaseQuery()
             ->selectRaw('COALESCE(SUM(COALESCE(daily_journal_entries.daily_income, 0)), 0) as total_institution_income')
-            ->selectRaw('COALESCE(SUM(COALESCE(daily_journal_entries.administrative_fee, 0)), 0) as total_administrative_percentage')
+            ->selectRaw('COALESCE(SUM(COALESCE(daily_journal_entries.administrative_fee, 0) - COALESCE(daily_journal_entries.administrative_debt, 0) + COALESCE(daily_journal_entries.contribution, 0)), 0) as total_administrative_percentage')
             ->selectRaw('COALESCE(SUM(COALESCE(daily_journal_entries.administrative_debt, 0)), 0) as total_administrative_debt')
             ->first();
 
@@ -68,7 +68,7 @@ class BuildAdministrationRatesAction
             ->groupBy('daily_journal_entries.journal_date')
             ->selectRaw('daily_journal_entries.journal_date as date')
             ->selectRaw('COALESCE(SUM(COALESCE(daily_journal_entries.daily_income, 0)), 0) as total_income')
-            ->selectRaw('COALESCE(SUM(COALESCE(daily_journal_entries.administrative_fee, 0)), 0) as administrative_percentage')
+            ->selectRaw('COALESCE(SUM(COALESCE(daily_journal_entries.administrative_fee, 0) - COALESCE(daily_journal_entries.administrative_debt, 0) + COALESCE(daily_journal_entries.contribution, 0)), 0) as administrative_percentage')
             ->selectRaw('COALESCE(SUM(COALESCE(daily_journal_entries.administrative_debt, 0)), 0) as administrative_debt')
             ->get();
 

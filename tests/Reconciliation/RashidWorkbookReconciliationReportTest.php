@@ -176,7 +176,7 @@ class RashidWorkbookReconciliationReportTest extends TestCase
     {
         $calculator = new ExpectedDailyJournalCalculator;
         $totalIncome = 0.0;
-        $totalFee = 0.0;
+        $totalCollected = 0.0;
 
         foreach ($dailyIncomeExpense as $incomeExpenseForDay) {
             $expectedForDay = $calculator->computeDay($projectDefsByName, $incomeExpenseForDay);
@@ -186,14 +186,17 @@ class RashidWorkbookReconciliationReportTest extends TestCase
                     continue;
                 }
 
-                $totalIncome += $expectedForDay[$name]['daily_income'];
-                $totalFee += $expectedForDay[$name]['administrative_fee'];
+                $row = $expectedForDay[$name];
+                $totalIncome += $row['daily_income'];
+                $totalCollected += $row['administrative_fee']
+                    - $row['administrative_debt']
+                    + ($row['contribution'] ?? 0);
             }
         }
 
         return [
             'total_income' => round($totalIncome, 2),
-            'total_administrative_fee' => round($totalFee, 2),
+            'total_administrative_fee' => round($totalCollected, 2),
         ];
     }
 

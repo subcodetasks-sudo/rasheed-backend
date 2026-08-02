@@ -12,8 +12,15 @@ class ListInventoryMovementsController extends Controller
 {
     public function __invoke(ListInventoryMovementsRequest $request, ListInventoryMovementsWorkflow $workflow): JsonResponse
     {
-        $movements = $workflow->handle($request);
+        $result = $workflow->handle($request);
 
-        return $this->paginated($movements, InventoryMovementResource::class, __('messages.inventory_movements_fetched_successfully'));
+        return $this->successResponse(
+            __('messages.inventory_movements_fetched_successfully'),
+            InventoryMovementResource::collection(collect($result['movements']->items())),
+            extra: array_merge(
+                $this->paginationPayload($result['movements']),
+                ['summary' => $result['summary']],
+            ),
+        );
     }
 }

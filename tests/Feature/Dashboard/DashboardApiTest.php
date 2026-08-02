@@ -5,6 +5,7 @@ namespace Tests\Feature\Dashboard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Modules\DailyJournal\Models\DailyJournalEntry;
+use Modules\Inventory\Models\InventoryItem;
 use Modules\Project\Enums\OperationalDeductionType;
 use Modules\Project\Enums\ProjectStatus;
 use Modules\Project\Models\Project;
@@ -258,7 +259,7 @@ class DashboardApiTest extends TestCase
         $this->assertSame('8.00', $second->json('data.total_operational_deduction'));
     }
 
-    public function test_response_contains_only_the_four_specified_fields(): void
+    public function test_response_contains_only_the_specified_fields(): void
     {
         $this->actAs('finance');
 
@@ -271,10 +272,50 @@ class DashboardApiTest extends TestCase
                 'total_daily_expenses',
                 'total_administrative_percentage',
                 'total_operational_deduction',
+                'low_stock_items',
             ],
             array_keys($data)
         );
+        $this->assertIsArray($response->json('data.low_stock_items'));
         $this->assertTrue($response->json('success'));
         $this->assertIsString($response->json('message'));
+    }
+
+    public function test_low_stock_items_appear_when_balance_at_or_below_minimum(): void
+    {
+        $this->actAs('finance');
+
+        $project = $this->createProject();
+
+        $low = InventoryItem::factory()->create([
+            'project_id' => $project->id,
+            'name' => 'Low stock item',
+            'opening_quantity' => 2,
+            'total_incoming_quantity' => 0,
+            'total_outgoing_quantity' => 0,
+            'current_balance' => 2,
+            'minimum_stock_level' => 5,
+        ]);
+
+        InventoryItem::factory()->create([
+            'project_id' => $project->id,
+            'name' => 'Healthy stock item',
+            'opening_quantity' => 20,
+            'total_incoming_quantity' => 0,
+            'total_outgoing_quantity' => 0,
+            'current_balance' => 20,
+            'minimum_stock_level' => 5,
+        ]);
+
+        $response = $this->getJson(self::ENDPOINT)->assertOk();
+        $items = collect($response->json('data.low_stock_items'));
+
+        $this->assertTrue($items->contains(fn (array $row) => $row['id'] === $low->id));
+        $this->assertFalse($items->contains(fn (array $row) => $row['name'] === 'Healthy stock item'));
+
+        $matched = $items->firstWhere('id', $low->id);
+        $this->assertSame('2.00', $matched['current_balance']);
+        $this->assertSame('5.00', $matched['minimum_stock_level']);
+        $this->assertSame($project->id, $matched['project_id']);
     }
 }

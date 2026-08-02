@@ -137,11 +137,13 @@ class InventoryFifoService
                 throw new BusinessException(__('messages.inventory_insufficient_stock'), 422);
             }
 
+            $unitPrice = $quantity > 0 ? round($totalCost / $quantity, 2) : 0.0;
+
             $movement = InventoryMovement::query()->create([
                 'inventory_item_id' => $item->id,
                 'type' => InventoryMovementType::Outgoing,
                 'quantity' => $quantity,
-                'unit_price' => null,
+                'unit_price' => $unitPrice,
                 'total_cost' => $totalCost,
                 'beneficiary_project_id' => $beneficiaryProjectId,
                 'expense_type' => $expenseType,
