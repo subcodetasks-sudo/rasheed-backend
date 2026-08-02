@@ -26,11 +26,20 @@ Unique key per row: `(project_id, journal_date)`. Only **Active** projects are a
 
 ## Core equations
 
-### 1. Administrative fee (from Project)
+### 1. Administrative fee (from Project + Settings)
 ```
 if project.administrative_exempt → 0
-else → round(daily_income × (administrative_fee_percentage / 100), 2)
+else → round(daily_income × (effective_admin_fee_percentage / 100), 2)
 ```
+
+Percentage = **effective** `admin_fee_percentage` for the journal date (not the live settings value,
+and not the project's stored snapshot used only for display / create-time copy).
+
+Settings changes are scheduled for the **next calendar day** via `administrative_fee_rates`.
+Each change also pins a row for the current day holding the percentage that was already in force, so the new
+value cannot reach today even if the open-ended history row is later re-seeded.
+Resolve: latest rate where `effective_from <= journal_date` (default **12.00** if none).
+A mid-day settings update never affects today or earlier dates; recalculation of a historical journal uses the percentage that was effective on that date.
 
 ### 2. Operational deduction (from Project + Settings)
 Pool = **effective** `total_operational_deduction` for the journal date (not the live settings value).

@@ -10,6 +10,7 @@ class UpdateProjectFinancialSettingsAction
         private readonly SettingService $settingService,
         private readonly GetProjectFinancialSettingsAction $getProjectFinancialSettingsAction,
         private readonly ScheduleOperationalDeductionChangeAction $scheduleOperationalDeductionChangeAction,
+        private readonly ScheduleAdminFeePercentageChangeAction $scheduleAdminFeePercentageChangeAction,
     ) {}
 
     /**
@@ -24,6 +25,10 @@ class UpdateProjectFinancialSettingsAction
                 $data['admin_fee_percentage'],
                 'decimal',
                 true
+            );
+
+            $this->scheduleAdminFeePercentageChangeAction->execute(
+                (float) $data['admin_fee_percentage']
             );
         }
 

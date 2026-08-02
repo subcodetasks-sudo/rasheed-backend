@@ -390,6 +390,13 @@ ENUMS_DOC = """
 - A mid-day change never affects **today** or earlier dates; the new amount applies from the **next calendar day** only.
 - Recalculating a historical journal still uses the pool that was effective on that journal date.
 
+## Administrative fee percentage effective date
+- Changing `admin_fee_percentage` (Settings or Financial Settings) updates the **configured** value immediately for GET/UI.
+- Journal / admin-fee **calculations** use the percentage effective for the journal date from `administrative_fee_rates`.
+- A mid-day change never affects **today** or earlier dates; the new percentage applies from the **next calendar day** only.
+- Recalculating a historical journal still uses the percentage that was effective on that journal date.
+- Project `administrative_fee_percentage` remains a create-time display snapshot; calculation uses the effective global rate (exempt projects still pay 0).
+
 ## Base URL
 `{{base_url}}` → e.g. `http://localhost:8000/api/v1` or XAMPP public path + `/api/v1`
 """
@@ -401,6 +408,15 @@ OP_DEDUCTION_EFFECTIVE_DATE_NOTE = (
     "(scheduled via `operational_deduction_rates`).\n"
     "A change on day D never affects journals for D or earlier; the new amount starts on **D+1**.\n"
     "Same-day re-edits only replace the scheduled D+1 rate. Historical recalc keeps the original effective pool."
+)
+
+ADMIN_FEE_EFFECTIVE_DATE_NOTE = (
+    "### Administrative fee percentage effective date\n"
+    "Changing `admin_fee_percentage` stores the new **configured** value immediately (shown on GET).\n"
+    "Daily Journal / admin-fee math uses the **effective** percentage for the journal date "
+    "(scheduled via `administrative_fee_rates`).\n"
+    "A change on day D never affects journals for D or earlier; the new percentage starts on **D+1**.\n"
+    "Same-day re-edits only replace the scheduled D+1 rate. Historical recalc keeps the original effective percentage."
 )
 
 
@@ -853,6 +869,8 @@ def settings_update() -> dict:
             "- admin_fee_percentage: numeric 0–100\n"
             "- total_operational_deduction: numeric > 0\n\n"
             + OP_DEDUCTION_EFFECTIVE_DATE_NOTE
+            + "\n\n"
+            + ADMIN_FEE_EFFECTIVE_DATE_NOTE
         ),
         roles=["super-admin"],
         enums="`type`: string | integer | boolean | json | decimal",
@@ -883,6 +901,8 @@ def settings_bulk() -> dict:
         description=(
             "Update multiple settings at once.\n\n"
             + OP_DEDUCTION_EFFECTIVE_DATE_NOTE
+            + "\n\n"
+            + ADMIN_FEE_EFFECTIVE_DATE_NOTE
         ),
         roles=["super-admin"],
         enums="`settings.*.type`: string | integer | boolean | json | decimal",
@@ -1194,9 +1214,10 @@ def financial_settings_show() -> dict:
         description=(
             "Global financial settings used by projects/journals "
             "(`admin_fee_percentage`, `total_operational_deduction`).\n"
-            "`total_operational_deduction` here is the **configured** value (may differ from today's "
-            "effective journal pool until the next calendar day).\n\n"
+            "Configured values here may differ from today's effective journal rates until the next calendar day.\n\n"
             + OP_DEDUCTION_EFFECTIVE_DATE_NOTE
+            + "\n\n"
+            + ADMIN_FEE_EFFECTIVE_DATE_NOTE
         ),
         roles=["super-admin", "finance"],
         responses=[
@@ -1227,6 +1248,8 @@ def financial_settings_update() -> dict:
             "- admin_fee_percentage: 0–100\n"
             "- total_operational_deduction: > 0\n\n"
             + OP_DEDUCTION_EFFECTIVE_DATE_NOTE
+            + "\n\n"
+            + ADMIN_FEE_EFFECTIVE_DATE_NOTE
         ),
         roles=["super-admin"],
         body=body,
@@ -2006,6 +2029,272 @@ def administration_rates_show() -> dict:
     )
 
 
+# --- Cash Station ---
+
+SAMPLE_CASH_STATION_PROJECT = {
+    "project_id": 1,
+    "project_name": "تكية اطعام",
+    "previous_monthly_total": "0.00",
+    "monthly_total": "1000.00",
+    "administrative_debt": "40.00",
+    "added_contribution": "0.00",
+    "deducted_contribution": "400.00",
+    "net_cash_fund": "600.00",
+    "remaining_administrative_debt": "40.00",
+    "status": None,
+}
+
+SAMPLE_CASH_STATION_PAYLOAD = {
+    "month": {"month": 7, "year": 2026},
+    "carried_forward_from_previous": False,
+    "summary": {
+        "total_monthly_surplus": "600.00",
+        "total_monthly_deficit": "100.00",
+        "administrative_debts": "40.00",
+        "net_cash_funds": "500.00",
+        "monthly_revenue": "1500.00",
+        "monthly_expenses": "300.00",
+        "total_administrative_percentage": "140.00",
+        "total_operational_deduction": "60.00",
+        "net_month": "1000.00",
+    },
+    "projects": [SAMPLE_CASH_STATION_PROJECT],
+    "settlements": [
+        {
+            "id": 1,
+            "year": 2026,
+            "month": 7,
+            "from_project_id": 1,
+            "to_project_id": 2,
+            "amount": "400.00",
+        }
+    ],
+}
+
+CASH_STATION_MONTH_ENUMS = (
+    "`month`: integer 1–12 (required)\n"
+    "`year`: integer 2000–2100 (required)\n\n"
+    "Monthly Total = SUM(daily_income) − SUM(administrative_fee) − SUM(operational_deduction) − SUM(daily_expense).\n"
+    "Previous Monthly Total is 0 until the prior month is explicitly carried forward.\n"
+    "After carry-forward, Previous = live Monthly Total of the prior month (not Net Cash Fund).\n"
+    "Net Cash Fund = Previous Monthly Total + Monthly Total + Added Contribution − Deducted Contribution.\n"
+    "Settlements never enter next month's opening. Net Cash Fund is never carried.\n"
+    "Does not recalculate Daily Journal math; reuses persisted journal fields only.\n"
+    "`status` is a placeholder (`null`) until product rules are defined."
+)
+
+
+def cash_station_show() -> dict:
+    path = "cash-station"
+    query = [
+        {"key": "month", "value": "7", "description": "Required. Month 1-12"},
+        {"key": "year", "value": "2026", "description": "Required. Year 2000-2100"},
+    ]
+    original = {"method": "GET", "header": header(), "url": url(path, query)}
+    return req(
+        "Show Cash Station",
+        "GET",
+        path,
+        description=(
+            "Monthly financial monitoring for all active projects: summary cards, project rows, "
+            "and settlement records for the selected month. Opening balance requires an explicit "
+            "carry-forward of the prior month; carried amounts are always live-recomputed from DJ."
+        ),
+        roles=["super-admin", "finance"],
+        enums=CASH_STATION_MONTH_ENUMS,
+        query=query,
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok("Cash station fetched successfully.", SAMPLE_CASH_STATION_PAYLOAD),
+                original_request=original,
+            ),
+            example(
+                "422 Validation Error",
+                422,
+                {
+                    "message": "The given data was invalid.",
+                    "errors": {
+                        "month": ["The month field is required."],
+                        "year": ["The year field is required."],
+                    },
+                },
+                original_request=original,
+            ),
+            *std_auth_errors(original, include_validation=True),
+        ],
+    )
+
+
+def cash_station_carry_forward() -> dict:
+    path = "cash-station/carry-forward"
+    body = {"month": 7, "year": 2026}
+    original = {"method": "POST", "header": header(json_body=True), "body": body_raw(body), "url": url(path)}
+    carried_payload = {
+        **SAMPLE_CASH_STATION_PAYLOAD,
+        "month": {"month": 8, "year": 2026},
+        "carried_forward_from_previous": True,
+        "projects": [
+            {
+                **SAMPLE_CASH_STATION_PROJECT,
+                "previous_monthly_total": "1000.00",
+                "monthly_total": "250.00",
+                "added_contribution": "0.00",
+                "deducted_contribution": "0.00",
+                "net_cash_fund": "1250.00",
+            }
+        ],
+        "settlements": [],
+    }
+    return req(
+        "Carry Forward Month",
+        "POST",
+        path,
+        description=(
+            "Explicit carry-forward of the source month's Monthly Total into the next month's "
+            "Previous Monthly Total. Idempotent. Does **not** close the month or carry Net Cash Fund. "
+            "Response returns the **target** (next) month Cash Station payload."
+        ),
+        roles=["super-admin", "finance"],
+        enums=(
+            "`month` / `year`: source month being carried (required).\n"
+            "Only Monthly Total is carried. Net Cash Fund is never carried."
+        ),
+        body=body,
+        json_body=True,
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok("Cash station month carried forward successfully.", carried_payload),
+                original_request=original,
+            ),
+            *std_auth_errors(original, include_validation=True),
+        ],
+    )
+
+
+def cash_station_settlement_create() -> dict:
+    path = "cash-station/settlements"
+    body = {
+        "month": 7,
+        "year": 2026,
+        "from_project_id": 1,
+        "to_project_id": 2,
+        "amount": 400,
+    }
+    original = {"method": "POST", "header": header(json_body=True), "body": body_raw(body), "url": url(path)}
+    return req(
+        "Create Settlement",
+        "POST",
+        path,
+        description=(
+            "Create a surplus→deficit settlement transfer for a month. "
+            "Affects Added/Deducted Contribution and Net Cash Fund only; never Monthly Total or Previous. "
+            "From-project must have available transferable surplus; amount cannot exceed that surplus."
+        ),
+        roles=["super-admin", "finance"],
+        enums=(
+            "`month` / `year`: settlement month (required).\n"
+            "`from_project_id`: contributor project with available surplus (required, must differ from `to_project_id`).\n"
+            "`to_project_id`: receiver project (required).\n"
+            "`amount`: positive decimal (required, gt:0, ≤ transferable surplus).\n"
+            "Transferable = max(0, Previous + Monthly Total + Added − Deducted) before this settlement."
+        ),
+        body=body,
+        json_body=True,
+        responses=[
+            example(
+                "201 Created",
+                201,
+                ok("Cash station settlement created successfully.", SAMPLE_CASH_STATION_PAYLOAD),
+                original_request=original,
+            ),
+            example(
+                "422 Validation Error",
+                422,
+                {
+                    "message": "The given data was invalid.",
+                    "errors": {
+                        "from_project_id": ["The from project id and to project id must be different."],
+                        "amount": ["The amount field must be greater than 0."],
+                    },
+                },
+                original_request=original,
+            ),
+            example(
+                "422 No surplus available",
+                422,
+                {
+                    "success": False,
+                    "message": "Settlements can only transfer funds from a project with available surplus.",
+                },
+                original_request=original,
+            ),
+            example(
+                "422 Exceeds transferable balance",
+                422,
+                {
+                    "success": False,
+                    "message": "The settlement amount exceeds the project's available transferable surplus.",
+                },
+                original_request=original,
+            ),
+            *std_auth_errors(original, include_validation=True),
+        ],
+    )
+
+
+def cash_station_settlement_delete() -> dict:
+    path = "cash-station/settlements/{{settlement_id}}"
+    original = {"method": "DELETE", "header": header(), "url": url(path)}
+    deleted_payload = {
+        **SAMPLE_CASH_STATION_PAYLOAD,
+        "projects": [
+            {
+                **SAMPLE_CASH_STATION_PROJECT,
+                "added_contribution": "0.00",
+                "deducted_contribution": "0.00",
+                "net_cash_fund": "1000.00",
+            }
+        ],
+        "settlements": [],
+    }
+    return req(
+        "Delete Settlement",
+        "DELETE",
+        path,
+        description="Delete a settlement by id. Response returns the updated Cash Station payload for that settlement's month.",
+        roles=["super-admin", "finance"],
+        enums="`settlement_id`: path param (cash_station_settlements.id).",
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok("Cash station settlement deleted successfully.", deleted_payload),
+                original_request=original,
+            ),
+            example(
+                "404 Not Found",
+                404,
+                {"success": False, "message": "Cash station settlement not found."},
+                original_request=original,
+            ),
+            *std_auth_errors(original, include_not_found=True),
+        ],
+    )
+
+
+def cash_station_folder_items() -> list:
+    return [
+        cash_station_show(),
+        cash_station_carry_forward(),
+        cash_station_settlement_create(),
+        cash_station_settlement_delete(),
+    ]
+
+
 # --- Media ---
 
 def media_upload() -> dict:
@@ -2205,6 +2494,7 @@ def build() -> dict:
                 "Administration Rates",
                 [administration_rates_show()],
             ),
+            folder("Cash Station", cash_station_folder_items()),
             folder("Inventory", inventory_folder_items()),
         ],
         description=(
@@ -2235,10 +2525,12 @@ def build() -> dict:
                 "Administration Rates",
                 [administration_rates_show()],
             ),
+            folder("Cash Station", cash_station_folder_items()),
         ],
         description=(
             "**Allowed:** list/show projects & categories, financial settings GET, "
-            "calculate deductions, daily journal CRUD, administration rates.\n\n"
+            "calculate deductions, daily journal CRUD, administration rates, cash station "
+            "(show / carry-forward / settlements).\n\n"
             "**Denied (403):** create/update/delete projects & categories, update financial settings, "
             "inventory module, user/role/settings admin endpoints."
         ),
@@ -2285,6 +2577,7 @@ def build() -> dict:
             ),
             folder("Daily Journal", [journal_show(), journal_save(), journal_update(), journal_repay_debt()]),
             folder("Administration Rates", [administration_rates_show()]),
+            folder("Cash Station", cash_station_folder_items()),
             folder("Inventory", inventory_folder_items()),
             folder("Media", [media_upload(), media_show(), media_download(), media_delete()]),
         ],
@@ -2320,6 +2613,7 @@ def build() -> dict:
             {"key": "category_id", "value": "1"},
             {"key": "project_id", "value": "1"},
             {"key": "inventory_item_id", "value": "1"},
+            {"key": "settlement_id", "value": "1"},
             {"key": "media_id", "value": "1"},
             {"key": "setting_key", "value": "admin_fee_percentage"},
         ],

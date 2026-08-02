@@ -142,10 +142,13 @@ class DailyJournalCalculationService
      */
     public function applyAdministrativeFees(Collection $entries): Collection
     {
+        $journalDate = $entries->first()?->journal_date ?? now();
+
         foreach ($entries as $entry) {
             $entry->administrative_fee = $this->administrativeDeductionService->calculate(
                 $entry->project,
-                $entry->incomeAmount()
+                $entry->incomeAmount(),
+                $journalDate,
             );
         }
 

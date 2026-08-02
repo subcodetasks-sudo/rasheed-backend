@@ -6,7 +6,6 @@ use Modules\Project\Enums\FundType;
 use Modules\Project\Enums\OperationalDeductionType;
 use Modules\Project\Enums\ProjectStatus;
 use Modules\Project\Models\Project;
-use Modules\Project\Services\AdministrativeDeductionService;
 use Modules\Settings\app\Models\Setting;
 use Modules\Settings\Services\SettingService;
 
@@ -77,11 +76,6 @@ class AdministrativeFeePercentageSnapshotTest extends ProjectFeatureTestCase
 
         $this->assertEquals(12.0, (float) $projectA->administrative_fee_percentage);
         $this->assertEquals(15.0, (float) $projectB->administrative_fee_percentage);
-
-        $service = new AdministrativeDeductionService;
-
-        $this->assertEquals(120.0, $service->calculate($projectA, 1000));
-        $this->assertEquals(150.0, $service->calculate($projectB, 1000));
     }
 
     public function test_editing_project_does_not_overwrite_stored_admin_fee_percentage(): void

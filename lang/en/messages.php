@@ -66,4 +66,12 @@ return [
     'inventory_item_not_found' => 'Inventory item not found.',
     'inventory_beneficiary_project_not_found' => 'The beneficiary project was not found.',
     'inventory_insufficient_stock' => 'Requested quantity exceeds available inventory stock.',
+    'cash_station_fetched_successfully' => 'Cash station fetched successfully.',
+    'cash_station_carried_forward_successfully' => 'Cash station month carried forward successfully.',
+    'cash_station_settlement_created_successfully' => 'Cash station settlement created successfully.',
+    'cash_station_settlement_deleted_successfully' => 'Cash station settlement deleted successfully.',
+    'cash_station_settlement_not_found' => 'Cash station settlement not found.',
+    'cash_station_settlement_self_transfer_not_allowed' => 'A settlement cannot transfer funds from a project to itself.',
+    'cash_station_settlement_requires_surplus' => 'Settlements can only transfer funds from a project with available surplus.',
+    'cash_station_settlement_exceeds_transferable_balance' => 'The settlement amount exceeds the project\'s available transferable surplus.',
 ];

@@ -66,4 +66,12 @@ return [
     'inventory_item_not_found' => 'صنف المخزون غير موجود.',
     'inventory_beneficiary_project_not_found' => 'مشروع المستفيد غير موجود.',
     'inventory_insufficient_stock' => 'الكمية المطلوبة تتجاوز الرصيد المتاح في المخزون.',
+    'cash_station_fetched_successfully' => 'تم جلب محطة الصندوق بنجاح.',
+    'cash_station_carried_forward_successfully' => 'تم ترحيل شهر محطة الصندوق بنجاح.',
+    'cash_station_settlement_created_successfully' => 'تم إنشاء تسوية محطة الصندوق بنجاح.',
+    'cash_station_settlement_deleted_successfully' => 'تم حذف تسوية محطة الصندوق بنجاح.',
+    'cash_station_settlement_not_found' => 'تسوية محطة الصندوق غير موجودة.',
+    'cash_station_settlement_self_transfer_not_allowed' => 'لا يمكن للتسوية تحويل الأموال من مشروع إلى نفسه.',
+    'cash_station_settlement_requires_surplus' => 'لا يمكن إجراء التسوية إلا من مشروع لديه فائض متاح.',
+    'cash_station_settlement_exceeds_transferable_balance' => 'مبلغ التسوية يتجاوز الفائض القابل للتحويل للمشروع.',
 ];

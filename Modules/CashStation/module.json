@@ -1,0 +1,11 @@
+{
+    "name": "CashStation",
+    "alias": "cashstation",
+    "description": "Monthly financial aggregation, carry-forward, and inter-project settlements",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\CashStation\\Providers\\CashStationServiceProvider"
+    ],
+    "files": []
+}

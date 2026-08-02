@@ -6,5 +6,6 @@
     "DailyJournal": true,
     "AdministrationRates": true,
     "Inventory": true,
-    "Dashboard": true
+    "Dashboard": true,
+    "CashStation": true
 }

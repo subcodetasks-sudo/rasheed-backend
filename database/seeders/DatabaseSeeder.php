@@ -23,7 +23,7 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $superAdminRole = Role::firstOrCreate(
-            ['name' => 'super-admin', 'guard_name' => 'web']
+            ['name' => 'super-admin', 'guard_name' => 'api']
         );
 
         $admin = User::firstOrCreate(
