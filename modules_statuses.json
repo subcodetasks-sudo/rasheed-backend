@@ -7,5 +7,7 @@
     "AdministrationRates": true,
     "Inventory": true,
     "Dashboard": true,
-    "CashStation": true
+    "CashStation": true,
+    "Notifications": true,
+    "AdministrativeDebtSettlement": true
 }

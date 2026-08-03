@@ -5,14 +5,14 @@ namespace Modules\DailyJournal\Events;
 use Carbon\CarbonInterface;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
 use Modules\DailyJournal\Http\Resources\DailyJournalEntryResource;
 use Modules\DailyJournal\Models\DailyJournalEntry;
 
-class DailyJournalUpdated implements ShouldBroadcast
+class DailyJournalUpdated implements ShouldBroadcastNow
 {
     use Dispatchable;
     use InteractsWithSockets;

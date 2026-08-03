@@ -397,6 +397,21 @@ ENUMS_DOC = """
 - Recalculating a historical journal still uses the percentage that was effective on that journal date.
 - Project `administrative_fee_percentage` remains a create-time display snapshot; calculation uses the effective global rate (exempt projects still pay 0).
 
+## Realtime (Socket.IO)
+- Transport: Socket.IO only (no Pusher). Node sidecar: `realtime/` (`npm start`). Frontend: `socket.io-client`.
+- Prod `https` → **WSS** (TLS at reverse proxy); local `http` → WS.
+- Handshake: connect with `auth: { token: <Sanctum PAT> }`. Server validates via `GET /api/v1/realtime/auth`.
+- Client emits `join` / `leave` for rooms. Notifications are **socket-only** (no notification REST CRUD).
+- Rooms / events:
+  - `notifications` → `notification.created`
+  - `daily-journals.{Y-m-d}` → `daily-journal.updated`
+  - `cash-station.{YYYY}-{MM}` → `cash-station.updated`
+  - `administrative-debt-settlements.{YYYY}-{MM}` → `administrative-debt-settlements.updated`
+  - `inventory` → `inventory.item-created`, `inventory.stock-moved`
+  - `projects.{id}` → (reserved for project payloads)
+- Env (Laravel): `BROADCAST_CONNECTION=socketio`, `SOCKET_IO_URL`, `SOCKET_IO_PATH`, `SOCKET_IO_SECRET`
+- Env (realtime/): `PORT`, `LARAVEL_URL`, `SOCKET_IO_SECRET` (must match), `CORS_ORIGIN`
+
 ## Base URL
 `{{base_url}}` → e.g. `http://localhost:8000/api/v1` or XAMPP public path + `/api/v1`
 """
@@ -495,6 +510,41 @@ def logout_item() -> dict:
         roles=["super-admin", "finance", "inventory", "any authenticated"],
         responses=[
             example("200 OK", 200, ok("Logged out successfully"), original_request=original),
+            *std_auth_errors(original, include_forbidden=False),
+        ],
+    )
+
+
+def realtime_auth_item() -> dict:
+    path = "realtime/auth"
+    original = {"method": "GET", "header": header(auth=True), "url": url(path)}
+    return req(
+        "Realtime Auth (Socket.IO handshake)",
+        "GET",
+        path,
+        description=(
+            "Any authenticated Sanctum user. Used by the Node Socket.IO sidecar to validate "
+            "`auth.token` on connect. Returns user uuid / roles. "
+            "**Not** a notifications CRUD endpoint — notifications are delivered only over Socket.IO "
+            "(`notifications` room, event `notification.created`). "
+            "See collection docs for rooms/events and `SOCKET_IO_*` env."
+        ),
+        roles=["super-admin", "finance", "inventory", "any authenticated"],
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok(
+                    "Realtime authentication successful.",
+                    {
+                        "id": None,
+                        "uuid": "user-uuid",
+                        "full_name": "Finance User",
+                        "roles": ["finance"],
+                    },
+                ),
+                original_request=original,
+            ),
             *std_auth_errors(original, include_forbidden=False),
         ],
     )
@@ -2048,15 +2098,15 @@ SAMPLE_CASH_STATION_PAYLOAD = {
     "month": {"month": 7, "year": 2026},
     "carried_forward_from_previous": False,
     "summary": {
-        "total_monthly_surplus": "600.00",
-        "total_monthly_deficit": "100.00",
+        "total_monthly_surplus": "1000.00",
+        "total_monthly_deficit": "500.00",
         "administrative_debts": "40.00",
         "net_cash_funds": "500.00",
         "monthly_revenue": "1500.00",
         "monthly_expenses": "300.00",
         "total_administrative_percentage": "140.00",
         "total_operational_deduction": "60.00",
-        "net_month": "1000.00",
+        "net_month": "500.00",
     },
     "projects": [SAMPLE_CASH_STATION_PROJECT],
     "settlements": [
@@ -2074,13 +2124,20 @@ SAMPLE_CASH_STATION_PAYLOAD = {
 CASH_STATION_MONTH_ENUMS = (
     "`month`: integer 1–12 (required)\n"
     "`year`: integer 2000–2100 (required)\n\n"
-    "Monthly Total = SUM(daily_income) − SUM(administrative_fee) − SUM(operational_deduction) − SUM(daily_expense).\n"
+    "Monthly Total = SUM(daily_income) − collected administrative percentage − SUM(operational_deduction) − SUM(daily_expense).\n"
+    "Collected administrative percentage (non-exempt only) = SUM(administrative_fee − administrative_debt + contribution).\n"
+    "Unpaid administrative percentage remains Administrative Debt only and is never deducted from Monthly Total / Net Monthly Result.\n"
     "Previous Monthly Total is 0 until the prior month is explicitly carried forward.\n"
     "After carry-forward, Previous = live Monthly Total of the prior month (not Net Cash Fund).\n"
     "Net Cash Fund = Previous Monthly Total + Monthly Total + Added Contribution − Deducted Contribution.\n"
+    "summary.total_monthly_surplus = Σ positive Monthly Totals (before settlements / carry-forward).\n"
+    "summary.total_monthly_deficit = Σ |negative Monthly Totals| (before settlements / carry-forward).\n"
+    "Settlements do not change surplus, deficit, or net_month; they only move Added/Deducted Contribution and Net Cash Fund.\n"
+    "summary.total_administrative_percentage = same collected intake used in Monthly Total.\n"
     "Settlements never enter next month's opening. Net Cash Fund is never carried.\n"
     "Does not recalculate Daily Journal math; reuses persisted journal fields only.\n"
-    "`status` is a placeholder (`null`) until product rules are defined."
+    "`remaining_administrative_debt` = originating accumulated debt − Administrative Debt Settlement debt allocations through the month.\n"
+    "`status` = Cash Box Status from Net Cash Fund: `surplus` | `deficit` | `balanced`."
 )
 
 
@@ -2295,6 +2352,123 @@ def cash_station_folder_items() -> list:
     ]
 
 
+# --- Administrative Debt Settlement ---
+
+SAMPLE_ADS_PROJECT = {
+    "project_id": 1,
+    "project_name": "مشروع أ",
+    "net_cash_balance": "500.00",
+    "administrative_debt": "120.00",
+    "recoverable_amount": "120.00",
+    "remaining_debt": "120.00",
+    "settlement_status": "unpaid",
+    "can_settle": True,
+}
+
+SAMPLE_ADS_PAYLOAD = {
+    "month": {"month": 7, "year": 2026},
+    "projects": [SAMPLE_ADS_PROJECT],
+}
+
+ADS_ENUMS = (
+    "`month`: integer 1–12 (required)\n"
+    "`year`: integer 2000–2100 (required)\n\n"
+    "Lists **only** projects with remaining Administrative Debt > 0 for the month.\n"
+    "Table columns only: project_id/name, net_cash_balance, administrative_debt, "
+    "recoverable_amount, remaining_debt, settlement_status, can_settle.\n"
+    "Surplus / Recoverable Amount uses Cash Station `net_cash_fund` (max(0, …)), not Daily Journal `fund_balance`.\n"
+    "Administrative Debt = month-end accumulated − module debt settlements through the month.\n"
+    "Recoverable Amount = min(debt, available surplus after cash-box reservation). "
+    "Available surplus = max(0, net_cash_fund) − Σ prior ADS settlements this month/project "
+    "(Net Cash itself is not mutated).\n"
+    "Remaining Debt = unpaid outstanding Administrative Debt (same as administrative_debt on the row).\n"
+    "`settlement_status`: unpaid | partial | paid.\n"
+    "`can_settle`: true when surplus capacity and recoverable amount are both > 0.\n"
+    "Realtime: room `administrative-debt-settlements.{YYYY}-{MM}` → `administrative-debt-settlements.updated`."
+)
+
+
+def administrative_debt_settlements_list() -> dict:
+    path = "administrative-debt-settlements"
+    query = [
+        {"key": "month", "value": "7", "description": "Required. Month 1-12"},
+        {"key": "year", "value": "2026", "description": "Required. Year 2000-2100"},
+    ]
+    original = {"method": "GET", "header": header(), "url": url(path, query)}
+    return req(
+        "List Administrative Debt Settlements",
+        "GET",
+        path,
+        description=(
+            "Month table of projects with outstanding administrative debt and surplus-based "
+            "recoverable amounts. Reuses Cash Station nets; does not recompute monthly math."
+        ),
+        roles=["super-admin", "finance"],
+        enums=ADS_ENUMS,
+        query=query,
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok("Administrative debt settlements fetched successfully.", SAMPLE_ADS_PAYLOAD),
+                original_request=original,
+            ),
+            *std_auth_errors(original, include_validation=True),
+        ],
+    )
+
+
+def administrative_debt_settlement_create() -> dict:
+    path = "administrative-debt-settlements"
+    body = {"year": 2026, "month": 7, "project_id": 1, "amount": 50}
+    original = {"method": "POST", "header": header(json_body=True), "body": body_raw(body), "url": url(path)}
+    return req(
+        "Execute Administrative Debt Settlement",
+        "POST",
+        path,
+        description=(
+            "Recover project administrative debt from month Net Cash surplus capacity. "
+            "Credits org Administrative Percentage Balance. Does not mutate Net Cash, "
+            "Cash Station settlements, or journal fund_balance. "
+            "`amount` optional (defaults to full recoverable)."
+        ),
+        roles=["super-admin", "finance"],
+        enums=(
+            "`year` / `month`: settlement month (required).\n"
+            "`project_id`: indebted project (required).\n"
+            "`amount`: optional positive decimal ≤ debt and ≤ surplus; omit for full recoverable.\n"
+            "Requires debt > 0 and net_cash_fund > 0."
+        ),
+        body=body,
+        json_body=True,
+        responses=[
+            example(
+                "201 Created",
+                201,
+                ok("Administrative debt settlement created successfully.", SAMPLE_ADS_PAYLOAD),
+                original_request=original,
+            ),
+            example(
+                "422 Requires surplus",
+                422,
+                {
+                    "success": False,
+                    "message": "Administrative debt settlement requires a positive Net Cash surplus for the project.",
+                },
+                original_request=original,
+            ),
+            *std_auth_errors(original, include_validation=True),
+        ],
+    )
+
+
+def administrative_debt_settlement_folder_items() -> list:
+    return [
+        administrative_debt_settlements_list(),
+        administrative_debt_settlement_create(),
+    ]
+
+
 # --- Media ---
 
 def media_upload() -> dict:
@@ -2432,8 +2606,12 @@ def build() -> dict:
             login_item("Login as Inventory", "inventory_user", role="inventory"),
             refresh_item(),
             logout_item(),
+            realtime_auth_item(),
         ],
-        description="Run a Login request first to populate `{{token}}`. Switch roles by re-logging in.",
+        description=(
+            "Run a Login request first to populate `{{token}}`. Switch roles by re-logging in. "
+            "Realtime Auth validates the token for the Socket.IO sidecar (`realtime/`)."
+        ),
     )
 
     public_folder = folder(
@@ -2495,6 +2673,7 @@ def build() -> dict:
                 [administration_rates_show()],
             ),
             folder("Cash Station", cash_station_folder_items()),
+            folder("Administrative Debt Settlement", administrative_debt_settlement_folder_items()),
             folder("Inventory", inventory_folder_items()),
         ],
         description=(
@@ -2526,11 +2705,12 @@ def build() -> dict:
                 [administration_rates_show()],
             ),
             folder("Cash Station", cash_station_folder_items()),
+            folder("Administrative Debt Settlement", administrative_debt_settlement_folder_items()),
         ],
         description=(
             "**Allowed:** list/show projects & categories, financial settings GET, "
             "calculate deductions, daily journal CRUD, administration rates, cash station "
-            "(show / carry-forward / settlements).\n\n"
+            "(show / carry-forward / settlements), administrative debt settlement.\n\n"
             "**Denied (403):** create/update/delete projects & categories, update financial settings, "
             "inventory module, user/role/settings admin endpoints."
         ),
@@ -2555,7 +2735,7 @@ def build() -> dict:
     by_module = folder(
         "06. All Endpoints by Module (index)",
         [
-            folder("Auth", [login_item("Login", "super_admin", role="super-admin"), refresh_item(), logout_item(), auth_users_list(), auth_users_create(), auth_users_update(), auth_users_delete()]),
+            folder("Auth", [login_item("Login", "super_admin", role="super-admin"), refresh_item(), logout_item(), realtime_auth_item(), auth_users_list(), auth_users_create(), auth_users_update(), auth_users_delete()]),
             folder("Authorization", [roles_list(), authz_users_list(), authz_users_update(), authz_users_delete(), authz_users_status()]),
             folder("Settings", [settings_list(), settings_update(), settings_bulk()]),
             folder("Categories", [categories_list(), categories_create(), categories_update(), categories_delete()]),
@@ -2578,6 +2758,7 @@ def build() -> dict:
             folder("Daily Journal", [journal_show(), journal_save(), journal_update(), journal_repay_debt()]),
             folder("Administration Rates", [administration_rates_show()]),
             folder("Cash Station", cash_station_folder_items()),
+            folder("Administrative Debt Settlement", administrative_debt_settlement_folder_items()),
             folder("Inventory", inventory_folder_items()),
             folder("Media", [media_upload(), media_show(), media_download(), media_delete()]),
         ],
@@ -2596,6 +2777,9 @@ def build() -> dict:
                 "2. Run **Login as …** under Auth to store Bearer `token`.\n"
                 "3. Open the folder matching the role you logged in as.\n"
                 "4. Each request includes saved example responses for success and error statuses.\n"
+                "5. For live updates: start `realtime/` (`npm start`), set Laravel "
+                "`BROADCAST_CONNECTION=socketio`, then use `socket.io-client` with the Sanctum token. "
+                "Call **Realtime Auth** to verify handshake. Notifications have **no REST CRUD**.\n"
             ),
             "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
         },
@@ -2616,6 +2800,7 @@ def build() -> dict:
             {"key": "settlement_id", "value": "1"},
             {"key": "media_id", "value": "1"},
             {"key": "setting_key", "value": "admin_fee_percentage"},
+            {"key": "socket_io_url", "value": "http://127.0.0.1:3001"},
         ],
         "item": [
             reference,

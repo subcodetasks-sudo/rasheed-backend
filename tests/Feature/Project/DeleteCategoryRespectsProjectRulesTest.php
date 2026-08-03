@@ -10,21 +10,49 @@ use Modules\Project\Models\Project;
 
 class DeleteCategoryRespectsProjectRulesTest extends ProjectFeatureTestCase
 {
-    public function test_cannot_delete_category_when_project_has_journal_entries(): void
+    public function test_cannot_delete_category_when_project_has_journal_financial_history(): void
     {
         $this->actAsSuperAdmin();
 
         $category = Category::factory()->create();
         $project = Project::factory()->create(['category_id' => $category->id]);
-        DailyJournalEntry::factory()->create(['project_id' => $project->id]);
+        DailyJournalEntry::factory()->create([
+            'project_id' => $project->id,
+            'administrative_debt' => 25,
+            'accumulated_administrative_debt' => 25,
+        ]);
 
         $this->deleteJson("/api/v1/categories/{$category->id}")
             ->assertStatus(422)
             ->assertJsonPath('success', false)
-            ->assertJsonPath('message', __('messages.project_has_journal_entries'));
+            ->assertJsonPath('message', __('messages.project_has_journal_financial_history'));
 
         $this->assertDatabaseHas('categories', ['id' => $category->id]);
         $this->assertDatabaseHas('projects', ['id' => $project->id]);
+    }
+
+    public function test_can_delete_category_when_project_only_has_zero_journal_placeholders(): void
+    {
+        $this->actAsSuperAdmin();
+
+        $category = Category::factory()->create();
+        $project = Project::factory()->create(['category_id' => $category->id]);
+        DailyJournalEntry::factory()->create([
+            'project_id' => $project->id,
+            'administrative_debt' => 0,
+            'accumulated_administrative_debt' => 0,
+            'fund_balance' => 0,
+            'administrative_fee' => 0,
+            'administrative_expense' => 0,
+            'contribution' => 0,
+        ]);
+
+        $this->deleteJson("/api/v1/categories/{$category->id}")
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertDatabaseMissing('categories', ['id' => $category->id]);
+        $this->assertDatabaseMissing('projects', ['id' => $project->id]);
     }
 
     public function test_cannot_delete_category_when_any_project_is_blocked_and_nothing_is_deleted(): void

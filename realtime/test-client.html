@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Rashid Socket.IO Test</title>
+  <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+    input, button { font-size: 1rem; padding: 0.5rem; margin: 0.25rem 0; }
+    input[type=text] { width: 100%; box-sizing: border-box; }
+    #log { background: #111; color: #0f0; padding: 1rem; height: 320px; overflow: auto; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Rashid Socket.IO Test</h1>
+  <label>Sanctum token</label>
+  <input id="token" type="text" placeholder="Paste Bearer token from Login" />
+  <div>
+    <button id="connect">Connect</button>
+    <button id="join" disabled>Join notifications + inventory</button>
+  </div>
+  <pre id="log"></pre>
+  <script>
+    const logEl = document.getElementById('log');
+    const log = (msg) => { logEl.textContent += msg + '\n'; logEl.scrollTop = logEl.scrollHeight; };
+    let socket;
+
+    document.getElementById('connect').onclick = () => {
+      const token = document.getElementById('token').value.trim();
+      if (!token) { log('Paste a token first'); return; }
+      if (socket) socket.disconnect();
+
+      socket = io('http://127.0.0.1:3001', {
+        path: '/socket.io',
+        auth: { token },
+        transports: ['websocket', 'polling'],
+      });
+
+      socket.on('connect', () => {
+        log('CONNECTED id=' + socket.id);
+        document.getElementById('join').disabled = false;
+      });
+      socket.on('connect_error', (err) => log('CONNECT ERROR: ' + err.message));
+      socket.on('disconnect', (reason) => log('DISCONNECTED: ' + reason));
+
+      ['notification.created', 'inventory.item-created', 'inventory.stock-moved', 'daily-journal.updated', 'cash-station.updated', 'administrative-debt-settlements.updated']
+        .forEach((event) => socket.on(event, (payload) => log(event + ' => ' + JSON.stringify(payload, null, 2))));
+    };
+
+    document.getElementById('join').onclick = () => {
+      if (!socket) return;
+      socket.emit('join', 'notifications', (ack) => log('join notifications => ' + JSON.stringify(ack)));
+      socket.emit('join', 'inventory', (ack) => log('join inventory => ' + JSON.stringify(ack)));
+    };
+  </script>
+</body>
+</html>

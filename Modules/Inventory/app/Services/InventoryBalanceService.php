@@ -3,9 +3,14 @@
 namespace Modules\Inventory\Services;
 
 use Modules\Inventory\Models\InventoryItem;
+use Modules\Notifications\Support\NotificationRuleRegistry;
 
 class InventoryBalanceService
 {
+    public function __construct(
+        private readonly NotificationRuleRegistry $notificationRuleRegistry,
+    ) {}
+
     public function recompute(InventoryItem $item): InventoryItem
     {
         $item->current_balance = round(
@@ -19,11 +24,12 @@ class InventoryBalanceService
     }
 
     /**
-     * Low-stock state is read live by the dashboard (`low_stock_items`).
-     * Kept as a hook after balance changes; do not invent a notification module here.
+     * Evaluate tagged stock notification rules after balance changes.
      */
-    public function checkMinimumStock(InventoryItem $item): void
+    public function checkMinimumStock(InventoryItem $item, ?float $previousBalance = null): void
     {
-        // Intentionally empty — dashboard queries current_balance <= minimum_stock_level.
+        $this->notificationRuleRegistry->evaluate('inventory.stock', $item, [
+            'previous_balance' => $previousBalance,
+        ]);
     }
 }

@@ -2,11 +2,17 @@
 
 namespace Modules\CashStation\Actions;
 
+use Modules\CashStation\Events\CashStationSettlementDeleted;
+use Modules\CashStation\Events\CashStationUpdated;
 use Modules\CashStation\Models\CashStationSettlement;
 use Modules\Project\Exceptions\BusinessException;
 
 class DeleteCashStationSettlementAction
 {
+    public function __construct(
+        private readonly BuildCashStationAction $buildCashStationAction,
+    ) {}
+
     /**
      * @return array{year: int, month: int}
      */
@@ -22,6 +28,13 @@ class DeleteCashStationSettlementAction
         $month = $settlement->month;
 
         $settlement->delete();
+
+        CashStationSettlementDeleted::dispatch($settlementId, $year, $month);
+        CashStationUpdated::dispatch(
+            $year,
+            $month,
+            $this->buildCashStationAction->execute($month, $year),
+        );
 
         return [
             'year' => $year,

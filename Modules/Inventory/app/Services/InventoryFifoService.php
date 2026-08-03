@@ -70,13 +70,14 @@ class InventoryFifoService
             'received_at' => now(),
         ]);
 
+        $previousBalance = (float) $item->current_balance;
         $item->total_incoming_quantity = round((float) $item->total_incoming_quantity + $quantity, 2);
         $item->latest_incoming_price = $unitPrice;
         $this->balanceService->recompute($item);
         $item->updated_by = $createdBy;
         $item->save();
 
-        $this->balanceService->checkMinimumStock($item);
+        $this->balanceService->checkMinimumStock($item, $previousBalance);
 
         return $movement->fresh(['item', 'creator']);
     }
@@ -162,12 +163,13 @@ class InventoryFifoService
                 ]);
             }
 
+            $previousBalance = (float) $item->current_balance;
             $item->total_outgoing_quantity = round((float) $item->total_outgoing_quantity + $quantity, 2);
             $this->balanceService->recompute($item);
             $item->updated_by = $createdBy;
             $item->save();
 
-            $this->balanceService->checkMinimumStock($item);
+            $this->balanceService->checkMinimumStock($item, $previousBalance);
 
             return $movement->fresh(['item', 'beneficiaryProject', 'consumptions', 'creator']);
         });

@@ -57,4 +57,25 @@ abstract class DailyJournalFeatureTestCase extends TestCase
     {
         return Category::factory()->create($attributes);
     }
+
+    /**
+     * Seed org Administrative Percentage Balance by recording fees on a donor project.
+     * Default 12% fee on 10_000 income ⇒ 1_200 available (minus any existing debits).
+     */
+    protected function seedAdminPercentageBalance(float $income = 10000.0, ?string $journalDate = null): Project
+    {
+        $donor = $this->createActiveProject([
+            'name' => 'Admin Fee Donor '.uniqid(),
+            'operational_deduction_type' => OperationalDeductionType::Exempt,
+            'administrative_exempt' => false,
+            'administrative_fee_percentage' => 12,
+        ]);
+
+        $this->putJson('/api/v1/daily-journals', [
+            'journal_date' => $journalDate ?? now()->subDays(2)->toDateString(),
+            'entries' => [['project_id' => $donor->id, 'daily_income' => $income]],
+        ])->assertOk();
+
+        return $donor;
+    }
 }

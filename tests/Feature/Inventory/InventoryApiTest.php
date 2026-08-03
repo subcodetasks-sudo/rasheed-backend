@@ -8,6 +8,7 @@ use Modules\Inventory\Models\InventoryBatch;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryMovement;
 use Modules\Project\Enums\OperationalDeductionType;
+use Modules\Project\Models\AdministrativeFeeRate;
 use Spatie\Permission\Models\Role;
 
 class InventoryApiTest extends InventoryFeatureTestCase
@@ -132,6 +133,11 @@ class InventoryApiTest extends InventoryFeatureTestCase
 
     public function test_incoming_does_not_affect_daily_journal_financials(): void
     {
+        AdministrativeFeeRate::query()->create([
+            'percentage' => 10,
+            'effective_from' => now()->subDay()->toDateString(),
+        ]);
+
         $this->actAsSuperAdmin();
         Role::findOrCreate('inventory', 'web');
         $user = auth()->user();
@@ -289,6 +295,11 @@ class InventoryApiTest extends InventoryFeatureTestCase
 
     public function test_administrative_expense_exceeding_fee_creates_case2_debt(): void
     {
+        AdministrativeFeeRate::query()->create([
+            'percentage' => 10,
+            'effective_from' => now()->subDay()->toDateString(),
+        ]);
+
         $this->actAsSuperAdmin();
         Role::findOrCreate('inventory', 'web');
         auth()->user()->assignRole('inventory');

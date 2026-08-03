@@ -9,7 +9,7 @@ modular monolith built on `nwidart/laravel-modules`: all domain code lives under
 thin cross-cutting concerns (base controller, media handling, exception handler, generic query helpers).
 
 Active modules (see `modules_statuses.json`): `User`, `Authorization`, `Settings`, `Project`, `DailyJournal`,
-`AdministrationRates`, `Inventory`.
+`AdministrationRates`, `Inventory`, `Dashboard`, `CashStation`, `Notifications`, `AdministrativeDebtSettlement`.
 
 ## Common commands
 
@@ -246,6 +246,75 @@ Read-only reporting module (`ShowAdministrationRatesController` → `BuildAdmini
 daily records for a given month (zero-filled for days with no entries), and monthly totals. It reuses
 `Modules\Project\Actions\Project\ResolveAdminFeePercentageAction` for the current admin-fee percentage — there is no
 persistence of its own beyond that read.
+
+### CashStation: derived monthly cash-position ledger
+
+`CashStation` has no controller-driven writes of its own for the numbers it displays — `BuildCashStationAction`
+recomputes a whole month's view on demand by aggregating `daily_journal_entries` (revenue, expenses, admin
+percentage collected net of debt, operational deduction) per active project, plus that project's
+`accumulated_administrative_debt` as of month-end, minus whatever has already been recovered via
+`AdministrativeDebtSettlement` for that project/month. The only things actually persisted in this module are
+**settlements** (`CashStationSettlement`: a manual surplus transfer from one project to another within a month, via
+`StoreCashStationSettlementController → StoreCashStationSettlementWorkflow`, validated by
+`ValidateCashStationSettlementAction` against `BuildCashStationAction::transferableBalance()`) and **month
+carries** (`CashStationMonthCarry`, via `CarryForwardCashStationController → CarryForwardCashStationWorkflow`,
+which chain a month's ending position into the next month's `previous_monthly_total`). Because the view is
+recomputed rather than stored, `Notifications`' `RefreshCashStationOnDailyJournalUpdate` listener re-broadcasts
+`CashStationUpdated` (walking forward through any `CashStationMonthCarry` chain) whenever `DailyJournalUpdated`
+fires, so open frontend sessions stay in sync without polling.
+
+### AdministrativeDebtSettlement: recovering unpaid admin-fee debt
+
+A project that can't pay its full `administrative_fee` on a given day accrues `accumulated_administrative_debt`
+(see `EQUATIONS.md`). `AdministrativeDebtSettlement` (`StoreAdministrativeDebtSettlementController →
+StoreAdministrativeDebtSettlementWorkflow`) lets that debt be recovered later out of a project's monthly surplus:
+`ValidateAdministrativeDebtSettlementAction` computes how much of the current-month and carried-forward debt can be
+allocated, `CreateAdministrativeDebtSettlementAction` persists the settlement with that snapshot, and — for the
+allocated portion only — `Modules\DailyJournal\Services\AdministrativePercentageBalanceService::creditFromDebtSettlement()`
+permanently credits the org-wide **Administrative Percentage Balance** pool (`admin_percentage_balance_credits`/
+`admin_percentage_balance_debits`, see `EQUATIONS.md` "Administrative Percentage Balance"). This is deliberately
+separate from the day-level `POST /daily-journals/repay-debt` flow: settlement-based recovery does **not** touch
+Net Cash or `fund_balance`, it only affects the shared admin-percentage pool. The workflow re-dispatches
+`CashStationUpdated` afterward since settling debt changes `remaining_administrative_debt` in the CashStation view.
+
+### Notifications: activity feed + cross-module reactions
+
+`Notifications` is a passive subscriber module: its `EventServiceProvider` (registered explicitly from
+`NotificationsServiceProvider::boot()`, not via Laravel's auto-discovery — `$shouldDiscoverEvents = false`) listens
+for domain events from `Project`, `DailyJournal`, `Inventory`, and `CashStation` and reacts two ways:
+1. **User-facing activity records** — `NotifyProjectActivity`, `NotifyDailyJournalActivity`,
+   `NotifyInventoryActivity`, `NotifyCashStationActivity` each translate one module's events into a persisted
+   `Notification` row via `NotificationService` (`notifyActivity`/`notifySuccess`/`notifyWarning`/`notifyDanger`/
+   `notifyInfo`), which also dispatches `NotificationCreated` for real-time delivery.
+2. **Cross-module cache/view refresh** — `RefreshCashStationOnDailyJournalUpdate` and
+   `RefreshAdministrativeDebtSettlementOnDailyJournalUpdate` rebuild and re-broadcast those other modules' derived
+   views whenever `DailyJournal` changes, so `CashStation`/`AdministrativeDebtSettlement` don't need direct
+   knowledge of `DailyJournal`'s write path.
+
+Separately, `Modules\Notifications\Contracts\NotificationRule` + `NotificationRuleRegistry` is a second, unrelated
+extension point: a rule declares which `context` string it `handles()` and is `evaluate()`-d against a subject
+(e.g. `InventoryStockNotificationRule` for low-stock warnings). Unlike `Project`'s deletion-constraint registry
+(container-tagged, open for any module to extend), this registry is a hardcoded list built in
+`NotificationsServiceProvider::register()` — add new rules there, not via tagging.
+
+### Realtime updates: Socket.IO broadcasting
+
+Live updates ride Laravel's native broadcasting (`ShouldBroadcastNow` events — `DailyJournalUpdated`,
+`CashStationUpdated`, `AdministrativeDebtSettlementUpdated`, `InventoryItemCreated`, `InventoryStockMoved`,
+`NotificationCreated`) over a **custom `socketio` broadcast driver**, not Pusher/Reverb/Ably. The driver
+(`App\Broadcasting\SocketIoBroadcaster`, registered via `Broadcast::extend('socketio', ...)` in
+`AppServiceProvider::boot()`) doesn't hold a persistent connection to clients itself — on each `broadcast()` call it
+opens a short-lived Socket.IO client connection (via `elephantio/elephant.io`, configured in `config/broadcasting.php`)
+to an external Node.js sidecar server (source in `realtime/`, not part of the PHP app) and emits a
+`server:broadcast` event carrying `{rooms, event, payload}`, authenticated with a shared `SOCKET_IO_SECRET`. The
+sidecar is what actually holds client WebSocket connections and fans the event out to whichever rooms (channel
+names, `private-`/`presence-` prefixes stripped) are subscribed. `App\Services\Broadcast\BroadcastService::emit()`
+is a thin imperative wrapper around the same `Broadcast::connection()->broadcast()` call for one-off emits outside
+of an event class; it also handles the `null`/`log` driver cases (used in tests/local dev, see `.env.example`).
+`GET /v1/realtime/auth` (`App\Http\Controllers\Api\RealtimeAuthController`, `routes/api.php`) is the handshake
+endpoint the sidecar calls to validate a client's Sanctum bearer token before admitting its socket connection —
+`SocketIoBroadcaster::auth()` itself rejects any `private-`/`presence-` channel outright, so real per-user/private
+channel authorization currently happens only at that handshake step, not per-channel.
 
 ### Pending: not-yet-modeled deletion domains
 

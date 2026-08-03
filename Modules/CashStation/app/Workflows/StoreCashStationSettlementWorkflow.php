@@ -3,8 +3,11 @@
 namespace Modules\CashStation\Workflows;
 
 use Illuminate\Support\Facades\DB;
+use Modules\CashStation\Actions\BuildCashStationAction;
 use Modules\CashStation\Actions\CreateCashStationSettlementAction;
 use Modules\CashStation\Actions\ValidateCashStationSettlementAction;
+use Modules\CashStation\Events\CashStationSettlementCreated;
+use Modules\CashStation\Events\CashStationUpdated;
 use Modules\CashStation\Models\CashStationSettlement;
 
 class StoreCashStationSettlementWorkflow
@@ -12,6 +15,7 @@ class StoreCashStationSettlementWorkflow
     public function __construct(
         private readonly ValidateCashStationSettlementAction $validateCashStationSettlementAction,
         private readonly CreateCashStationSettlementAction $createCashStationSettlementAction,
+        private readonly BuildCashStationAction $buildCashStationAction,
     ) {}
 
     public function handle(
@@ -21,7 +25,7 @@ class StoreCashStationSettlementWorkflow
         int $toProjectId,
         string $amount,
     ): CashStationSettlement {
-        return DB::transaction(function () use ($year, $month, $fromProjectId, $toProjectId, $amount) {
+        $settlement = DB::transaction(function () use ($year, $month, $fromProjectId, $toProjectId, $amount) {
             $this->validateCashStationSettlementAction->execute(
                 $year,
                 $month,
@@ -39,5 +43,14 @@ class StoreCashStationSettlementWorkflow
                 auth()->user()?->uuid,
             );
         });
+
+        CashStationSettlementCreated::dispatch($settlement);
+        CashStationUpdated::dispatch(
+            $settlement->year,
+            $settlement->month,
+            $this->buildCashStationAction->execute($settlement->month, $settlement->year),
+        );
+
+        return $settlement;
     }
 }

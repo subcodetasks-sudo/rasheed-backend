@@ -5,6 +5,7 @@ namespace Modules\CashStation\Actions;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Modules\CashStation\Models\CashStationMonthCarry;
 use Modules\CashStation\Models\CashStationSettlement;
 use Modules\Project\Models\Project;
@@ -45,6 +46,7 @@ class BuildCashStationAction
             : [];
 
         $debts = $this->administrativeDebtsByProject($projectIds, $endOfMonth->toDateString());
+        $adsDebtSettledThisMonth = $this->administrativeDebtSettledInMonthByProject($projectIds, $year, $month);
         $settlements = $this->settlementsForMonth($year, $month);
         $contributions = $this->contributionsByProject($settlements);
 
@@ -77,25 +79,31 @@ class BuildCashStationAction
             $deducted = (float) ($contributions[$project->id]['deducted'] ?? 0);
             $netCashFund = $previousMonthlyTotal + $monthlyTotal + $added - $deducted;
 
-            $administrativeDebt = (float) ($debts[$project->id] ?? 0);
+            $originatingDebt = (float) ($debts[$project->id] ?? 0);
+            $settledDebtThisMonth = (float) ($adsDebtSettledThisMonth[$project->id] ?? 0);
+            // Journal tip is reduced on ADS settle; remaining is the journal balance.
+            // Originating display reconstructs pre-settlement month debt for the card.
+            $administrativeDebt = max(0.0, round($originatingDebt, 2));
+            $originatingDisplay = max(0.0, round($administrativeDebt + $settledDebtThisMonth, 2));
 
             $projectRows[] = [
                 'project_id' => $project->id,
                 'project_name' => $project->name,
                 'previous_monthly_total' => $this->decimal($previousMonthlyTotal),
                 'monthly_total' => $this->decimal($monthlyTotal),
-                'administrative_debt' => $this->decimal($administrativeDebt),
+                'administrative_debt' => $this->decimal($originatingDisplay),
                 'added_contribution' => $this->decimal($added),
                 'deducted_contribution' => $this->decimal($deducted),
                 'net_cash_fund' => $this->decimal($netCashFund),
                 'remaining_administrative_debt' => $this->decimal($administrativeDebt),
-                'status' => null,
+                'status' => $this->cashBoxStatus($netCashFund),
             ];
 
-            if ($netCashFund > 0) {
-                $totalSurplus += $netCashFund;
-            } elseif ($netCashFund < 0) {
-                $totalDeficit += abs($netCashFund);
+            // Surplus/deficit cards use Monthly Total only (before settlements / carry-forward).
+            if ($monthlyTotal > 0) {
+                $totalSurplus += $monthlyTotal;
+            } elseif ($monthlyTotal < 0) {
+                $totalDeficit += abs($monthlyTotal);
             }
 
             $totalAdminDebts += $administrativeDebt;
@@ -201,16 +209,26 @@ class BuildCashStationAction
             return [];
         }
 
+        // administrative_percentage here is collected intake only (fee − debt + contribution).
+        // Unpaid fee stays in Administrative Debt and must not reduce Monthly Total / Net Monthly Result.
+        // Exempt projects contribute 0.
         $rows = DB::table('daily_journal_entries')
-            ->whereIn('project_id', $projectIds)
-            ->where('journal_date', '>=', $startDate)
-            ->where('journal_date', '<=', $endDate)
-            ->groupBy('project_id')
-            ->selectRaw('project_id')
-            ->selectRaw('COALESCE(SUM(COALESCE(daily_income, 0)), 0) as monthly_revenue')
-            ->selectRaw('COALESCE(SUM(COALESCE(daily_expense, 0)), 0) as monthly_expenses')
-            ->selectRaw('COALESCE(SUM(COALESCE(administrative_fee, 0)), 0) as administrative_percentage')
-            ->selectRaw('COALESCE(SUM(COALESCE(operational_deduction, 0)), 0) as operational_deduction')
+            ->join('projects', 'daily_journal_entries.project_id', '=', 'projects.id')
+            ->whereIn('daily_journal_entries.project_id', $projectIds)
+            ->where('daily_journal_entries.journal_date', '>=', $startDate)
+            ->where('daily_journal_entries.journal_date', '<=', $endDate)
+            ->groupBy('daily_journal_entries.project_id')
+            ->selectRaw('daily_journal_entries.project_id as project_id')
+            ->selectRaw('COALESCE(SUM(COALESCE(daily_journal_entries.daily_income, 0)), 0) as monthly_revenue')
+            ->selectRaw('COALESCE(SUM(COALESCE(daily_journal_entries.daily_expense, 0)), 0) as monthly_expenses')
+            ->selectRaw(
+                'COALESCE(SUM(CASE WHEN projects.administrative_exempt = 0 THEN '
+                .'COALESCE(daily_journal_entries.administrative_fee, 0)'
+                .' - COALESCE(daily_journal_entries.administrative_debt, 0)'
+                .' + COALESCE(daily_journal_entries.contribution, 0)'
+                .' ELSE 0 END), 0) as administrative_percentage'
+            )
+            ->selectRaw('COALESCE(SUM(COALESCE(daily_journal_entries.operational_deduction, 0)), 0) as operational_deduction')
             ->get();
 
         $keyed = [];
@@ -231,6 +249,52 @@ class BuildCashStationAction
             - (float) ($aggregate->administrative_percentage ?? 0)
             - (float) ($aggregate->operational_deduction ?? 0)
             - (float) ($aggregate->monthly_expenses ?? 0);
+    }
+
+    /**
+     * Debt allocated by ADS settlements in the selected month only (not prior months).
+     *
+     * @param  array<int, int>  $projectIds
+     * @return array<int, float>
+     */
+    private function administrativeDebtSettledInMonthByProject(array $projectIds, int $year, int $month): array
+    {
+        if ($projectIds === []) {
+            return [];
+        }
+
+        if (! Schema::hasTable('administrative_debt_settlements')) {
+            return [];
+        }
+
+        $rows = DB::table('administrative_debt_settlements')
+            ->whereIn('project_id', $projectIds)
+            ->where('year', $year)
+            ->where('month', $month)
+            ->groupBy('project_id')
+            ->selectRaw('project_id')
+            ->selectRaw('COALESCE(SUM(COALESCE(allocated_current_debt, 0) + COALESCE(allocated_carried_debt, 0)), 0) as total')
+            ->get();
+
+        $keyed = [];
+        foreach ($rows as $row) {
+            $keyed[(int) $row->project_id] = (float) $row->total;
+        }
+
+        return $keyed;
+    }
+
+    private function cashBoxStatus(float $netCashFund): string
+    {
+        if ($netCashFund > 0) {
+            return 'surplus';
+        }
+
+        if ($netCashFund < 0) {
+            return 'deficit';
+        }
+
+        return 'balanced';
     }
 
     /**

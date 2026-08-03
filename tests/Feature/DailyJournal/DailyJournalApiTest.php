@@ -419,7 +419,7 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
             ->assertJsonValidationErrors(['entries.0.contribution']);
     }
 
-    public function test_null_or_zero_contribution_from_non_super_admin_is_accepted(): void
+    public function test_null_or_zero_contribution_from_non_super_admin_is_accepted_when_unchanged(): void
     {
         $this->actAsFinanceUser();
         $project = $this->createActiveProject([
@@ -440,9 +440,46 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
         ])->assertOk();
     }
 
+    public function test_finance_cannot_clear_existing_contribution(): void
+    {
+        $this->actAsSuperAdmin();
+        $this->seedAdminPercentageBalance();
+
+        $project = $this->createActiveProject([
+            'operational_deduction_type' => OperationalDeductionType::Exempt,
+            'administrative_exempt' => true,
+        ]);
+
+        $yesterday = now()->subDay()->toDateString();
+        $today = now()->toDateString();
+
+        $this->putJson('/api/v1/daily-journals', [
+            'journal_date' => $yesterday,
+            'entries' => [['project_id' => $project->id, 'daily_income' => 50]],
+        ])->assertOk();
+
+        $this->putJson('/api/v1/daily-journals', [
+            'journal_date' => $today,
+            'entries' => [
+                ['project_id' => $project->id, 'daily_expense' => 200, 'contribution' => 100],
+            ],
+        ])->assertOk();
+
+        $this->actAsFinanceUser();
+
+        $this->putJson('/api/v1/daily-journals', [
+            'journal_date' => $today,
+            'entries' => [
+                ['project_id' => $project->id, 'daily_expense' => 200, 'contribution' => null],
+            ],
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors(['entries.0.contribution']);
+    }
+
     public function test_super_admin_contribution_rejected_when_no_deficit(): void
     {
         $this->actAsSuperAdmin();
+        $this->seedAdminPercentageBalance();
         $project = $this->createActiveProject([
             'operational_deduction_type' => OperationalDeductionType::Exempt,
             'administrative_exempt' => true,
@@ -459,6 +496,7 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
     public function test_super_admin_contribution_rejected_when_exceeds_remaining_deficit(): void
     {
         $this->actAsSuperAdmin();
+        $this->seedAdminPercentageBalance();
         $project = $this->createActiveProject([
             'operational_deduction_type' => OperationalDeductionType::Exempt,
             'administrative_exempt' => true,
@@ -472,8 +510,6 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
             'entries' => [['project_id' => $project->id, 'daily_income' => 50]],
         ])->assertOk();
 
-        // Today: expense 200 -> fund balance = 50 + (-200) = -150, remaining deficit = 150
-        // Contribution 200 > 150 -> reject
         $this->putJson('/api/v1/daily-journals', [
             'journal_date' => $today,
             'entries' => [
@@ -483,9 +519,12 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
             ->assertJsonValidationErrors(['entries.0.contribution']);
     }
 
-    public function test_super_admin_contribution_accepted_within_remaining_deficit(): void
+    public function test_super_admin_contribution_rejected_when_exceeds_admin_percentage_balance(): void
     {
         $this->actAsSuperAdmin();
+        // Seed only 12 fee (100 income * 12%)
+        $this->seedAdminPercentageBalance(100);
+
         $project = $this->createActiveProject([
             'operational_deduction_type' => OperationalDeductionType::Exempt,
             'administrative_exempt' => true,
@@ -499,9 +538,33 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
             'entries' => [['project_id' => $project->id, 'daily_income' => 50]],
         ])->assertOk();
 
-        // Today: expense 200, no contribution -> daily total = -200, fund = 50-200 = -150
-        // Remaining deficit = 150. Contribute 100 (within limit).
-        // With contribution: daily total = 0+100-200 = -100, fund = 50-100 = -50 (signed)
+        // Deficit 150 but available admin balance only 12
+        $this->putJson('/api/v1/daily-journals', [
+            'journal_date' => $today,
+            'entries' => [
+                ['project_id' => $project->id, 'daily_expense' => 200, 'contribution' => 100],
+            ],
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors(['entries.0.contribution']);
+    }
+
+    public function test_super_admin_contribution_accepted_within_remaining_deficit(): void
+    {
+        $this->actAsSuperAdmin();
+        $this->seedAdminPercentageBalance();
+        $project = $this->createActiveProject([
+            'operational_deduction_type' => OperationalDeductionType::Exempt,
+            'administrative_exempt' => true,
+        ]);
+
+        $yesterday = now()->subDay()->toDateString();
+        $today = now()->toDateString();
+
+        $this->putJson('/api/v1/daily-journals', [
+            'journal_date' => $yesterday,
+            'entries' => [['project_id' => $project->id, 'daily_income' => 50]],
+        ])->assertOk();
+
         $response = $this->putJson('/api/v1/daily-journals', [
             'journal_date' => $today,
             'entries' => [
@@ -509,23 +572,28 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
             ],
         ]);
 
-        $response->assertOk();
+        $response->assertOk()
+            ->assertJsonPath('data.available_administrative_percentage_balance', 1100);
 
         $entry = collect($response->json('data.entries'))->firstWhere('project.id', $project->id);
 
         $this->assertSame('-100.00', $entry['daily_total']);
         $this->assertSame('-50.00', $entry['fund_balance']);
-        // Fee 0 (exempt): contribution alone is today's debt; deficit reduced by 100
         $this->assertSame('100.00', $entry['administrative_debt']);
         $this->assertSame('100.00', $entry['accumulated_administrative_debt']);
         $this->assertSame('0.00', $entry['administrative_fee']);
         $this->assertSame('0.00', $entry['operational_deduction']);
         $this->assertSame('100.00', $entry['contribution']);
+
+        $this->assertDatabaseHas('admin_percentage_balance_debits', [
+            'amount' => '100.00',
+        ]);
     }
 
-    public function test_super_admin_contribution_exactly_equals_remaining_deficit(): void
+    public function test_clearing_contribution_does_not_refund_admin_percentage_balance(): void
     {
         $this->actAsSuperAdmin();
+        $this->seedAdminPercentageBalance();
         $project = $this->createActiveProject([
             'operational_deduction_type' => OperationalDeductionType::Exempt,
             'administrative_exempt' => true,
@@ -539,10 +607,42 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
             'entries' => [['project_id' => $project->id, 'daily_income' => 50]],
         ])->assertOk();
 
-        // Today: expense 200 -> without contribution: fund = 50-200 = -150
-        // Contribute exactly 150.
-        // With contribution: daily total = 0+150-200 = -50, fund = 50-50 = 0
-        // Fee 0 → debt = contribution 150
+        $this->putJson('/api/v1/daily-journals', [
+            'journal_date' => $today,
+            'entries' => [
+                ['project_id' => $project->id, 'daily_expense' => 200, 'contribution' => 100],
+            ],
+        ])->assertOk()
+            ->assertJsonPath('data.available_administrative_percentage_balance', 1100);
+
+        $cleared = $this->putJson('/api/v1/daily-journals', [
+            'journal_date' => $today,
+            'entries' => [
+                ['project_id' => $project->id, 'daily_expense' => 200, 'contribution' => null],
+            ],
+        ])->assertOk();
+
+        $this->assertSame(1100.0, (float) $cleared->json('data.available_administrative_percentage_balance'));
+        $this->assertDatabaseHas('admin_percentage_balance_debits', ['amount' => '100.00']);
+    }
+
+    public function test_super_admin_contribution_exactly_equals_remaining_deficit(): void
+    {
+        $this->actAsSuperAdmin();
+        $this->seedAdminPercentageBalance();
+        $project = $this->createActiveProject([
+            'operational_deduction_type' => OperationalDeductionType::Exempt,
+            'administrative_exempt' => true,
+        ]);
+
+        $yesterday = now()->subDay()->toDateString();
+        $today = now()->toDateString();
+
+        $this->putJson('/api/v1/daily-journals', [
+            'journal_date' => $yesterday,
+            'entries' => [['project_id' => $project->id, 'daily_income' => 50]],
+        ])->assertOk();
+
         $response = $this->putJson('/api/v1/daily-journals', [
             'journal_date' => $today,
             'entries' => [
@@ -566,6 +666,7 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
     {
         $this->actAsSuperAdmin();
         app(SettingService::class)->update('total_operational_deduction', 1081, 'decimal', true);
+        $this->seedAdminPercentageBalance();
 
         $project = $this->createActiveProject([
             'administrative_fee_percentage' => 12,
@@ -581,11 +682,6 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
             'entries' => [['project_id' => $project->id, 'daily_income' => 500]],
         ])->assertOk();
 
-        // Today: income 100 + expense 800
-        // admin fee = 100*12% = 12, op deduction = 0 (exempt)
-        // without contribution: daily total = 100-800-12 = -712, fund = prev+(-712) -> deficit
-        // contribute 100 (within deficit)
-        // with contribution: daily total = 100+100-800-12 = -612
         $response = $this->putJson('/api/v1/daily-journals', [
             'journal_date' => $today,
             'entries' => [
@@ -597,11 +693,9 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
 
         $entry = collect($response->json('data.entries'))->firstWhere('project.id', $project->id);
 
-        // Admin Fee unchanged by contribution
         $this->assertSame('12.00', $entry['administrative_fee']);
         $this->assertSame('0.00', $entry['operational_deduction']);
         $this->assertSame('-612.00', $entry['daily_total']);
-        // Case 1 base (fee 12) + contribution 100 = 112
         $this->assertSame('100.00', $entry['contribution']);
         $this->assertSame('112.00', $entry['administrative_debt']);
         $this->assertSame('-172.00', $entry['fund_balance']);
@@ -610,13 +704,17 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
     public function test_contribution_debt_recomputation_does_not_compound(): void
     {
         $this->actAsSuperAdmin();
+        $this->seedAdminPercentageBalance();
+        \Modules\Project\Models\AdministrativeFeeRate::query()->create([
+            'percentage' => 10,
+            'effective_from' => now()->subYear()->toDateString(),
+        ]);
         $project = $this->createActiveProject([
             'operational_deduction_type' => OperationalDeductionType::Exempt,
             'administrative_exempt' => false,
             'administrative_fee_percentage' => 10,
         ]);
 
-        // Income 1000 → fee 100; expense 2000 → Pass-1 fund = -1100; Case 1 base = 100
         $first = $this->putJson('/api/v1/daily-journals', [
             'entries' => [
                 ['project_id' => $project->id, 'daily_income' => 1000, 'daily_expense' => 2000, 'contribution' => 30],
@@ -624,12 +722,10 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
         ])->assertOk();
 
         $entry = collect($first->json('data.entries'))->firstWhere('project.id', $project->id);
-        // daily_total = 1000+30-2000-100 = -1070; fund = -1070; debt = 100+30 = 130
         $this->assertSame('-1070.00', $entry['fund_balance']);
         $this->assertSame('130.00', $entry['administrative_debt']);
         $this->assertSame('130.00', $entry['accumulated_administrative_debt']);
 
-        // Re-save contribution 40 → debt = 100+40 = 140 (not 170); fund deficit reduced by 40
         $second = $this->putJson('/api/v1/daily-journals', [
             'entries' => [
                 ['project_id' => $project->id, 'daily_income' => 1000, 'daily_expense' => 2000, 'contribution' => 40],
@@ -645,6 +741,7 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
     public function test_contribution_via_patch_works_with_update_workflow(): void
     {
         $this->actAsSuperAdmin();
+        $this->seedAdminPercentageBalance();
         $project = $this->createActiveProject([
             'operational_deduction_type' => OperationalDeductionType::Exempt,
             'administrative_exempt' => true,
@@ -658,13 +755,11 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
             'entries' => [['project_id' => $project->id, 'daily_income' => 50]],
         ])->assertOk();
 
-        // Today: first save expense only
         $this->putJson('/api/v1/daily-journals', [
             'journal_date' => $today,
             'entries' => [['project_id' => $project->id, 'daily_expense' => 200]],
         ])->assertOk();
 
-        // PATCH to add contribution
         $response = $this->patchJson('/api/v1/daily-journals', [
             'journal_date' => $today,
             'entries' => [['project_id' => $project->id, 'contribution' => 100]],

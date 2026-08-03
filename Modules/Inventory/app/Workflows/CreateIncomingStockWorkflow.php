@@ -5,6 +5,7 @@ namespace Modules\Inventory\Workflows;
 use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Actions\CreateIncomingStockAction;
 use Modules\Inventory\DTOs\IncomingStockData;
+use Modules\Inventory\Events\InventoryStockMoved;
 use Modules\Inventory\Models\InventoryMovement;
 
 class CreateIncomingStockWorkflow
@@ -15,11 +16,15 @@ class CreateIncomingStockWorkflow
 
     public function handle(IncomingStockData $data): InventoryMovement
     {
-        return DB::transaction(function () use ($data) {
+        $movement = DB::transaction(function () use ($data) {
             return $this->createIncomingStockAction->execute(
                 $data,
                 auth()->user()?->uuid,
             );
         });
+
+        InventoryStockMoved::dispatch($movement);
+
+        return $movement;
     }
 }

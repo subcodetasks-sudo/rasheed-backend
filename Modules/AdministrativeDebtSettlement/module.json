@@ -1,0 +1,11 @@
+{
+    "name": "AdministrativeDebtSettlement",
+    "alias": "administrativedebtsettlement",
+    "description": "Month/org-pool recovery of project administrative debt that credits Administrative Percentage Balance",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\AdministrativeDebtSettlement\\Providers\\AdministrativeDebtSettlementServiceProvider"
+    ],
+    "files": []
+}

@@ -3,6 +3,7 @@
 namespace Modules\DailyJournal\Actions;
 
 use Illuminate\Validation\ValidationException;
+use Modules\DailyJournal\Events\AdministrativeDebtRepaid;
 use Modules\DailyJournal\Models\DailyJournalEntry;
 use Modules\DailyJournal\Services\DailyJournalCalculationService;
 use Modules\Project\Models\Project;
@@ -55,6 +56,10 @@ class RepayAdministrativeDebtAction
         $entry->updated_by = auth()->user()?->uuid;
         $entry->save();
 
-        return $entry->loadMissing(['project.category']);
+        $entry = $entry->loadMissing(['project.category']);
+
+        AdministrativeDebtRepaid::dispatch($entry);
+
+        return $entry;
     }
 }

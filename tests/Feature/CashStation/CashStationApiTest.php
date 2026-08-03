@@ -128,7 +128,7 @@ class CashStationApiTest extends TestCase
         $this->assertSame('1000.00', $row['net_cash_fund']);
         $this->assertSame('40.00', $row['administrative_debt']);
         $this->assertSame('40.00', $row['remaining_administrative_debt']);
-        $this->assertNull($row['status']);
+        $this->assertSame('surplus', $row['status']);
 
         $this->assertSame('1500.00', $data['summary']['monthly_revenue']);
         $this->assertSame('300.00', $data['summary']['monthly_expenses']);
@@ -377,7 +377,7 @@ class CashStationApiTest extends TestCase
         $this->assertSame('0.00', $this->findProject($august, $to->id)['previous_monthly_total']);
     }
 
-    public function test_surplus_and_deficit_summary_cards_use_net_cash_fund(): void
+    public function test_surplus_and_deficit_summary_cards_use_monthly_total(): void
     {
         $this->actAs('finance');
         $a = $this->createProject();
@@ -398,21 +398,176 @@ class CashStationApiTest extends TestCase
         $this->assertSame('250.00', $data['summary']['total_monthly_deficit']);
     }
 
-    public function test_status_is_always_null_placeholder(): void
+    public function test_settlement_does_not_change_surplus_deficit_or_net_month(): void
+    {
+        $this->actAs('finance');
+        $from = $this->createProject(['name' => 'فائض']);
+        $to = $this->createProject(['name' => 'عجز']);
+
+        $this->seedEntry($from->id, '2026-07-12', [
+            'daily_income' => 1000,
+            'administrative_fee' => 0,
+            'operational_deduction' => 0,
+            'daily_expense' => 0,
+        ]);
+        $this->seedEntry($to->id, '2026-07-12', [
+            'daily_income' => 0,
+            'administrative_fee' => 0,
+            'operational_deduction' => 0,
+            'daily_expense' => 500,
+        ]);
+
+        $before = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
+        $this->assertSame('1000.00', $before['summary']['total_monthly_surplus']);
+        $this->assertSame('500.00', $before['summary']['total_monthly_deficit']);
+        $this->assertSame('500.00', $before['summary']['net_month']);
+        $this->assertSame('500.00', $before['summary']['net_cash_funds']);
+
+        $after = $this->postJson(self::ENDPOINT.'/settlements', [
+            'month' => 7,
+            'year' => 2026,
+            'from_project_id' => $from->id,
+            'to_project_id' => $to->id,
+            'amount' => 400,
+        ])->assertCreated()->json('data');
+
+        // Surplus/deficit/net_month stay on Monthly Total; only per-project net cash moves.
+        $this->assertSame('1000.00', $after['summary']['total_monthly_surplus']);
+        $this->assertSame('500.00', $after['summary']['total_monthly_deficit']);
+        $this->assertSame('500.00', $after['summary']['net_month']);
+        $this->assertSame('500.00', $after['summary']['net_cash_funds']);
+        $this->assertSame('600.00', $this->findProject($after, $from->id)['net_cash_fund']);
+        $this->assertSame('-100.00', $this->findProject($after, $to->id)['net_cash_fund']);
+    }
+
+    public function test_carry_forward_does_not_inflate_next_month_surplus_deficit(): void
     {
         $this->actAs('finance');
         $project = $this->createProject();
-        $this->seedEntry($project->id, '2026-07-01', [
-            'daily_income' => 100,
+
+        $this->seedEntry($project->id, '2026-07-15', [
+            'daily_income' => 2000,
+            'administrative_fee' => 0,
+            'operational_deduction' => 0,
+            'daily_expense' => 500,
+        ]);
+        // July monthly total = 1500
+
+        $this->postJson(self::ENDPOINT.'/carry-forward', [
+            'month' => 7,
+            'year' => 2026,
+        ])->assertOk();
+
+        $this->seedEntry($project->id, '2026-08-05', [
+            'daily_income' => 300,
+            'administrative_fee' => 0,
+            'operational_deduction' => 0,
+            'daily_expense' => 50,
+        ]);
+        // August monthly total = 250
+
+        $august = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data');
+        $row = $this->findProject($august, $project->id);
+
+        $this->assertSame('1500.00', $row['previous_monthly_total']);
+        $this->assertSame('250.00', $row['monthly_total']);
+        $this->assertSame('1750.00', $row['net_cash_fund']);
+
+        // Surplus/deficit use August Monthly Total only; previous appears only in net cash.
+        $this->assertSame('250.00', $august['summary']['total_monthly_surplus']);
+        $this->assertSame('0.00', $august['summary']['total_monthly_deficit']);
+        $this->assertSame('250.00', $august['summary']['net_month']);
+        $this->assertSame('1750.00', $august['summary']['net_cash_funds']);
+    }
+
+    public function test_summary_administrative_percentage_uses_collected_not_gross_fee(): void
+    {
+        $this->actAs('finance');
+        $eligible = $this->createProject(['name' => 'خاضع']);
+        $exempt = $this->createProject([
+            'name' => 'معفى',
+            'administrative_exempt' => true,
         ]);
 
-        $row = $this->findProject(
-            $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data'),
-            $project->id,
-        );
+        // collected = fee − debt + contribution = 120 − 80 + 30 = 70
+        $this->seedEntry($eligible->id, '2026-07-10', [
+            'daily_income' => 1000,
+            'administrative_fee' => 120,
+            'administrative_debt' => 80,
+            'contribution' => 30,
+            'daily_expense' => 0,
+        ]);
 
-        $this->assertArrayHasKey('status', $row);
-        $this->assertNull($row['status']);
+        // Exempt fees must not enter the collected summary card.
+        $this->seedEntry($exempt->id, '2026-07-10', [
+            'daily_income' => 500,
+            'administrative_fee' => 50,
+            'administrative_debt' => 0,
+            'contribution' => 0,
+        ]);
+
+        $data = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
+
+        $this->assertSame('70.00', $data['summary']['total_administrative_percentage']);
+
+        // Monthly Total / Net Monthly Result deduct collected only: 1000 − 70 = 930.
+        // Unpaid portion (debt-related) is not deducted from monthly_total.
+        $this->assertSame('930.00', $this->findProject($data, $eligible->id)['monthly_total']);
+
+        // Exempt fee is ignored for both collected card and monthly_total admin deduction.
+        // Exempt monthly_total = 500 − 0 = 500.
+        $this->assertSame('500.00', $this->findProject($data, $exempt->id)['monthly_total']);
+        $this->assertSame('1430.00', $data['summary']['net_month']);
+    }
+
+    public function test_net_month_does_not_deduct_unpaid_administrative_percentage(): void
+    {
+        $this->actAs('finance');
+        $project = $this->createProject();
+
+        // Gross fee 200, of which 80 is unpaid debt and contribution 0 → collected 120.
+        $this->seedEntry($project->id, '2026-07-10', [
+            'daily_income' => 1000,
+            'administrative_fee' => 200,
+            'administrative_debt' => 80,
+            'contribution' => 0,
+            'operational_deduction' => 50,
+            'daily_expense' => 100,
+            'accumulated_administrative_debt' => 80,
+        ]);
+
+        $data = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
+
+        // Net month = 1000 − 120 − 50 − 100 = 730 (not 1000 − 200 − 50 − 100 = 650).
+        $this->assertSame('120.00', $data['summary']['total_administrative_percentage']);
+        $this->assertSame('730.00', $data['summary']['net_month']);
+        $this->assertSame('730.00', $this->findProject($data, $project->id)['monthly_total']);
+        $this->assertSame('80.00', $data['summary']['administrative_debts']);
+    }
+
+    public function test_status_reflects_net_cash_fund(): void
+    {
+        $this->actAs('finance');
+        $surplus = $this->createProject(['name' => 'فائض']);
+        $deficit = $this->createProject(['name' => 'عجز']);
+        $balanced = $this->createProject(['name' => 'متوازن']);
+
+        $this->seedEntry($surplus->id, '2026-07-01', [
+            'daily_income' => 100,
+        ]);
+        $this->seedEntry($deficit->id, '2026-07-01', [
+            'daily_expense' => 50,
+        ]);
+        $this->seedEntry($balanced->id, '2026-07-01', [
+            'daily_income' => 0,
+            'daily_expense' => 0,
+        ]);
+
+        $data = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
+
+        $this->assertSame('surplus', $this->findProject($data, $surplus->id)['status']);
+        $this->assertSame('deficit', $this->findProject($data, $deficit->id)['status']);
+        $this->assertSame('balanced', $this->findProject($data, $balanced->id)['status']);
     }
 
     public function test_settlement_validation_rejects_same_project_and_non_positive_amount(): void

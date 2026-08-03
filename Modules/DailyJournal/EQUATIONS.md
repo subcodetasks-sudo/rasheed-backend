@@ -184,22 +184,42 @@ fund_balance = surplus
 
 ---
 
-## Contribution validation (positive contribution only)
+## Contribution validation
+
+Any change to a contribution value (create, raise, lower, or clear) requires `super-admin`.
 
 | Rule | Error |
 |------|--------|
-| User is not `super-admin` | `contribution_requires_super_admin` |
-| Pass-1 remaining deficit ≤ 0 | `contribution_requires_deficit` |
+| User is not `super-admin` (any contribution mutation) | `contribution_requires_super_admin` |
+| Pass-1 remaining deficit ≤ 0 (positive amount) | `contribution_requires_deficit` |
 | contribution > remaining deficit | `contribution_exceeds_remaining_deficit` |
+| additional debit > available Administrative Percentage Balance | `contribution_exceeds_admin_percentage_balance` |
 
-- Null / zero contribution: allowed for finance users; skip contribution checks.
-- Remaining deficit = `|fund_balance|` after Pass-1 totals+balances (signed balance may be negative), with contribution zeroed.
-- Contribution must not exceed that remaining deficit.
+### Administrative Percentage Balance (org pool)
+
+```
+available = SUM(administrative_fee) − SUM(admin_percentage_balance_debits.amount) + SUM(admin_percentage_balance_credits.amount)
+```
+
+- Contributions are funded only from this pool.
+- Max contribution for an entry = `min(remaining_deficit, already_consumed_for_entry + available)`.
+- On save, any increase above prior permanent debits creates a new debit row (`admin_percentage_balance_debits`).
+- Debits are **non-refundable**: lowering or clearing `contribution` never reduces prior debits.
+- Monthly Cash Station settlements never restore these debits.
+- Administrative Debt Settlement (month/org-pool recovery) permanently **credits** the pool via `admin_percentage_balance_credits` for the **debt-allocated** portion (`allocated_current_debt + allocated_carried_debt`) when surplus-based debt is recovered. That path does **not** reduce Net Cash or `fund_balance` (distinct from day-level `POST /daily-journals/repay-debt`).
+- On settle, the same debt-allocated amount reduces `accumulated_administrative_debt` on the latest journal entry on/before month-end (and later entries), so a new journal day inherits the settled balance. Day `administrative_debt` and `fund_balance` are not changed (preserves Monthly Total / Net Cash).
+- Available surplus capacity for ADS in a month = `max(0, net_cash_fund) − Σ prior ADS recoverable_amount for that project/month` (cumulative cap without mutating Net Cash).
+- Allocation priority on execute: Cash Box capacity → Current Admin Debt → Carried Admin Debt.
+
+- Remaining deficit = `|fund_balance|` after Pass-1 totals+balances (contribution zeroed).
+- Unchanged null/zero when no prior contribution: finance may omit/send zero without error.
 
 ### Worked example
+- Org fees collected = 200; prior contribution debits = 0 → available = 200
 - Yesterday fund = 50; today expense = 200 → Pass-1 fund = −150 → remaining deficit = 150
-- Contribute 100 → daily_total = −100, fund_balance = **−50** (deficit reduced); day debt = **100** (contribution; fee 0 on exempt project)
-- Contribute exactly 150 → fund_balance **0**, day debt **150**
+- Max = min(150, 200) = 150
+- Contribute 100 → daily_total = −100, fund_balance = **−50**; day debt includes contribution; debit 100 from pool; available → 100
+- Clear contribution later → journal contribution = 0; pool debits stay 100 (non-refundable)
 
 ### Administrative Debt worked examples
 - Income 200 @ 12% → fee 24; expense 0; fund negative → Case 1 debt = **24**
@@ -255,8 +275,9 @@ Action rejections:
 | Negative balance, fee 0 | Debt 0 (negative alone never creates debt) |
 | Admin expense > fee | Case 2 debt = fee (expense-first) |
 | Admin expense ≤ fee | No Case 2 debt; remaining fee available for Case 1 |
-| Contribution | Requires Pass-1 deficit; reduces fund deficit via daily_total; adds amount to debt |
-| Contribution re-save | Recomputes from same fund-consumption base (never compounds) |
+| Contribution | Requires Pass-1 deficit + available admin percentage balance; reduces fund deficit via daily_total; adds amount to debt; permanently debits org admin pool |
+| Contribution clear/lower | Super-admin only; does **not** refund admin percentage pool debits |
+| Contribution re-save | Recomputes from same fund-consumption base (never compounds); additional pool debit only for increases |
 | Surplus day after prior debt | Surplus kept; accumulated unchanged until repay endpoint |
 | Pass-2 preserve | Fee / op / admin expense frozen from Pass 1 |
 | Non-active projects | Rejected on save |

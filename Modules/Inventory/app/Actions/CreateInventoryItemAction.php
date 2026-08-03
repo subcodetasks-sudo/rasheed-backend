@@ -42,7 +42,7 @@ class CreateInventoryItemAction
         $item->save();
 
         $this->fifoService->createOpeningBatch($item, $openingQuantity, $openingPrice);
-        $this->balanceService->checkMinimumStock($item);
+        $this->balanceService->checkMinimumStock($item, null);
 
         return $item->fresh(['project']);
     }

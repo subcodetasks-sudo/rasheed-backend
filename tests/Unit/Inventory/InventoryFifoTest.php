@@ -16,7 +16,7 @@ class InventoryFifoTest extends TestCase
 
     public function test_balance_formula(): void
     {
-        $service = new InventoryBalanceService;
+        $service = app(InventoryBalanceService::class);
         $item = new InventoryItem([
             'opening_quantity' => 10,
             'total_incoming_quantity' => 5,
