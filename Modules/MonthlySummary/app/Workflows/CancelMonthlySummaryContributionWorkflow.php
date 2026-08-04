@@ -1,0 +1,81 @@
+<?php
+
+namespace Modules\MonthlySummary\Workflows;
+
+use Illuminate\Support\Facades\DB;
+use Modules\CashStation\Actions\BuildCashStationAction;
+use Modules\CashStation\Events\CashStationSettlementDeleted;
+use Modules\CashStation\Events\CashStationUpdated;
+use Modules\CashStation\Models\CashStationSettlement;
+use Modules\MonthlySummary\Actions\BuildMonthlySummaryAction;
+use Modules\MonthlySummary\Actions\ReverseContributionAdministrativeDebtAction;
+use Modules\MonthlySummary\Enums\ContributionType;
+use Modules\MonthlySummary\Events\MonthlySummaryUpdated;
+use Modules\Project\Exceptions\BusinessException;
+
+class CancelMonthlySummaryContributionWorkflow
+{
+    public function __construct(
+        private readonly ReverseContributionAdministrativeDebtAction $reverseContributionAdministrativeDebtAction,
+        private readonly BuildCashStationAction $buildCashStationAction,
+        private readonly BuildMonthlySummaryAction $buildMonthlySummaryAction,
+    ) {}
+
+    public function handle(int $settlementId): array
+    {
+        $result = DB::transaction(function () use ($settlementId) {
+            $settlement = CashStationSettlement::query()
+                ->lockForUpdate()
+                ->find($settlementId);
+
+            if ($settlement === null) {
+                throw new BusinessException(__('messages.monthly_summary_contribution_not_found'), 404);
+            }
+
+            if ($settlement->contribution_type === null) {
+                throw new BusinessException(__('messages.monthly_summary_contribution_not_found'), 404);
+            }
+
+            $year = $settlement->year;
+            $month = $settlement->month;
+            $amount = (float) $settlement->amount;
+            $toProjectId = $settlement->to_project_id;
+            $type = $settlement->contribution_type;
+
+            if ($type === ContributionType::AdministrativeDebt) {
+                $this->reverseContributionAdministrativeDebtAction->execute(
+                    $toProjectId,
+                    $year,
+                    $month,
+                    $amount,
+                );
+            }
+
+            $settlement->delete();
+
+            return [
+                'settlement_id' => $settlementId,
+                'year' => $year,
+                'month' => $month,
+            ];
+        });
+
+        CashStationSettlementDeleted::dispatch(
+            $result['settlement_id'],
+            $result['year'],
+            $result['month'],
+        );
+        CashStationUpdated::dispatch(
+            $result['year'],
+            $result['month'],
+            $this->buildCashStationAction->execute($result['month'], $result['year']),
+        );
+        MonthlySummaryUpdated::dispatch(
+            $result['year'],
+            $result['month'],
+            $this->buildMonthlySummaryAction->execute($result['month'], $result['year']),
+        );
+
+        return $result;
+    }
+}

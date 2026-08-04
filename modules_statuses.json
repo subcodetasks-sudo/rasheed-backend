@@ -9,5 +9,6 @@
     "Dashboard": true,
     "CashStation": true,
     "Notifications": true,
-    "AdministrativeDebtSettlement": true
+    "AdministrativeDebtSettlement": true,
+    "MonthlySummary": true
 }

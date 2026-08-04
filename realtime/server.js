@@ -19,6 +19,7 @@ const ALLOWED_ROOM_PREFIXES = [
   'daily-journals.',
   'cash-station.',
   'administrative-debt-settlements.',
+  'monthly-summary.',
   'inventory',
   'projects.',
 ];

@@ -8,10 +8,11 @@
     4 => 'Modules\\DailyJournal\\Providers\\DailyJournalServiceProvider',
     5 => 'Modules\\Dashboard\\Providers\\DashboardServiceProvider',
     6 => 'Modules\\Inventory\\Providers\\InventoryServiceProvider',
-    7 => 'Modules\\Notifications\\Providers\\NotificationsServiceProvider',
-    8 => 'Modules\\Project\\Providers\\ProjectServiceProvider',
-    9 => 'Modules\\Settings\\Providers\\SettingsServiceProvider',
-    10 => 'Modules\\User\\app\\Providers\\UserServiceProvider',
+    7 => 'Modules\\MonthlySummary\\Providers\\MonthlySummaryServiceProvider',
+    8 => 'Modules\\Notifications\\Providers\\NotificationsServiceProvider',
+    9 => 'Modules\\Project\\Providers\\ProjectServiceProvider',
+    10 => 'Modules\\Settings\\Providers\\SettingsServiceProvider',
+    11 => 'Modules\\User\\app\\Providers\\UserServiceProvider',
   ),
   'eager' => 
   array (
@@ -22,10 +23,11 @@
     4 => 'Modules\\DailyJournal\\Providers\\DailyJournalServiceProvider',
     5 => 'Modules\\Dashboard\\Providers\\DashboardServiceProvider',
     6 => 'Modules\\Inventory\\Providers\\InventoryServiceProvider',
-    7 => 'Modules\\Notifications\\Providers\\NotificationsServiceProvider',
-    8 => 'Modules\\Project\\Providers\\ProjectServiceProvider',
-    9 => 'Modules\\Settings\\Providers\\SettingsServiceProvider',
-    10 => 'Modules\\User\\app\\Providers\\UserServiceProvider',
+    7 => 'Modules\\MonthlySummary\\Providers\\MonthlySummaryServiceProvider',
+    8 => 'Modules\\Notifications\\Providers\\NotificationsServiceProvider',
+    9 => 'Modules\\Project\\Providers\\ProjectServiceProvider',
+    10 => 'Modules\\Settings\\Providers\\SettingsServiceProvider',
+    11 => 'Modules\\User\\app\\Providers\\UserServiceProvider',
   ),
   'deferred' => 
   array (

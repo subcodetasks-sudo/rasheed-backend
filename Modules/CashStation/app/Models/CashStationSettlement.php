@@ -4,6 +4,7 @@ namespace Modules\CashStation\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Modules\MonthlySummary\Enums\ContributionType;
 use Modules\Project\Models\Project;
 use Modules\User\app\Models\User;
 
@@ -17,6 +18,7 @@ class CashStationSettlement extends Model
         'from_project_id',
         'to_project_id',
         'amount',
+        'contribution_type',
         'created_by',
     ];
 
@@ -26,6 +28,7 @@ class CashStationSettlement extends Model
             'year' => 'integer',
             'month' => 'integer',
             'amount' => 'decimal:2',
+            'contribution_type' => ContributionType::class,
         ];
     }
 

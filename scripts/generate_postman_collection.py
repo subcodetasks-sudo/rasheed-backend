@@ -2466,6 +2466,194 @@ def cash_station_folder_items() -> list:
     ]
 
 
+# --- Monthly Summary ---
+
+SAMPLE_MONTHLY_SUMMARY_PROJECT = {
+    "project_id": 1,
+    "project_name": "تكية اطعام",
+    "project_type": "إطعام",
+    "project_status": "subject_to_administrative_percentage",
+    "project_net_result": "1000.00",
+    "net_result_state": "surplus",
+    "administrative_debt": "40.00",
+    "total_received_contributions": "0.00",
+}
+
+SAMPLE_MONTHLY_SUMMARY_PAYLOAD = {
+    "month": {"month": 7, "year": 2026},
+    "calculation_date": "2026-07-31",
+    "projects": [SAMPLE_MONTHLY_SUMMARY_PROJECT],
+    "contributions": [],
+}
+
+MONTHLY_SUMMARY_ROLES = ["super-admin", "finance"]
+
+
+def monthly_summary_show() -> dict:
+    path = "monthly-summary"
+    query = [
+        {"key": "month", "value": "7"},
+        {"key": "year", "value": "2026"},
+    ]
+    original = {"method": "GET", "header": header(), "url": url(path, query)}
+    return req(
+        "Show Monthly Summary",
+        "GET",
+        path,
+        description=(
+            "Per-project cards for the selected month. "
+            "`project_net_result` = Cash Station monthly_total. "
+            "Contributions are typed cash_station_settlements."
+        ),
+        roles=MONTHLY_SUMMARY_ROLES,
+        enums=(
+            "`month` 1–12, `year` 2000–2100\n"
+            "`project_status`: exempt | subject_to_administrative_percentage\n"
+            "`net_result_state`: surplus | deficit | neutral\n"
+            "`contribution_type`: fund_deficit | administrative_debt"
+        ),
+        query=query,
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok("Monthly summary fetched successfully.", SAMPLE_MONTHLY_SUMMARY_PAYLOAD),
+                original_request=original,
+            ),
+            *std_auth_errors(original, include_validation=True),
+        ],
+    )
+
+
+def monthly_summary_contributor_options() -> dict:
+    path = "monthly-summary/contributor-options"
+    query = [{"key": "month", "value": "7"}, {"key": "year", "value": "2026"}]
+    original = {"method": "GET", "header": header(), "url": url(path, query)}
+    return req(
+        "List Contributor Options",
+        "GET",
+        path,
+        description="Active projects with available Cash Fund surplus for Add Contribution.",
+        roles=MONTHLY_SUMMARY_ROLES,
+        query=query,
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok(
+                    "Monthly summary contributor options fetched successfully.",
+                    [{"project_id": 1, "project_name": "فائض", "available_surplus": "1000.00"}],
+                ),
+                original_request=original,
+            ),
+            *std_auth_errors(original, include_validation=True),
+        ],
+    )
+
+
+def monthly_summary_beneficiary_options() -> dict:
+    path = "monthly-summary/beneficiary-options"
+    query = [
+        {"key": "month", "value": "7"},
+        {"key": "year", "value": "2026"},
+        {"key": "from_project_id", "value": "1"},
+        {"key": "contribution_type", "value": "fund_deficit"},
+    ]
+    original = {"method": "GET", "header": header(), "url": url(path, query)}
+    return req(
+        "List Beneficiary Options",
+        "GET",
+        path,
+        description="Same-category beneficiaries with fund deficit or administrative debt.",
+        roles=MONTHLY_SUMMARY_ROLES,
+        query=query,
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok(
+                    "Monthly summary beneficiary options fetched successfully.",
+                    [{"project_id": 2, "project_name": "عجز", "remaining_need": "400.00"}],
+                ),
+                original_request=original,
+            ),
+            *std_auth_errors(original, include_validation=True),
+        ],
+    )
+
+
+def monthly_summary_contribution_create() -> dict:
+    path = "monthly-summary/contributions"
+    body = {
+        "month": 7,
+        "year": 2026,
+        "from_project_id": 1,
+        "to_project_id": 2,
+        "contribution_type": "fund_deficit",
+        "amount": 300,
+    }
+    original = {"method": "POST", "header": header(json_body=True), "body": body_raw(body), "url": url(path)}
+    return req(
+        "Create Monthly Summary Contribution",
+        "POST",
+        path,
+        description=(
+            "Typed month-end contribution stored on cash_station_settlements. "
+            "Affects Net Cash Fund only; does not change monthly_total. "
+            "administrative_debt also reduces beneficiary accumulated debt."
+        ),
+        roles=MONTHLY_SUMMARY_ROLES,
+        body=body,
+        json_body=True,
+        responses=[
+            example(
+                "201 Created",
+                201,
+                ok("Monthly summary contribution created successfully.", SAMPLE_MONTHLY_SUMMARY_PAYLOAD),
+                original_request=original,
+            ),
+            *std_auth_errors(original, include_validation=True),
+        ],
+    )
+
+
+def monthly_summary_contribution_cancel() -> dict:
+    path = "monthly-summary/contributions/{{monthly_summary_contribution_id}}"
+    original = {"method": "DELETE", "header": header(), "url": url(path)}
+    return req(
+        "Cancel Monthly Summary Contribution",
+        "DELETE",
+        path,
+        description="Cancel a typed contribution; restores admin debt when type=administrative_debt.",
+        roles=MONTHLY_SUMMARY_ROLES,
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok("Monthly summary contribution cancelled successfully.", SAMPLE_MONTHLY_SUMMARY_PAYLOAD),
+                original_request=original,
+            ),
+            example(
+                "404 Not Found",
+                404,
+                fail("Monthly summary contribution not found."),
+                original_request=original,
+            ),
+            *std_auth_errors(original),
+        ],
+    )
+
+
+def monthly_summary_folder_items() -> list:
+    return [
+        monthly_summary_show(),
+        monthly_summary_contributor_options(),
+        monthly_summary_beneficiary_options(),
+        monthly_summary_contribution_create(),
+        monthly_summary_contribution_cancel(),
+    ]
+
+
 # --- Administrative Debt Settlement ---
 
 SAMPLE_ADS_PROJECT = {
@@ -2794,6 +2982,7 @@ def build() -> dict:
                 [administration_rates_show()],
             ),
             folder("Cash Station", cash_station_folder_items()),
+            folder("Monthly Summary", monthly_summary_folder_items()),
             folder("Administrative Debt Settlement", administrative_debt_settlement_folder_items()),
             folder("Inventory", inventory_folder_items()),
         ],
@@ -2826,6 +3015,7 @@ def build() -> dict:
                 [administration_rates_show()],
             ),
             folder("Cash Station", cash_station_folder_items()),
+            folder("Monthly Summary", monthly_summary_folder_items()),
             folder("Administrative Debt Settlement", administrative_debt_settlement_folder_items()),
         ],
         description=(

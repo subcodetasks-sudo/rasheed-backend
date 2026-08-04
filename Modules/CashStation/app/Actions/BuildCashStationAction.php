@@ -137,6 +137,7 @@ class BuildCashStationAction
                 'from_project_id' => $settlement->from_project_id,
                 'to_project_id' => $settlement->to_project_id,
                 'amount' => $this->decimal($settlement->amount),
+                'contribution_type' => $settlement->contribution_type?->value,
             ])->values()->all(),
         ];
     }
@@ -239,7 +240,7 @@ class BuildCashStationAction
         return $keyed;
     }
 
-    private function monthlyTotalFromAggregate(mixed $aggregate): float
+    public function monthlyTotalFromAggregate(mixed $aggregate): float
     {
         if ($aggregate === null) {
             return 0.0;
@@ -298,10 +299,52 @@ class BuildCashStationAction
     }
 
     /**
+     * Net cash fund for a project in a month (can be negative).
+     */
+    public function netCashFundForProject(int $projectId, int $month, int $year): float
+    {
+        $startOfMonth = Carbon::create($year, $month, 1)->startOfDay();
+        $endOfMonth = $startOfMonth->copy()->endOfMonth()->startOfDay();
+        $previousMonth = $startOfMonth->copy()->subMonthNoOverflow();
+
+        $carriedFromPrevious = $this->hasCarryFromPrevious(
+            (int) $previousMonth->year,
+            (int) $previousMonth->month,
+            $year,
+            $month,
+        );
+
+        $previousMonthlyTotal = 0.0;
+        if ($carriedFromPrevious) {
+            $previousAggregates = $this->monthlyAggregatesByProject(
+                [$projectId],
+                $previousMonth->copy()->startOfMonth()->toDateString(),
+                $previousMonth->copy()->endOfMonth()->toDateString(),
+            );
+            $previousMonthlyTotal = $this->monthlyTotalFromAggregate($previousAggregates[$projectId] ?? null);
+        }
+
+        $aggregates = $this->monthlyAggregatesByProject(
+            [$projectId],
+            $startOfMonth->toDateString(),
+            $endOfMonth->toDateString(),
+        );
+        $contributions = $this->contributionsByProject(
+            $this->settlementsForMonth($year, $month)
+        );
+
+        $monthlyTotal = $this->monthlyTotalFromAggregate($aggregates[$projectId] ?? null);
+        $added = (float) ($contributions[$projectId]['added'] ?? 0);
+        $deducted = (float) ($contributions[$projectId]['deducted'] ?? 0);
+
+        return $previousMonthlyTotal + $monthlyTotal + $added - $deducted;
+    }
+
+    /**
      * @param  array<int, int>  $projectIds
      * @return array<int, float>
      */
-    private function administrativeDebtsByProject(array $projectIds, string $asOfDate): array
+    public function administrativeDebtsByProject(array $projectIds, string $asOfDate): array
     {
         if ($projectIds === []) {
             return [];

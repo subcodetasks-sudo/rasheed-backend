@@ -1,0 +1,11 @@
+{
+    "name": "MonthlySummary",
+    "alias": "monthlysummary",
+    "description": "Monthly per-project financial cards and typed month-end contributions via cash_station_settlements",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\MonthlySummary\\Providers\\MonthlySummaryServiceProvider"
+    ],
+    "files": []
+}
