@@ -1,0 +1,23 @@
+{
+    "name": "nwidart/cashfundexpenses",
+    "description": "",
+    "authors": [],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {}
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\CashFundExpenses\\": "app/",
+            "Modules\\CashFundExpenses\\Database\\Factories\\": "database/factories/",
+            "Modules\\CashFundExpenses\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\CashFundExpenses\\Tests\\": "tests/"
+        }
+    }
+}

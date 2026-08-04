@@ -8,6 +8,7 @@
     "Inventory": true,
     "Dashboard": true,
     "CashStation": true,
+    "CashFundExpenses": true,
     "Notifications": true,
     "AdministrativeDebtSettlement": true,
     "MonthlySummary": true

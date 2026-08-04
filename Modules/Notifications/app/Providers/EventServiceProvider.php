@@ -15,6 +15,7 @@ use Modules\Notifications\Listeners\NotifyDailyJournalActivity;
 use Modules\Notifications\Listeners\NotifyInventoryActivity;
 use Modules\Notifications\Listeners\NotifyProjectActivity;
 use Modules\Notifications\Listeners\RefreshAdministrativeDebtSettlementOnDailyJournalUpdate;
+use Modules\Notifications\Listeners\RefreshCashFundExpensesOnDailyJournalUpdate;
 use Modules\Notifications\Listeners\RefreshCashStationOnDailyJournalUpdate;
 use Modules\Project\Events\ProjectArchived;
 use Modules\Project\Events\ProjectCreated;
@@ -35,6 +36,7 @@ class EventServiceProvider extends ServiceProvider
             NotifyDailyJournalActivity::class,
             RefreshCashStationOnDailyJournalUpdate::class,
             RefreshAdministrativeDebtSettlementOnDailyJournalUpdate::class,
+            RefreshCashFundExpensesOnDailyJournalUpdate::class,
         ],
         AdministrativeDebtRepaid::class => [
             NotifyDailyJournalActivity::class,

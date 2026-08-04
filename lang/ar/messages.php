@@ -74,6 +74,7 @@ return [
     'inventory_category_deleted_successfully' => 'تم حذف تصنيف المخزون بنجاح.',
     'inventory_category_has_items' => 'لا يمكن حذف تصنيف المخزون لوجود أصناف مرتبطة به.',
     'inventory_category_not_found' => 'تصنيف المخزون غير موجود.',
+    'cash_fund_expenses_fetched_successfully' => 'تم جلب مصروفات الصناديق بنجاح.',
     'cash_station_fetched_successfully' => 'تم جلب محطة الصندوق بنجاح.',
     'cash_station_carried_forward_successfully' => 'تم ترحيل شهر محطة الصندوق بنجاح.',
     'cash_station_settlement_created_successfully' => 'تم إنشاء تسوية محطة الصندوق بنجاح.',

@@ -9,7 +9,8 @@ modular monolith built on `nwidart/laravel-modules`: all domain code lives under
 thin cross-cutting concerns (base controller, media handling, exception handler, generic query helpers).
 
 Active modules (see `modules_statuses.json`): `User`, `Authorization`, `Settings`, `Project`, `DailyJournal`,
-`AdministrationRates`, `Inventory`, `Dashboard`, `CashStation`, `Notifications`, `AdministrativeDebtSettlement`.
+`AdministrationRates`, `Inventory`, `Dashboard`, `CashStation`, `CashFundExpenses`, `Notifications`,
+`AdministrativeDebtSettlement`, `MonthlySummary`.
 
 ## Common commands
 
@@ -277,6 +278,37 @@ separate from the day-level `POST /daily-journals/repay-debt` flow: settlement-b
 Net Cash or `fund_balance`, it only affects the shared admin-percentage pool. The workflow re-dispatches
 `CashStationUpdated` afterward since settling debt changes `remaining_administrative_debt` in the CashStation view.
 
+### CashFundExpenses: read-only daily-expense matrix
+
+Single-endpoint reporting module (`ShowCashFundExpensesController → ShowCashFundExpensesWorkflow →
+BuildCashFundExpensesAction`, `GET /v1/cash-fund-expenses`). For a given month/year it aggregates
+`daily_journal_entries.daily_expense + administrative_expense` per project per day straight off the DB (no other
+module's derived data), returning a zero-filled day-by-day matrix per project plus each project's monthly total;
+projects with a zero monthly total are dropped from the response. It has no persistence of its own — like
+`AdministrationRates`, it's purely a read model. `RefreshCashFundExpensesOnDailyJournalUpdate` (registered on
+`DailyJournalUpdated` in `Notifications\EventServiceProvider`) rebuilds and re-broadcasts `CashFundExpensesUpdated`
+whenever a journal entry changes, the same push-refresh pattern `CashStation` uses.
+
+### MonthlySummary: cross-project contribution transfers
+
+Aggregation + write module (`ShowMonthlySummaryController → ShowMonthlySummaryWorkflow → BuildMonthlySummaryAction`,
+`GET /v1/monthly-summary`) that lists every active project's monthly net result (surplus/deficit, derived from
+`CashStation\BuildCashStationAction`'s per-project monthly aggregates), outstanding `accumulated_administrative_debt`,
+and any contribution settlements recorded for that month. A **contribution** is a `CashStationSettlement` row with a
+non-null `contribution_type` (`Modules\MonthlySummary\Enums\ContributionType`: `fund_deficit` or
+`administrative_debt`) — it reuses `CashStation`'s settlement table/model rather than introducing a new one.
+`StoreMonthlySummaryContributionController → StoreMonthlySummaryContributionWorkflow`
+(`POST /v1/monthly-summary/contributions`) transfers surplus from a contributor project to a beneficiary project
+within the **same category**: `ValidateMonthlySummaryContributionAction` caps the amount at
+`min(contributor's transferable surplus, beneficiary's remaining need)` — remaining need being either the
+beneficiary's fund deficit or its outstanding administrative debt, depending on `contribution_type` — then
+`CreateCashStationSettlementAction` persists it. For `administrative_debt` contributions only,
+`ApplyContributionAdministrativeDebtAction` additionally walks the beneficiary's `daily_journal_entries` from the
+settlement month forward and reduces `accumulated_administrative_debt` on the tip entry and every later entry by the
+contributed amount (mirrored in reverse by `ReverseContributionAdministrativeDebtAction` when
+`CancelMonthlySummaryContributionController` deletes a contribution). Every write re-dispatches both
+`CashStationUpdated` and `MonthlySummaryUpdated` since a contribution changes both views.
+
 ### Notifications: activity feed + cross-module reactions
 
 `Notifications` is a passive subscriber module: its `EventServiceProvider` (registered explicitly from
@@ -286,10 +318,12 @@ for domain events from `Project`, `DailyJournal`, `Inventory`, and `CashStation`
    `NotifyInventoryActivity`, `NotifyCashStationActivity` each translate one module's events into a persisted
    `Notification` row via `NotificationService` (`notifyActivity`/`notifySuccess`/`notifyWarning`/`notifyDanger`/
    `notifyInfo`), which also dispatches `NotificationCreated` for real-time delivery.
-2. **Cross-module cache/view refresh** — `RefreshCashStationOnDailyJournalUpdate` and
-   `RefreshAdministrativeDebtSettlementOnDailyJournalUpdate` rebuild and re-broadcast those other modules' derived
-   views whenever `DailyJournal` changes, so `CashStation`/`AdministrativeDebtSettlement` don't need direct
-   knowledge of `DailyJournal`'s write path.
+2. **Cross-module cache/view refresh** — `RefreshCashStationOnDailyJournalUpdate`,
+   `RefreshAdministrativeDebtSettlementOnDailyJournalUpdate`, and `RefreshCashFundExpensesOnDailyJournalUpdate`
+   rebuild and re-broadcast those other modules' derived views whenever `DailyJournal` changes, so
+   `CashStation`/`AdministrativeDebtSettlement`/`CashFundExpenses` don't need direct knowledge of `DailyJournal`'s
+   write path. `MonthlySummary` doesn't need a listener here since it only changes via its own contribution
+   endpoints, which dispatch `MonthlySummaryUpdated` directly.
 
 Separately, `Modules\Notifications\Contracts\NotificationRule` + `NotificationRuleRegistry` is a second, unrelated
 extension point: a rule declares which `context` string it `handles()` and is `evaluate()`-d against a subject

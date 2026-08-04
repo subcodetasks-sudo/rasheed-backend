@@ -414,6 +414,8 @@ ENUMS_DOC = """
   - `notifications` → `notification.created`
   - `daily-journals.{Y-m-d}` → `daily-journal.updated`
   - `cash-station.{YYYY}-{MM}` → `cash-station.updated`
+  - `monthly-summary.{YYYY}-{MM}` → `monthly-summary.updated`
+  - `cash-fund-expenses.{YYYY}-{MM}` → `cash-fund-expenses.updated`
   - `administrative-debt-settlements.{YYYY}-{MM}` → `administrative-debt-settlements.updated`
   - `inventory` → `inventory.item-created`, `inventory.stock-moved`
   - `projects.{id}` → (reserved for project payloads)
@@ -2502,7 +2504,8 @@ def monthly_summary_show() -> dict:
         path,
         description=(
             "Per-project cards for the selected month. "
-            "`project_net_result` = Cash Station monthly_total. "
+            "`project_net_result` = Cash Station monthly_total adjusted for this month's "
+            "contributions given/received (+ added − deducted). "
             "Contributions are typed cash_station_settlements."
         ),
         roles=MONTHLY_SUMMARY_ROLES,
@@ -2651,6 +2654,68 @@ def monthly_summary_folder_items() -> list:
         monthly_summary_beneficiary_options(),
         monthly_summary_contribution_create(),
         monthly_summary_contribution_cancel(),
+    ]
+
+
+# --- Cash Fund Expenses ---
+
+SAMPLE_CASH_FUND_EXPENSES_PAYLOAD = {
+    "month": 8,
+    "year": 2026,
+    "days": list(range(1, 32)),
+    "projects": [
+        {
+            "project_id": 1,
+            "project_name": "Project A",
+            "daily_expenses": {"1": "250.00", "2": None, "3": "500.00"},
+            "monthly_total": "750.00",
+        }
+    ],
+}
+
+CASH_FUND_EXPENSES_ROLES = ["super-admin", "finance"]
+
+
+def cash_fund_expenses_show() -> dict:
+    path = "cash-fund-expenses"
+    query = [
+        {"key": "month", "value": "8"},
+        {"key": "year", "value": "2026"},
+    ]
+    original = {"method": "GET", "header": header(), "url": url(path, query)}
+    return req(
+        "Show Cash Fund Expenses",
+        "GET",
+        path,
+        description=(
+            "Read-only month grid of cash-fund expenses from Daily Journal only. "
+            "Each day cell = SUM(daily_expense + administrative_expense). "
+            "Days with no expenses return null (frontend shows —). "
+            "Projects with zero month total are omitted. "
+            "Realtime: room `cash-fund-expenses.{YYYY}-{MM}`, event `cash-fund-expenses.updated`."
+        ),
+        roles=CASH_FUND_EXPENSES_ROLES,
+        enums=(
+            "`month` 1–12, `year` 2000–2100\n"
+            "`days` = 1..daysInMonth for the selected calendar month\n"
+            "Day amount = COALESCE(daily_expense,0) + COALESCE(administrative_expense,0)"
+        ),
+        query=query,
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok("Cash fund expenses fetched successfully.", SAMPLE_CASH_FUND_EXPENSES_PAYLOAD),
+                original_request=original,
+            ),
+            *std_auth_errors(original, include_validation=True),
+        ],
+    )
+
+
+def cash_fund_expenses_folder_items() -> list:
+    return [
+        cash_fund_expenses_show(),
     ]
 
 
@@ -2983,6 +3048,7 @@ def build() -> dict:
             ),
             folder("Cash Station", cash_station_folder_items()),
             folder("Monthly Summary", monthly_summary_folder_items()),
+            folder("Cash Fund Expenses", cash_fund_expenses_folder_items()),
             folder("Administrative Debt Settlement", administrative_debt_settlement_folder_items()),
             folder("Inventory", inventory_folder_items()),
         ],
@@ -3016,12 +3082,14 @@ def build() -> dict:
             ),
             folder("Cash Station", cash_station_folder_items()),
             folder("Monthly Summary", monthly_summary_folder_items()),
+            folder("Cash Fund Expenses", cash_fund_expenses_folder_items()),
             folder("Administrative Debt Settlement", administrative_debt_settlement_folder_items()),
         ],
         description=(
             "**Allowed:** list/show projects & categories, financial settings GET, "
             "calculate deductions, daily journal CRUD, administration rates, cash station "
-            "(show / carry-forward / settlements), administrative debt settlement.\n\n"
+            "(show / carry-forward / settlements), monthly summary, cash fund expenses, "
+            "administrative debt settlement.\n\n"
             "**Denied (403):** create/update/delete projects & categories, update financial settings, "
             "inventory module, user/role/settings admin endpoints."
         ),

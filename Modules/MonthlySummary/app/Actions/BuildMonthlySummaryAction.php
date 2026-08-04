@@ -43,7 +43,9 @@ class BuildMonthlySummaryAction
                 $aggregates[$project->id] ?? null
             );
             $added = (float) ($contributions[$project->id]['added'] ?? 0);
+            $deducted = (float) ($contributions[$project->id]['deducted'] ?? 0);
             $debt = (float) ($debts[$project->id] ?? 0);
+            $netResult = $monthlyTotal + $added - $deducted;
 
             $projectRows[] = [
                 'project_id' => $project->id,
@@ -52,10 +54,11 @@ class BuildMonthlySummaryAction
                 'project_status' => $project->administrative_exempt
                     ? 'exempt'
                     : 'subject',
-                'project_net_result' => $this->decimal($monthlyTotal),
-                'net_result_state' => $this->netResultState($monthlyTotal),
+                'project_net_result' => $this->decimal($netResult),
+                'net_result_state' => $this->netResultState($netResult),
                 'administrative_debt' => $this->decimal($debt),
                 'total_received_contributions' => $this->decimal($added),
+                'total_deducted_contributions' => $this->decimal($deducted),
             ];
         }
 

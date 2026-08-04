@@ -1,0 +1,11 @@
+{
+    "name": "CashFundExpenses",
+    "alias": "cashfundexpenses",
+    "description": "Read-only monthly cash fund expenses report from Daily Journal",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\CashFundExpenses\\Providers\\CashFundExpensesServiceProvider"
+    ],
+    "files": []
+}

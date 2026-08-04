@@ -74,6 +74,7 @@ return [
     'inventory_category_deleted_successfully' => 'Inventory category deleted successfully.',
     'inventory_category_has_items' => 'Cannot delete inventory category because it has linked inventory items.',
     'inventory_category_not_found' => 'Inventory category not found.',
+    'cash_fund_expenses_fetched_successfully' => 'Cash fund expenses fetched successfully.',
     'cash_station_fetched_successfully' => 'Cash station fetched successfully.',
     'cash_station_carried_forward_successfully' => 'Cash station month carried forward successfully.',
     'cash_station_settlement_created_successfully' => 'Cash station settlement created successfully.',
