@@ -25,7 +25,7 @@ class CreateInventoryItemAction
             'code' => $this->codeGenerator->generate(),
             'project_id' => $data->projectId,
             'name' => $data->name,
-            'category' => $data->category,
+            'inventory_category_id' => $data->categoryId,
             'unit' => $data->unit,
             'latest_incoming_price' => $openingPrice,
             'opening_quantity' => $openingQuantity,
@@ -44,6 +44,6 @@ class CreateInventoryItemAction
         $this->fifoService->createOpeningBatch($item, $openingQuantity, $openingPrice);
         $this->balanceService->checkMinimumStock($item, null);
 
-        return $item->fresh(['project']);
+        return $item->fresh(['project', 'inventoryCategory']);
     }
 }

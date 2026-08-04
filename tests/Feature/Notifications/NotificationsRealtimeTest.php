@@ -8,6 +8,7 @@ use Laravel\Sanctum\Sanctum;
 use Modules\Inventory\Enums\InventoryExpenseType;
 use Modules\Inventory\Events\InventoryItemCreated;
 use Modules\Inventory\Events\InventoryStockMoved;
+use Modules\Inventory\Models\InventoryCategory;
 use Modules\Notifications\Enums\NotificationType;
 use Modules\Notifications\Events\NotificationCreated;
 use Modules\Notifications\Models\Notification;
@@ -115,7 +116,7 @@ class NotificationsRealtimeTest extends TestCase
 
         $itemId = $this->postJson('/api/v1/inventory/items', [
             'name' => 'Gloves',
-            'category' => 'safety',
+            'category_id' => InventoryCategory::factory()->create(['name' => 'safety'])->id,
             'project_id' => $project->id,
             'unit' => 'box',
             'opening_price' => 5,
@@ -151,7 +152,7 @@ class NotificationsRealtimeTest extends TestCase
 
         $itemId = $this->postJson('/api/v1/inventory/items', [
             'name' => 'Mask',
-            'category' => 'safety',
+            'category_id' => InventoryCategory::factory()->create(['name' => 'safety'])->id,
             'project_id' => $project->id,
             'unit' => 'box',
             'opening_price' => 5,
@@ -184,7 +185,7 @@ class NotificationsRealtimeTest extends TestCase
 
         $this->postJson('/api/v1/inventory/items', [
             'name' => 'Paper',
-            'category' => 'office',
+            'category_id' => InventoryCategory::factory()->create(['name' => 'office'])->id,
             'project_id' => $project->id,
             'unit' => 'ream',
             'opening_price' => 10,

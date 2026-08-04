@@ -298,11 +298,19 @@ SAMPLE_JOURNAL_ENTRY_CONTRIBUTION = {
     "accumulated_administrative_debt": "0.00",
 }
 
+SAMPLE_INVENTORY_CATEGORY = {
+    "id": 1,
+    "name": "مستهلكات",
+    "created_at": "2026-08-04 10:00:00",
+    "updated_at": "2026-08-04 10:00:00",
+}
+
 SAMPLE_INVENTORY_ITEM = {
     "id": 1,
     "code": "INV-0001",
     "name": "قفازات طبية",
-    "category": "مستهلكات",
+    "category_id": 1,
+    "category": {"id": 1, "name": "مستهلكات"},
     "unit": "علبة",
     "project": {"id": 1, "name": "مشروع صحي ثابت"},
     "project_id": 1,
@@ -1705,7 +1713,8 @@ def journal_repay_debt() -> dict:
 INVENTORY_ROLES = ["super-admin", "inventory"]
 
 INVENTORY_ITEM_ENUMS = (
-    "`name`, `category`, `unit`: required strings\n"
+    "`name`, `unit`: required strings\n"
+    "`category_id`: required, must exist in inventory_categories (not project categories)\n"
     "`project_id`: required, must exist in projects\n"
     "`opening_price`, `opening_quantity`: required numeric ≥ 0 (creates opening batch + incoming movement)\n"
     "`minimum_stock_level`: nullable numeric ≥ 0\n"
@@ -1738,9 +1747,9 @@ INVENTORY_OUTGOING_ENUMS = (
 
 LIST_INVENTORY_ITEMS_QUERY = [
     {"key": "search", "value": "قفازات", "description": "Search name, code", "disabled": True},
-    {"key": "filter[category]", "value": "مستهلكات", "description": "Exact category string", "disabled": True},
+    {"key": "filter[category_id]", "value": "1", "description": "Inventory category id", "disabled": True},
     {"key": "filter[project_id]", "value": "1", "description": "Owning project id", "disabled": True},
-    {"key": "sort", "value": "-created_at", "description": "name | code | category | created_at | current_balance", "disabled": True},
+    {"key": "sort", "value": "-created_at", "description": "name | code | inventory_category_id | created_at | current_balance", "disabled": True},
     {"key": "per_page", "value": "15", "description": "1–100, default 15"},
     {"key": "page", "value": "1", "disabled": True},
 ]
@@ -1766,10 +1775,10 @@ def inventory_items_list() -> dict:
         description="Paginated inventory items with filters, sort, and search.",
         roles=INVENTORY_ROLES,
         enums=(
-            "`filter[category]`: string\n"
+            "`filter[category_id]`: inventory category id\n"
             "`filter[project_id]`: integer\n"
             "`search`: name | code\n"
-            "`sort`: name | code | category | created_at | current_balance (prefix `-` for desc)"
+            "`sort`: name | code | inventory_category_id | created_at | current_balance (prefix `-` for desc)"
         ),
         query=LIST_INVENTORY_ITEMS_QUERY,
         responses=[
@@ -1821,7 +1830,7 @@ def inventory_items_create() -> dict:
     path = "inventory/items"
     body = {
         "name": "قفازات طبية",
-        "category": "مستهلكات",
+        "category_id": 1,
         "project_id": 1,
         "unit": "علبة",
         "opening_price": 25.5,
@@ -1993,8 +2002,110 @@ def inventory_outgoing_create() -> dict:
     )
 
 
+def inventory_categories_list() -> dict:
+    path = "inventory/categories"
+    original = {"method": "GET", "header": header(), "url": url(path)}
+    return req(
+        "List Inventory Categories",
+        "GET",
+        path,
+        description="List inventory categories (separate from project categories).",
+        roles=INVENTORY_ROLES,
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok("Inventory categories fetched successfully.", [SAMPLE_INVENTORY_CATEGORY]),
+                original_request=original,
+            ),
+            *std_auth_errors(original),
+        ],
+    )
+
+
+def inventory_categories_create() -> dict:
+    path = "inventory/categories"
+    body = {"name": "مستهلكات"}
+    original = {"method": "POST", "header": header(json_body=True), "body": body_raw(body), "url": url(path)}
+    return req(
+        "Create Inventory Category",
+        "POST",
+        path,
+        description="Create an inventory category. Name must be unique in inventory_categories.",
+        roles=INVENTORY_ROLES,
+        enums="`name`: required string, unique in inventory_categories",
+        body=body,
+        json_body=True,
+        responses=[
+            example(
+                "201 Created",
+                201,
+                ok("Inventory category created successfully.", SAMPLE_INVENTORY_CATEGORY),
+                original_request=original,
+            ),
+            *std_auth_errors(original, include_validation=True),
+        ],
+    )
+
+
+def inventory_categories_update() -> dict:
+    path = "inventory/categories/{{inventory_category_id}}"
+    body = {"name": "معدات"}
+    original = {"method": "PATCH", "header": header(json_body=True), "body": body_raw(body), "url": url(path)}
+    return req(
+        "Update Inventory Category",
+        "PATCH",
+        path,
+        description="Rename an inventory category.",
+        roles=INVENTORY_ROLES,
+        enums="`name`: required string, unique in inventory_categories",
+        body=body,
+        json_body=True,
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok("Inventory category updated successfully.", {**SAMPLE_INVENTORY_CATEGORY, "name": "معدات"}),
+                original_request=original,
+            ),
+            *std_auth_errors(original, include_validation=True),
+        ],
+    )
+
+
+def inventory_categories_delete() -> dict:
+    path = "inventory/categories/{{inventory_category_id}}"
+    original = {"method": "DELETE", "header": header(), "url": url(path)}
+    return req(
+        "Delete Inventory Category",
+        "DELETE",
+        path,
+        description="Delete an inventory category. Blocked when items still reference it.",
+        roles=INVENTORY_ROLES,
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok("Inventory category deleted successfully."),
+                original_request=original,
+            ),
+            example(
+                "422 Has Items",
+                422,
+                fail("Cannot delete inventory category because it has linked inventory items."),
+                original_request=original,
+            ),
+            *std_auth_errors(original),
+        ],
+    )
+
+
 def inventory_folder_items() -> list:
     return [
+        inventory_categories_list(),
+        inventory_categories_create(),
+        inventory_categories_update(),
+        inventory_categories_delete(),
         inventory_items_list(),
         inventory_items_create(),
         inventory_items_show(),
@@ -2136,7 +2247,10 @@ CASH_STATION_MONTH_ENUMS = (
     "summary.total_administrative_percentage = same collected intake used in Monthly Total.\n"
     "Settlements never enter next month's opening. Net Cash Fund is never carried.\n"
     "Does not recalculate Daily Journal math; reuses persisted journal fields only.\n"
-    "`remaining_administrative_debt` = originating accumulated debt − Administrative Debt Settlement debt allocations through the month.\n"
+    "`remaining_administrative_debt` = month-end journal `accumulated_administrative_debt` "
+    "(already reduced when ADS settles; do not also subtract settlement rows).\n"
+    "`administrative_debt` (Cash Station row) = remaining + debt allocated by ADS in this month "
+    "(display of pre-settlement month debt).\n"
     "`status` = Cash Box Status from Net Cash Fund: `surplus` | `deficit` | `balanced`."
 )
 
@@ -2377,11 +2491,15 @@ ADS_ENUMS = (
     "Table columns only: project_id/name, net_cash_balance, administrative_debt, "
     "recoverable_amount, remaining_debt, settlement_status, can_settle.\n"
     "Surplus / Recoverable Amount uses Cash Station `net_cash_fund` (max(0, …)), not Daily Journal `fund_balance`.\n"
-    "Administrative Debt = month-end accumulated − module debt settlements through the month.\n"
+    "Administrative Debt / Remaining Debt = month-end journal `accumulated_administrative_debt` "
+    "(ADS settle mutates that tip; settlement rows are not subtracted again).\n"
     "Recoverable Amount = min(debt, available surplus after cash-box reservation). "
     "Available surplus = max(0, net_cash_fund) − Σ prior ADS settlements this month/project "
     "(Net Cash itself is not mutated).\n"
-    "Remaining Debt = unpaid outstanding Administrative Debt (same as administrative_debt on the row).\n"
+    "Allocation priority on execute: Cash Box capacity → Current Admin Debt → Carried Admin Debt. "
+    "Only debt-allocated amounts credit the org Administrative Percentage Balance.\n"
+    "Settlement updates admin % balance, remaining debt, and related indicators immediately; "
+    "it does **not** deduct from Net Cash Fund.\n"
     "`settlement_status`: unpaid | partial | paid.\n"
     "`can_settle`: true when surplus capacity and recoverable amount are both > 0.\n"
     "Realtime: room `administrative-debt-settlements.{YYYY}-{MM}` → `administrative-debt-settlements.updated`."
@@ -2428,8 +2546,10 @@ def administrative_debt_settlement_create() -> dict:
         path,
         description=(
             "Recover project administrative debt from month Net Cash surplus capacity. "
-            "Credits org Administrative Percentage Balance. Does not mutate Net Cash, "
-            "Cash Station settlements, or journal fund_balance. "
+            "Credits org Administrative Percentage Balance for debt-allocated amounts. "
+            "Reduces journal `accumulated_administrative_debt` so later days inherit the settled "
+            "balance. Does not mutate Net Cash Fund, day `administrative_debt`, "
+            "Cash Station inter-project settlements, or journal `fund_balance`. "
             "`amount` optional (defaults to full recoverable)."
         ),
         roles=["super-admin", "finance"],
@@ -2437,7 +2557,8 @@ def administrative_debt_settlement_create() -> dict:
             "`year` / `month`: settlement month (required).\n"
             "`project_id`: indebted project (required).\n"
             "`amount`: optional positive decimal ≤ debt and ≤ surplus; omit for full recoverable.\n"
-            "Requires debt > 0 and net_cash_fund > 0."
+            "Requires debt > 0 and available Net Cash surplus capacity > 0.\n"
+            "Priority: Cash Box capacity → Current Admin Debt → Carried Admin Debt."
         ),
         body=body,
         json_body=True,

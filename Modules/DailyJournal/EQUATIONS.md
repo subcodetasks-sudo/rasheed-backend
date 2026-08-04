@@ -208,8 +208,10 @@ available = SUM(administrative_fee) − SUM(admin_percentage_balance_debits.amou
 - Monthly Cash Station settlements never restore these debits.
 - Administrative Debt Settlement (month/org-pool recovery) permanently **credits** the pool via `admin_percentage_balance_credits` for the **debt-allocated** portion (`allocated_current_debt + allocated_carried_debt`) when surplus-based debt is recovered. That path does **not** reduce Net Cash or `fund_balance` (distinct from day-level `POST /daily-journals/repay-debt`).
 - On settle, the same debt-allocated amount reduces `accumulated_administrative_debt` on the latest journal entry on/before month-end (and later entries), so a new journal day inherits the settled balance. Day `administrative_debt` and `fund_balance` are not changed (preserves Monthly Total / Net Cash).
+- Settlement updates Administrative Percentage Balance, remaining administrative debt, and related Cash Station / ADS indicators immediately; **it does not deduct the settlement amount from Net Cash Fund** (debt was already charged against the pool when formed; settle only restores the pool).
 - Available surplus capacity for ADS in a month = `max(0, net_cash_fund) − Σ prior ADS recoverable_amount for that project/month` (cumulative cap without mutating Net Cash).
 - Allocation priority on execute: Cash Box capacity → Current Admin Debt → Carried Admin Debt.
+- ADS list / Cash Station remaining debt read month-end journal `accumulated_administrative_debt` after mutation (do not also subtract settlement ledger totals — that would double-count).
 
 - Remaining deficit = `|fund_balance|` after Pass-1 totals+balances (contribution zeroed).
 - Unchanged null/zero when no prior contribution: finance may omit/send zero without error.

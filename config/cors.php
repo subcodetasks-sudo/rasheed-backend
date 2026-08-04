@@ -22,7 +22,7 @@ return [
     |--------------------------------------------------------------------------
     */
     'allowed_origins' => array_filter(
-        explode(',', env('CORS_ALLOWED_ORIGINS', 'http://localhost:5174'))
+        explode(',', env('CORS_ALLOWED_ORIGINS', ['http://localhost:5174', 'http://192.168.1.10:5174']))
     ),
     /*
     |--------------------------------------------------------------------------

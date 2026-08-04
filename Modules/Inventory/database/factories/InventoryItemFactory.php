@@ -4,6 +4,7 @@ namespace Modules\Inventory\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
+use Modules\Inventory\Models\InventoryCategory;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Project\Models\Project;
 
@@ -22,7 +23,7 @@ class InventoryItemFactory extends Factory
             'code' => (string) Str::ulid(),
             'project_id' => Project::factory(),
             'name' => fake()->words(3, true),
-            'category' => fake()->randomElement(['office', 'equipment', 'supplies']),
+            'inventory_category_id' => InventoryCategory::factory(),
             'unit' => fake()->randomElement(['piece', 'box', 'kg']),
             'latest_incoming_price' => fake()->randomFloat(2, 1, 100),
             'opening_quantity' => $opening,

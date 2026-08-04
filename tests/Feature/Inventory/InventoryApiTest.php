@@ -20,7 +20,7 @@ class InventoryApiTest extends InventoryFeatureTestCase
 
         $response = $this->postJson('/api/v1/inventory/items', [
             'name' => 'Paper A4',
-            'category' => 'office',
+            'category_id' => $this->createInventoryCategory(['name' => 'office'])->id,
             'project_id' => $project->id,
             'unit' => 'ream',
             'opening_price' => 10,
@@ -62,7 +62,7 @@ class InventoryApiTest extends InventoryFeatureTestCase
 
         $this->postJson('/api/v1/inventory/items', [
             'name' => 'X',
-            'category' => 'office',
+            'category_id' => $this->createInventoryCategory(['name' => 'office'])->id,
             'project_id' => $project->id,
             'unit' => 'pc',
             'opening_price' => 1,
@@ -79,7 +79,7 @@ class InventoryApiTest extends InventoryFeatureTestCase
 
         $itemId = $this->postJson('/api/v1/inventory/items', [
             'name' => 'Ink',
-            'category' => 'supplies',
+            'category_id' => $this->createInventoryCategory(['name' => 'supplies'])->id,
             'project_id' => $project->id,
             'unit' => 'bottle',
             'opening_price' => 5,
@@ -116,7 +116,7 @@ class InventoryApiTest extends InventoryFeatureTestCase
 
         $itemId = $this->postJson('/api/v1/inventory/items', [
             'name' => 'Ink',
-            'category' => 'supplies',
+            'category_id' => $this->createInventoryCategory(['name' => 'supplies'])->id,
             'project_id' => $project->id,
             'unit' => 'bottle',
             'opening_price' => 5,
@@ -150,7 +150,7 @@ class InventoryApiTest extends InventoryFeatureTestCase
 
         $itemId = $this->postJson('/api/v1/inventory/items', [
             'name' => 'Toner',
-            'category' => 'supplies',
+            'category_id' => $this->createInventoryCategory(['name' => 'supplies'])->id,
             'project_id' => $project->id,
             'unit' => 'pc',
             'opening_price' => 100,
@@ -186,7 +186,7 @@ class InventoryApiTest extends InventoryFeatureTestCase
 
         $itemId = $this->postJson('/api/v1/inventory/items', [
             'name' => 'Cable',
-            'category' => 'equipment',
+            'category_id' => $this->createInventoryCategory(['name' => 'equipment'])->id,
             'project_id' => $owner->id,
             'unit' => 'm',
             'opening_price' => 2,
@@ -234,7 +234,7 @@ class InventoryApiTest extends InventoryFeatureTestCase
 
         $itemId = $this->postJson('/api/v1/inventory/items', [
             'name' => 'Cable',
-            'category' => 'equipment',
+            'category_id' => $this->createInventoryCategory(['name' => 'equipment'])->id,
             'project_id' => $owner->id,
             'unit' => 'm',
             'opening_price' => 2,
@@ -263,7 +263,7 @@ class InventoryApiTest extends InventoryFeatureTestCase
 
         $itemId = $this->postJson('/api/v1/inventory/items', [
             'name' => 'Office chair',
-            'category' => 'furniture',
+            'category_id' => $this->createInventoryCategory(['name' => 'furniture'])->id,
             'project_id' => $owner->id,
             'unit' => 'pc',
             'opening_price' => 100,
@@ -313,7 +313,7 @@ class InventoryApiTest extends InventoryFeatureTestCase
 
         $itemId = $this->postJson('/api/v1/inventory/items', [
             'name' => 'Desk',
-            'category' => 'furniture',
+            'category_id' => $this->createInventoryCategory(['name' => 'furniture'])->id,
             'project_id' => $owner->id,
             'unit' => 'pc',
             'opening_price' => 80,
@@ -361,7 +361,7 @@ class InventoryApiTest extends InventoryFeatureTestCase
 
         $itemId = $this->postJson('/api/v1/inventory/items', [
             'name' => 'Screw',
-            'category' => 'parts',
+            'category_id' => $this->createInventoryCategory(['name' => 'parts'])->id,
             'project_id' => $owner->id,
             'unit' => 'pc',
             'opening_price' => 1,
@@ -393,16 +393,18 @@ class InventoryApiTest extends InventoryFeatureTestCase
 
         $this->postJson('/api/v1/inventory/items', [
             'name' => 'Alpha Widget',
-            'category' => 'widgets',
+            'category_id' => $this->createInventoryCategory(['name' => 'widgets'])->id,
             'project_id' => $project->id,
             'unit' => 'pc',
             'opening_price' => 1,
             'opening_quantity' => 1,
         ])->assertCreated();
 
+        $gadgetsCategory = $this->createInventoryCategory(['name' => 'gadgets']);
+
         $this->postJson('/api/v1/inventory/items', [
             'name' => 'Beta Gadget',
-            'category' => 'gadgets',
+            'category_id' => $gadgetsCategory->id,
             'project_id' => $project->id,
             'unit' => 'pc',
             'opening_price' => 1,
@@ -414,7 +416,7 @@ class InventoryApiTest extends InventoryFeatureTestCase
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.name', 'Alpha Widget');
 
-        $this->getJson('/api/v1/inventory/items?filter[category]=gadgets')
+        $this->getJson('/api/v1/inventory/items?filter[category_id]='.$gadgetsCategory->id)
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.name', 'Beta Gadget');
@@ -428,7 +430,7 @@ class InventoryApiTest extends InventoryFeatureTestCase
         $this->getJson('/api/v1/inventory/items')->assertForbidden();
         $this->postJson('/api/v1/inventory/items', [
             'name' => 'X',
-            'category' => 'c',
+            'category_id' => $this->createInventoryCategory(['name' => 'c'])->id,
             'project_id' => $project->id,
             'unit' => 'pc',
             'opening_price' => 1,
@@ -443,7 +445,7 @@ class InventoryApiTest extends InventoryFeatureTestCase
 
         $itemId = $this->postJson('/api/v1/inventory/items', [
             'name' => 'X',
-            'category' => 'c',
+            'category_id' => $this->createInventoryCategory(['name' => 'c'])->id,
             'project_id' => $owner->id,
             'unit' => 'pc',
             'opening_price' => 1,
@@ -469,7 +471,7 @@ class InventoryApiTest extends InventoryFeatureTestCase
 
         $itemId = $this->postJson('/api/v1/inventory/items', [
             'name' => 'Paper',
-            'category' => 'office',
+            'category_id' => $this->createInventoryCategory(['name' => 'office'])->id,
             'project_id' => $owner->id,
             'unit' => 'ream',
             'opening_price' => 10,
@@ -511,7 +513,7 @@ class InventoryApiTest extends InventoryFeatureTestCase
 
         $itemId = $this->postJson('/api/v1/inventory/items', [
             'name' => 'Ink',
-            'category' => 'office',
+            'category_id' => $this->createInventoryCategory(['name' => 'office'])->id,
             'project_id' => $owner->id,
             'unit' => 'bottle',
             'opening_price' => 8,

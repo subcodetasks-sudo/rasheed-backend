@@ -13,7 +13,11 @@ class InventoryItemResource extends JsonResource
             'id' => $this->id,
             'code' => $this->code,
             'name' => $this->name,
-            'category' => $this->category,
+            'category_id' => $this->inventory_category_id,
+            'category' => $this->whenLoaded('inventoryCategory', fn () => [
+                'id' => $this->inventoryCategory->id,
+                'name' => $this->inventoryCategory->name,
+            ]),
             'unit' => $this->unit,
             'project' => $this->whenLoaded('project', fn () => [
                 'id' => $this->project->id,

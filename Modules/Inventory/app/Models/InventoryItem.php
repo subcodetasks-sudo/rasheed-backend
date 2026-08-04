@@ -18,7 +18,7 @@ class InventoryItem extends Model
         'code',
         'project_id',
         'name',
-        'category',
+        'inventory_category_id',
         'unit',
         'latest_incoming_price',
         'opening_quantity',
@@ -51,6 +51,11 @@ class InventoryItem extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function inventoryCategory(): BelongsTo
+    {
+        return $this->belongsTo(InventoryCategory::class);
     }
 
     public function movements(): HasMany

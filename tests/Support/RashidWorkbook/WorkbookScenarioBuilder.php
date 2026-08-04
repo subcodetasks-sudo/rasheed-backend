@@ -7,6 +7,7 @@ use Illuminate\Testing\TestResponse;
 use Modules\Inventory\DTOs\CreateInventoryItemData;
 use Modules\Inventory\DTOs\IncomingStockData;
 use Modules\Inventory\DTOs\OutgoingStockData;
+use Modules\Inventory\Models\InventoryCategory;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryMovement;
 use Modules\Inventory\Workflows\CreateIncomingStockWorkflow;
@@ -86,10 +87,14 @@ class WorkbookScenarioBuilder
         foreach ($openingBatches as $row) {
             Carbon::setTestNow(Carbon::parse($row['opening_date']));
 
+            $inventoryCategory = InventoryCategory::query()->firstOrCreate(
+                ['name' => 'raw-materials'],
+            );
+
             $itemsByCode[$row['code']] = app(CreateInventoryItemWorkflow::class)->handle(
                 CreateInventoryItemData::fromArray([
                     'name' => $row['name'],
-                    'category' => 'raw-materials',
+                    'category_id' => $inventoryCategory->id,
                     'project_id' => $ownerProject->id,
                     'unit' => $row['unit'],
                     'opening_price' => $row['opening_unit_price'],

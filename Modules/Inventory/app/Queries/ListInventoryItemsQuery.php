@@ -11,12 +11,17 @@ class ListInventoryItemsQuery
 {
     public function paginate(Request $request): LengthAwarePaginator
     {
-        $query = InventoryItem::query()->with(['project']);
+        $query = InventoryItem::query()->with(['project', 'inventoryCategory']);
         $perPage = (int) $request->input('per_page', 15);
 
+        $categoryId = $request->input('filter.category_id', $request->input('filter.inventory_category_id'));
+        if ($categoryId !== null && $categoryId !== '') {
+            $query->where('inventory_category_id', $categoryId);
+        }
+
         $base = new BaseQueryService($query, $request);
-        $base->allowedFilters(['category', 'project_id'])
-            ->allowedSorts(['name', 'code', 'category', 'created_at', 'current_balance'])
+        $base->allowedFilters(['project_id'])
+            ->allowedSorts(['name', 'code', 'inventory_category_id', 'created_at', 'current_balance'])
             ->allowedSearch(['name', 'code'])
             ->apply();
 

@@ -4,6 +4,7 @@ namespace Tests\Feature\Inventory;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Modules\Inventory\Models\InventoryCategory;
 use Modules\Project\Enums\OperationalDeductionType;
 use Modules\Project\Models\Project;
 use Modules\User\app\Models\User;
@@ -47,5 +48,10 @@ abstract class InventoryFeatureTestCase extends TestCase
             'operational_deduction_type' => OperationalDeductionType::Exempt,
             'administrative_exempt' => true,
         ], $attributes));
+    }
+
+    protected function createInventoryCategory(array $attributes = []): InventoryCategory
+    {
+        return InventoryCategory::factory()->create($attributes);
     }
 }

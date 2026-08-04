@@ -6,6 +6,7 @@ use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 use Modules\Authorization\Database\Seeders\RolesAndPermissionsSeeder;
+use Modules\Inventory\Database\Seeders\InventoryDatabaseSeeder;
 use Modules\Project\Database\Seeders\ProjectDatabaseSeeder;
 use Modules\Settings\Database\Seeders\SettingsDatabaseSeeder;
 use Modules\User\app\Models\User;
@@ -43,6 +44,7 @@ class DatabaseSeeder extends Seeder
 
         $this->call([
             ProjectDatabaseSeeder::class,
+            InventoryDatabaseSeeder::class,
         ]);
     }
 }

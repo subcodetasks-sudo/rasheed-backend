@@ -16,7 +16,7 @@ class CreateInventoryItemRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'category' => ['required', 'string', 'max:255'],
+            'category_id' => ['required', 'integer', Rule::exists('inventory_categories', 'id')],
             'project_id' => ['required', 'integer', Rule::exists('projects', 'id')],
             'unit' => ['required', 'string', 'max:50'],
             'opening_price' => ['required', 'numeric', 'min:0'],

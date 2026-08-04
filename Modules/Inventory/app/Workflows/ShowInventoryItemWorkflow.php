@@ -9,7 +9,7 @@ class ShowInventoryItemWorkflow
 {
     public function handle(int $itemId): InventoryItem
     {
-        $item = InventoryItem::query()->with(['project'])->find($itemId);
+        $item = InventoryItem::query()->with(['project', 'inventoryCategory'])->find($itemId);
 
         if (! $item) {
             throw new BusinessException(__('messages.inventory_item_not_found'), 404);

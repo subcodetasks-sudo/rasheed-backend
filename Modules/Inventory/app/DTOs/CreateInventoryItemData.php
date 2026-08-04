@@ -6,7 +6,7 @@ readonly class CreateInventoryItemData
 {
     public function __construct(
         public string $name,
-        public string $category,
+        public int $categoryId,
         public int $projectId,
         public string $unit,
         public float $openingPrice,
@@ -19,7 +19,7 @@ readonly class CreateInventoryItemData
     {
         return new self(
             name: (string) $data['name'],
-            category: (string) $data['category'],
+            categoryId: (int) $data['category_id'],
             projectId: (int) $data['project_id'],
             unit: (string) $data['unit'],
             openingPrice: (float) $data['opening_price'],
