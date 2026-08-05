@@ -1,0 +1,11 @@
+{
+    "name": "AdministrativeFund",
+    "alias": "administrativefund",
+    "description": "Administrative Fund month calendar with auto and manual daily fields",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\AdministrativeFund\\Providers\\AdministrativeFundServiceProvider"
+    ],
+    "files": []
+}

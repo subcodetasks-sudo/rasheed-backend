@@ -3,9 +3,13 @@
 namespace Modules\DailyJournal\Actions;
 
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
+use Modules\AdministrativeDebtSettlement\Models\AdministrativeDebtSettlement;
+use Modules\CashStation\Models\CashStationSettlement;
 use Modules\DailyJournal\DTOs\DailyJournalData;
 use Modules\DailyJournal\Models\DailyJournalEntry;
 use Modules\DailyJournal\Services\AdministrativePercentageBalanceService;
+use Modules\MonthlySummary\Enums\ContributionType;
 
 /**
  * Two-pass Daily Journal write:
@@ -38,13 +42,15 @@ class ProcessDailyJournalWriteAction
         $this->validateDailyJournalContributionsAction->execute(
             $data,
             $pass1->remainingDeficits,
-            auth()->user(),
+            Auth::user(),
             $replaceMissingEditableFields,
             $existing['contributions'],
             $existing['entry_ids'],
         );
 
         if (! $data->hasPositiveContribution()) {
+            $this->reapplyOverlaysAfterRecalculation($pass1->entries, $data->journalDate);
+
             return $pass1->entries;
         }
 
@@ -55,6 +61,8 @@ class ProcessDailyJournalWriteAction
             preserveIncomeDerivedDeductions: true,
         )->entries;
 
+        $this->reapplyOverlaysAfterRecalculation($entries, $data->journalDate);
+
         foreach ($entries as $entry) {
             $this->administrativePercentageBalanceService->syncDebitForContribution(
                 $entry,
@@ -63,6 +71,152 @@ class ProcessDailyJournalWriteAction
         }
 
         return $entries;
+    }
+
+    /**
+     * Re-apply previously recorded overlays that mutate `daily_journal_entries`
+     * outside the main calculation pipeline.
+     *
+     * The overlays (MS contributions + Administrative Debt Settlements) are anchored
+     * to a specific journal date; when that date is re-calculated, we must restore
+     * the overlay effect for that date so downstream derived modules stay consistent.
+     */
+    private function reapplyOverlaysAfterRecalculation(Collection $entries, $journalDate): void
+    {
+        $dateString = $journalDate->toDateString();
+        $projectIds = $entries->pluck('project_id')->unique()->values()->all();
+
+        if ($projectIds === []) {
+            return;
+        }
+
+        $entryByProjectId = $entries->keyBy('project_id');
+
+        // 1) Fund-deficit contributions: add to fund_balance on the anchor journal date.
+        $fundDeficitAmountsByProjectId = [];
+        $fundDeficitSettlements = CashStationSettlement::query()
+            ->where('contribution_type', ContributionType::FundDeficit)
+            ->whereDate('journal_anchor_date', $dateString)
+            ->whereIn('to_project_id', $projectIds)
+            ->get(['to_project_id', 'amount']);
+
+        foreach ($fundDeficitSettlements as $settlement) {
+            $projectId = (int) $settlement->to_project_id;
+            $fundDeficitAmountsByProjectId[$projectId] = round(
+                (float) ($fundDeficitAmountsByProjectId[$projectId] ?? 0)
+                + (float) $settlement->amount,
+                2,
+            );
+        }
+
+        foreach ($fundDeficitAmountsByProjectId as $projectId => $amount) {
+            $entry = $entryByProjectId->get($projectId);
+            if ($entry === null) {
+                continue;
+            }
+
+            $entry->fund_balance = round((float) $entry->fund_balance + $amount, 2);
+            $entry->save();
+        }
+
+        // 2) Administrative-debt contributions: subtract accumulated debt on the anchor journal date.
+        $adminDebtAmountsByProjectId = [];
+        $adminDebtSettlements = CashStationSettlement::query()
+            ->where('contribution_type', ContributionType::AdministrativeDebt)
+            ->whereDate('journal_anchor_date', $dateString)
+            ->whereIn('to_project_id', $projectIds)
+            ->get(['to_project_id', 'amount']);
+
+        foreach ($adminDebtSettlements as $settlement) {
+            $projectId = (int) $settlement->to_project_id;
+            $adminDebtAmountsByProjectId[$projectId] = round(
+                (float) ($adminDebtAmountsByProjectId[$projectId] ?? 0)
+                + (float) $settlement->amount,
+                2,
+            );
+        }
+
+        foreach ($adminDebtAmountsByProjectId as $projectId => $amount) {
+            $entry = $entryByProjectId->get($projectId);
+            if ($entry === null) {
+                continue;
+            }
+
+            $entry->accumulated_administrative_debt = round(
+                max(0, (float) $entry->accumulated_administrative_debt - $amount),
+                2,
+            );
+            $entry->save();
+        }
+
+        // 3) Administrative debt settlements: subtract accumulated debt if this journal date
+        // is the month-tip anchor that the settlement would target.
+        $journalYear = (int) $journalDate->year;
+        $journalMonth = (int) $journalDate->month;
+
+        $adsSettlements = AdministrativeDebtSettlement::query()
+            ->whereIn('project_id', $projectIds)
+            ->where(function ($query) use ($journalYear, $journalMonth) {
+                $query->where('year', '>', $journalYear)
+                    ->orWhere(function ($nested) use ($journalYear, $journalMonth) {
+                        $nested->where('year', $journalYear)
+                            ->where('month', '>=', $journalMonth);
+                    });
+            })
+            ->get(['project_id', 'year', 'month', 'allocated_current_debt', 'allocated_carried_debt']);
+
+        $adsDebtAppliedByProjectId = [];
+        foreach ($adsSettlements as $settlement) {
+            $endOfMonth = sprintf(
+                '%04d-%02d-%02d',
+                (int) $settlement->year,
+                (int) $settlement->month,
+                (int) date('t', mktime(0, 0, 0, (int) $settlement->month, 1, (int) $settlement->year)),
+            );
+
+            $anchor = DailyJournalEntry::query()
+                ->where('project_id', $settlement->project_id)
+                ->whereDate('journal_date', '<=', $endOfMonth)
+                ->orderByDesc('journal_date')
+                ->orderByDesc('id')
+                ->first(['journal_date']);
+
+            if ($anchor === null) {
+                continue;
+            }
+
+            if ($anchor->journal_date?->toDateString() !== $dateString) {
+                continue;
+            }
+
+            $projectId = (int) $settlement->project_id;
+            $debtApplied = round(
+                (float) $settlement->allocated_current_debt + (float) $settlement->allocated_carried_debt,
+                2,
+            );
+
+            if ($debtApplied <= 0) {
+                continue;
+            }
+
+            $adsDebtAppliedByProjectId[$projectId] = round(
+                (float) ($adsDebtAppliedByProjectId[$projectId] ?? 0) + $debtApplied,
+                2,
+            );
+        }
+
+        foreach ($adsDebtAppliedByProjectId as $projectId => $amount) {
+            $entry = $entryByProjectId->get($projectId);
+            if ($entry === null) {
+                continue;
+            }
+
+            $entry->accumulated_administrative_debt = round(
+                max(0, (float) $entry->accumulated_administrative_debt - $amount),
+                2,
+            );
+            $entry->save();
+        }
     }
 
     /**

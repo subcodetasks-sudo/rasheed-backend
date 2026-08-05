@@ -2,8 +2,10 @@
 
 namespace Modules\DailyJournal\Actions;
 
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Modules\DailyJournal\Events\AdministrativeDebtRepaid;
+use Modules\DailyJournal\Events\DailyJournalUpdated;
 use Modules\DailyJournal\Models\DailyJournalEntry;
 use Modules\DailyJournal\Services\DailyJournalCalculationService;
 use Modules\Project\Models\Project;
@@ -53,10 +55,16 @@ class RepayAdministrativeDebtAction
         $entry->fund_balance = $result['fund_balance'];
         $entry->administrative_debt = $result['administrative_debt'];
         $entry->accumulated_administrative_debt = $result['accumulated_administrative_debt'];
-        $entry->updated_by = auth()->user()?->uuid;
+        $entry->updated_by = Auth::user()?->uuid;
         $entry->save();
 
         $entry = $entry->loadMissing(['project.category']);
+
+        // Keep Daily Journal clients in sync by broadcasting the updated journal date.
+        DailyJournalUpdated::dispatch(
+            $entry->journal_date->copy()->startOfDay(),
+            collect([$entry]),
+        );
 
         AdministrativeDebtRepaid::dispatch($entry);
 

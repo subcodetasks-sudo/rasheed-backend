@@ -253,6 +253,51 @@ class MonthlySummaryApiTest extends TestCase
         $this->assertSame('0.00', $this->findProject($restored, $from->id)['total_deducted_contributions']);
     }
 
+    public function test_administrative_debt_contribution_deleted_via_cash_station_restores(): void
+    {
+        $this->actAs('finance');
+        $category = Category::factory()->create(['name' => 'تعليمي']);
+        $from = $this->createProject(['name' => 'مساهم', 'category_id' => $category->id]);
+        $to = $this->createProject(['name' => 'مدين', 'category_id' => $category->id]);
+
+        $this->seedEntry($from->id, '2026-07-12', [
+            'daily_income' => 800,
+            'daily_expense' => 0,
+        ]);
+        $this->seedEntry($to->id, '2026-07-12', [
+            'daily_income' => 100,
+            'daily_expense' => 0,
+            'administrative_debt' => 50,
+            'accumulated_administrative_debt' => 120,
+        ]);
+
+        $created = $this->postJson(self::ENDPOINT.'/contributions', [
+            'month' => 7,
+            'year' => 2026,
+            'from_project_id' => $from->id,
+            'to_project_id' => $to->id,
+            'contribution_type' => ContributionType::AdministrativeDebt->value,
+            'amount' => 80,
+        ])->assertCreated()->json('data');
+
+        $this->assertSame('40.00', $this->findProject($created, $to->id)['administrative_debt']);
+
+        $settlementId = $created['contributions'][0]['id'];
+
+        $this->deleteJson(self::CASH_STATION_ENDPOINT.'/settlements/'.$settlementId)
+            ->assertOk()
+            ->assertJsonPath('message', __('messages.cash_station_settlement_deleted_successfully'));
+
+        $after = $this->getJson(self::ENDPOINT.'?month=7&year=2026')
+            ->assertOk()
+            ->json('data');
+
+        $this->assertSame('120.00', $this->findProject($after, $to->id)['administrative_debt']);
+        $this->assertSame('0.00', $this->findProject($after, $to->id)['total_received_contributions']);
+        $this->assertSame('0.00', $this->findProject($after, $from->id)['total_deducted_contributions']);
+        $this->assertSame([], $after['contributions']);
+    }
+
     public function test_rejects_amount_above_maximum_and_different_category(): void
     {
         $this->actAs('finance');

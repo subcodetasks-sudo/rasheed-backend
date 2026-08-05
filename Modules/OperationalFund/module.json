@@ -1,0 +1,11 @@
+{
+    "name": "OperationalFund",
+    "alias": "operationalfund",
+    "description": "Operational Fund daily balance and monthly surplus/deficit coverage",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\OperationalFund\\Providers\\OperationalFundServiceProvider"
+    ],
+    "files": []
+}

@@ -2,6 +2,7 @@
 
 namespace Modules\MonthlySummary\Workflows;
 
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Modules\AdministrativeDebtSettlement\Actions\BuildAdministrativeDebtSettlementAction;
 use Modules\AdministrativeDebtSettlement\Events\AdministrativeDebtSettlementUpdated;
@@ -62,24 +63,14 @@ class StoreMonthlySummaryContributionWorkflow
                 $fromProjectId,
                 $toProjectId,
                 number_format($amount, 2, '.', ''),
-                auth()->user()?->uuid,
+                Auth::user()?->uuid,
                 $contributionType,
             );
 
             if ($contributionType === ContributionType::AdministrativeDebt) {
-                $this->applyContributionAdministrativeDebtAction->execute(
-                    $toProjectId,
-                    $year,
-                    $month,
-                    $amount,
-                );
+                $this->applyContributionAdministrativeDebtAction->execute($settlement);
             } elseif ($contributionType === ContributionType::FundDeficit) {
-                $this->applyContributionFundBalanceAction->execute(
-                    $toProjectId,
-                    $year,
-                    $month,
-                    $amount,
-                );
+                $this->applyContributionFundBalanceAction->execute($settlement);
             }
 
             return $settlement;

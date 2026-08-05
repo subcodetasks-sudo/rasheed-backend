@@ -2,31 +2,35 @@
 
 namespace Modules\MonthlySummary\Actions;
 
+use Modules\CashStation\Models\CashStationSettlement;
 use Modules\DailyJournal\Models\DailyJournalEntry;
 
 class ReverseContributionFundBalanceAction
 {
     /**
-     * Withdraw $amount from beneficiary fund_balance (tip + later entries).
+     * Withdraw the settlement amount from beneficiary `fund_balance`.
+     *
+     * Uses `journal_anchor_date` as the month-tip anchor so cancel/reversal
+     * stays stable even if the journal is later edited or re-created.
      */
-    public function execute(int $projectId, int $year, int $month, float $amount): void
+    public function execute(CashStationSettlement $settlement): void
     {
-        $amount = round(max(0, $amount), 2);
+        $amount = round(max(0, (float) $settlement->amount), 2);
         if ($amount <= 0) {
             return;
         }
 
-        $endOfMonth = sprintf(
-            '%04d-%02d-%02d',
-            $year,
-            $month,
-            (int) date('t', mktime(0, 0, 0, $month, 1, $year)),
-        );
+        if ($settlement->journal_anchor_date === null) {
+            // Pending (never applied to the journal).
+            return;
+        }
+
+        $projectId = $settlement->to_project_id;
+        $anchorDate = $settlement->journal_anchor_date->toDateString();
 
         $anchor = DailyJournalEntry::query()
             ->where('project_id', $projectId)
-            ->whereDate('journal_date', '<=', $endOfMonth)
-            ->orderByDesc('journal_date')
+            ->whereDate('journal_date', $anchorDate)
             ->orderByDesc('id')
             ->lockForUpdate()
             ->first();

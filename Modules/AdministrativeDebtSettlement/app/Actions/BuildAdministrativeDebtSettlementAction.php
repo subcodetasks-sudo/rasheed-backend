@@ -3,10 +3,12 @@
 namespace Modules\AdministrativeDebtSettlement\Actions;
 
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Modules\AdministrativeDebtSettlement\Enums\AdministrativeDebtSettlementStatus;
 use Modules\AdministrativeDebtSettlement\Models\AdministrativeDebtSettlement;
 use Modules\CashStation\Actions\BuildCashStationAction;
+use Modules\DailyJournal\Actions\ReadAccumulatedAdministrativeDebtTipAction;
 
 class BuildAdministrativeDebtSettlementAction
 {
@@ -76,7 +78,7 @@ class BuildAdministrativeDebtSettlementAction
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, AdministrativeDebtSettlement>  $projectSettlements
+     * @param  Collection<int, AdministrativeDebtSettlement>  $projectSettlements
      * @return array{
      *     net_cash_balance: float,
      *     administrative_debt: float,
@@ -178,7 +180,7 @@ class BuildAdministrativeDebtSettlementAction
 
     /**
      * @param  array<int, int>  $projectIds
-     * @return array<int, \Illuminate\Support\Collection<int, AdministrativeDebtSettlement>>
+     * @return array<int, Collection<int, AdministrativeDebtSettlement>>
      */
     public function settlementsGroupedByProject(array $projectIds): array
     {
@@ -262,26 +264,7 @@ class BuildAdministrativeDebtSettlementAction
      */
     public function accumulatedAsOf(array $projectIds, string $asOfDate): array
     {
-        if ($projectIds === []) {
-            return [];
-        }
-
-        $debts = [];
-
-        foreach ($projectIds as $projectId) {
-            $row = DB::table('daily_journal_entries')
-                ->where('project_id', $projectId)
-                ->where('journal_date', '<=', $asOfDate)
-                ->orderByDesc('journal_date')
-                ->orderByDesc('id')
-                ->first(['accumulated_administrative_debt']);
-
-            if ($row !== null) {
-                $debts[$projectId] = (float) ($row->accumulated_administrative_debt ?? 0);
-            }
-        }
-
-        return $debts;
+        return (new ReadAccumulatedAdministrativeDebtTipAction)->execute($projectIds, $asOfDate);
     }
 
     private function debtAllocated(AdministrativeDebtSettlement $settlement): float

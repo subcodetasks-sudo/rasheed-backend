@@ -11,5 +11,8 @@
     "CashFundExpenses": true,
     "Notifications": true,
     "AdministrativeDebtSettlement": true,
+    "AdministrativeFund": true,
+    "OperationalFund": true,
+    "OperationalRate": true,
     "MonthlySummary": true
 }

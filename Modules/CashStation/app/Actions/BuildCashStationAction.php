@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\CashStation\Models\CashStationMonthCarry;
 use Modules\CashStation\Models\CashStationSettlement;
+use Modules\DailyJournal\Actions\ReadAccumulatedAdministrativeDebtTipAction;
 use Modules\Project\Models\Project;
 
 class BuildCashStationAction
@@ -358,26 +359,7 @@ class BuildCashStationAction
      */
     public function administrativeDebtsByProject(array $projectIds, string $asOfDate): array
     {
-        if ($projectIds === []) {
-            return [];
-        }
-
-        $debts = [];
-
-        foreach ($projectIds as $projectId) {
-            $row = DB::table('daily_journal_entries')
-                ->where('project_id', $projectId)
-                ->whereDate('journal_date', '<=', $asOfDate)
-                ->orderByDesc('journal_date')
-                ->orderByDesc('id')
-                ->first(['accumulated_administrative_debt']);
-
-            if ($row !== null) {
-                $debts[$projectId] = (float) ($row->accumulated_administrative_debt ?? 0);
-            }
-        }
-
-        return $debts;
+        return (new ReadAccumulatedAdministrativeDebtTipAction)->execute($projectIds, $asOfDate);
     }
 
     /**

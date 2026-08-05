@@ -1,0 +1,23 @@
+{
+    "name": "nwidart/administrativefund",
+    "description": "",
+    "authors": [],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {}
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\AdministrativeFund\\": "app/",
+            "Modules\\AdministrativeFund\\Database\\Factories\\": "database/factories/",
+            "Modules\\AdministrativeFund\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\AdministrativeFund\\Tests\\": "tests/"
+        }
+    }
+}

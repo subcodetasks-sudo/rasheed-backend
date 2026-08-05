@@ -593,6 +593,34 @@ class CashStationApiTest extends TestCase
         ])->assertStatus(422);
     }
 
+    public function test_repay_debt_refreshes_cash_station_administrative_debt(): void
+    {
+        $this->actAs('finance');
+        $project = $this->createProject(['name' => 'مشروع أ', 'administrative_exempt' => false]);
+
+        $journalDate = '2026-07-12';
+
+        $this->seedEntry($project->id, $journalDate, [
+            'fund_balance' => 200,
+            'administrative_debt' => 150,
+            'accumulated_administrative_debt' => 300,
+        ]);
+
+        $this->postJson('/api/v1/daily-journals/repay-debt', [
+            'journal_date' => $journalDate,
+            'project_id' => $project->id,
+        ])->assertOk();
+
+        $data = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
+
+        $row = $this->findProject($data, $project->id);
+        // repayToday = min(200, 150) = 150
+        // Calculation reduces accumulated during repayToday (300 - 150 = 150),
+        // then repays remaining surplus against accumulated (150 - 50 = 100).
+        $this->assertSame('100.00', $row['administrative_debt']);
+        $this->assertSame('100.00', $row['remaining_administrative_debt']);
+    }
+
     public function test_delete_missing_settlement_returns_404(): void
     {
         $this->actAs('finance');

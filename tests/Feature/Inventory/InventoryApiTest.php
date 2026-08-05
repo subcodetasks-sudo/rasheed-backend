@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Inventory;
 
+use Illuminate\Support\Facades\Auth;
+use Modules\DailyJournal\Models\DailyJournalEntry;
 use Modules\Inventory\Enums\InventoryBatchSourceType;
 use Modules\Inventory\Enums\InventoryExpenseType;
 use Modules\Inventory\Models\InventoryBatch;
@@ -9,6 +11,7 @@ use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryMovement;
 use Modules\Project\Enums\OperationalDeductionType;
 use Modules\Project\Models\AdministrativeFeeRate;
+use Modules\User\app\Models\User;
 use Spatie\Permission\Models\Role;
 
 class InventoryApiTest extends InventoryFeatureTestCase
@@ -140,7 +143,8 @@ class InventoryApiTest extends InventoryFeatureTestCase
 
         $this->actAsSuperAdmin();
         Role::findOrCreate('inventory', 'web');
-        $user = auth()->user();
+        /** @var User $user */
+        $user = Auth::user();
         $user->assignRole('inventory');
 
         $project = $this->createActiveProject([
@@ -253,7 +257,9 @@ class InventoryApiTest extends InventoryFeatureTestCase
     {
         $this->actAsSuperAdmin();
         Role::findOrCreate('inventory', 'web');
-        auth()->user()->assignRole('inventory');
+        /** @var User $user */
+        $user = Auth::user();
+        $user->assignRole('inventory');
 
         $owner = $this->createActiveProject();
         $beneficiary = $this->createActiveProject([
@@ -293,6 +299,47 @@ class InventoryApiTest extends InventoryFeatureTestCase
         $this->assertSame('200.00', $entry['administrative_expense']);
     }
 
+    public function test_administrative_outgoing_auto_refreshes_daily_journal_expense(): void
+    {
+        $this->actAsSuperAdmin();
+        Role::findOrCreate('inventory', 'web');
+        /** @var User $user */
+        $user = Auth::user();
+        $user->assignRole('inventory');
+
+        $owner = $this->createActiveProject();
+        $beneficiary = $this->createActiveProject([
+            'administrative_exempt' => true,
+            'operational_deduction_type' => OperationalDeductionType::Exempt,
+        ]);
+
+        $itemId = $this->postJson('/api/v1/inventory/items', [
+            'name' => 'Office chair',
+            'category_id' => $this->createInventoryCategory(['name' => 'furniture'])->id,
+            'project_id' => $owner->id,
+            'unit' => 'pc',
+            'opening_price' => 100,
+            'opening_quantity' => 3,
+        ])->json('data.id');
+
+        $this->postJson('/api/v1/inventory/movements/outgoing', [
+            'inventory_item_id' => $itemId,
+            'quantity' => 2,
+            'beneficiary_project_id' => $beneficiary->id,
+            'expense_type' => InventoryExpenseType::Administrative->value,
+        ])->assertCreated();
+
+        // The DailyJournal should be recalculated automatically from the inventory movement
+        // (no need to call PUT /api/v1/daily-journals just to refresh administrative expense).
+        $entry = DailyJournalEntry::query()
+            ->where('project_id', $beneficiary->id)
+            ->whereDate('journal_date', now()->toDateString())
+            ->first();
+
+        $this->assertNotNull($entry, 'Daily journal entry should exist for movement day.');
+        $this->assertSame('200.00', number_format((float) $entry->administrative_expense, 2, '.', ''));
+    }
+
     public function test_administrative_expense_exceeding_fee_creates_case2_debt(): void
     {
         AdministrativeFeeRate::query()->create([
@@ -302,7 +349,9 @@ class InventoryApiTest extends InventoryFeatureTestCase
 
         $this->actAsSuperAdmin();
         Role::findOrCreate('inventory', 'web');
-        auth()->user()->assignRole('inventory');
+        /** @var User $user */
+        $user = Auth::user();
+        $user->assignRole('inventory');
 
         $owner = $this->createActiveProject();
         $beneficiary = $this->createActiveProject([
@@ -352,7 +401,9 @@ class InventoryApiTest extends InventoryFeatureTestCase
     {
         $this->actAsSuperAdmin();
         Role::findOrCreate('inventory', 'web');
-        auth()->user()->assignRole('inventory');
+        /** @var User $user */
+        $user = Auth::user();
+        $user->assignRole('inventory');
 
         $owner = $this->createActiveProject();
         $beneficiary = $this->createActiveProject([

@@ -50,19 +50,9 @@ class CancelMonthlySummaryContributionWorkflow
             $type = $settlement->contribution_type;
 
             if ($type === ContributionType::AdministrativeDebt) {
-                $this->reverseContributionAdministrativeDebtAction->execute(
-                    $toProjectId,
-                    $year,
-                    $month,
-                    $amount,
-                );
+                $this->reverseContributionAdministrativeDebtAction->execute($settlement);
             } elseif ($type === ContributionType::FundDeficit) {
-                $this->reverseContributionFundBalanceAction->execute(
-                    $toProjectId,
-                    $year,
-                    $month,
-                    $amount,
-                );
+                $this->reverseContributionFundBalanceAction->execute($settlement);
             }
 
             $settlement->delete();

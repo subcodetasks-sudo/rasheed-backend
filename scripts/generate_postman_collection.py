@@ -416,6 +416,9 @@ ENUMS_DOC = """
   - `cash-station.{YYYY}-{MM}` → `cash-station.updated`
   - `monthly-summary.{YYYY}-{MM}` → `monthly-summary.updated`
   - `cash-fund-expenses.{YYYY}-{MM}` → `cash-fund-expenses.updated`
+  - `administrative-fund.{YYYY}-{MM}` → `administrative-fund.updated`
+  - `operational-fund.{YYYY}-{MM}` → `operational-fund.updated`
+  - `operational-rate.{YYYY}-{MM}` → `operational-rate.updated`
   - `administrative-debt-settlements.{YYYY}-{MM}` → `administrative-debt-settlements.updated`
   - `inventory` → `inventory.item-created`, `inventory.stock-moved`
   - `projects.{id}` → (reserved for project payloads)
@@ -2769,6 +2772,346 @@ def cash_fund_expenses_folder_items() -> list:
     ]
 
 
+# --- Administrative Fund ---
+
+SAMPLE_ADMINISTRATIVE_FUND_DAY = {
+    "date": "2026-08-01",
+    "day": "Saturday",
+    "project_administration": "100.00",
+    "cash_fund_contributions": "0.00",
+    "individual_contributions": "25.00",
+    "debt_recovery": "0.00",
+    "total_income": "125.00",
+    "operational_administration": "0.00",
+    "asset_administration": "10.00",
+    "total_expenses": "10.00",
+    "net": "115.00",
+    "notes": None,
+}
+
+SAMPLE_ADMINISTRATIVE_FUND_SUMMARY = {
+    "project_administration": "100.00",
+    "cash_fund_contributions": "0.00",
+    "individual_contributions": "25.00",
+    "debt_recovery": "0.00",
+    "total_income": "125.00",
+    "operational_administration": "0.00",
+    "asset_administration": "10.00",
+    "total_expenses": "10.00",
+    "administrative_net": "115.00",
+}
+
+SAMPLE_ADMINISTRATIVE_FUND_PAYLOAD = {
+    "month": 8,
+    "year": 2026,
+    "summary": SAMPLE_ADMINISTRATIVE_FUND_SUMMARY,
+    "days": [SAMPLE_ADMINISTRATIVE_FUND_DAY],
+    "totals": {
+        "project_administration": "100.00",
+        "cash_fund_contributions": "0.00",
+        "individual_contributions": "25.00",
+        "debt_recovery": "0.00",
+        "total_income": "125.00",
+        "operational_administration": "0.00",
+        "asset_administration": "10.00",
+        "total_expenses": "10.00",
+        "net": "115.00",
+    },
+}
+
+ADMINISTRATIVE_FUND_ROLES = ["super-admin", "finance"]
+
+
+def administrative_fund_show() -> dict:
+    path = "administrative-fund"
+    query = [
+        {"key": "month", "value": "8"},
+        {"key": "year", "value": "2026"},
+    ]
+    original = {"method": "GET", "header": header(), "url": url(path, query)}
+    return req(
+        "Show Administrative Fund",
+        "GET",
+        path,
+        description=(
+            "Month calendar for the Administrative Fund. "
+            "Auto: project_administration (DJ collected admin %), debt_recovery (ADS). "
+            "Stubs until other pages exist: cash_fund_contributions=0, operational_administration=0. "
+            "Manual via PUT: individual_contributions, asset_administration, notes. "
+            "Realtime: room `administrative-fund.{YYYY}-{MM}`, event `administrative-fund.updated`."
+        ),
+        roles=ADMINISTRATIVE_FUND_ROLES,
+        enums=(
+            "`month` 1–12, `year` 2000–2100\n"
+            "One row per calendar day of the month\n"
+            "total_income = project_admin + cash_fund_contrib + individual + debt_recovery\n"
+            "total_expenses = operational_admin + asset_admin\n"
+            "net = total_income − total_expenses"
+        ),
+        query=query,
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok("Administrative fund fetched successfully.", SAMPLE_ADMINISTRATIVE_FUND_PAYLOAD),
+                original_request=original,
+            ),
+            *std_auth_errors(original, include_validation=True),
+        ],
+    )
+
+
+def administrative_fund_update_day() -> dict:
+    path = "administrative-fund/{{administrative_fund_date}}"
+    body = {
+        "individual_contributions": 25,
+        "asset_administration": 10,
+        "notes": "optional note",
+    }
+    original = {"method": "PUT", "header": header(json_body=True), "body": body_raw(body), "url": url(path)}
+    return req(
+        "Update Administrative Fund Day",
+        "PUT",
+        path,
+        description=(
+            "Upsert manual fields for one day (`Y-m-d`). "
+            "Only `individual_contributions`, `asset_administration`, `notes` are allowed. "
+            "Sending any auto/calculated field returns 422. "
+            "Response is the full rebuilt month payload."
+        ),
+        roles=ADMINISTRATIVE_FUND_ROLES,
+        enums=(
+            "Editable: individual_contributions, asset_administration, notes\n"
+            "Forbidden: project_administration, cash_fund_contributions, debt_recovery, "
+            "operational_administration, total_income, total_expenses, net, administrative_net"
+        ),
+        body=body,
+        json_body=True,
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok("Administrative fund day updated successfully.", SAMPLE_ADMINISTRATIVE_FUND_PAYLOAD),
+                original_request=original,
+            ),
+            *std_auth_errors(original, include_validation=True),
+        ],
+    )
+
+
+def administrative_fund_folder_items() -> list:
+    return [
+        administrative_fund_show(),
+        administrative_fund_update_day(),
+    ]
+
+
+# --- Operational Fund ---
+
+SAMPLE_OPERATIONAL_FUND_DAY = {
+    "date": "2026-08-05",
+    "expected_operational_income": "1235.00",
+    "operational_expense": "200.00",
+    "daily_operational_net": "1035.00",
+    "day_status": "operational_surplus",
+}
+
+SAMPLE_OPERATIONAL_FUND_MONTH = {
+    "month": 8,
+    "year": 2026,
+    "summary": {
+        "total_monthly_operational_income": "38385.00",
+        "total_monthly_operational_expense": "200.00",
+        "monthly_operational_net": "38185.00",
+    },
+    "days": [
+        {
+            "date": "2026-08-05",
+            "operational_income": "1235.00",
+            "operational_expense": "200.00",
+            "daily_net": "1035.00",
+            "day_status": "operational_surplus",
+            "deficit_coverage_status": None,
+        }
+    ],
+}
+
+OPERATIONAL_FUND_ROLES = ["super-admin", "finance"]
+
+
+def operational_fund_day_show() -> dict:
+    path = "operational-fund/day"
+    query = [{"key": "date", "value": "2026-08-05"}]
+    original = {"method": "GET", "header": header(), "url": url(path, query)}
+    return req(
+        "Show Operational Fund Day",
+        "GET",
+        path,
+        description=(
+            "Daily tab: expected income (effective op-deduction pool + sum of active fixed project amounts), "
+            "manual operational expense, daily net and status."
+        ),
+        roles=OPERATIONAL_FUND_ROLES,
+        enums="`day_status`: operational_surplus | operational_deficit | balanced",
+        query=query,
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok("Operational fund day fetched successfully.", SAMPLE_OPERATIONAL_FUND_DAY),
+                original_request=original,
+            ),
+            *std_auth_errors(original, include_validation=True),
+        ],
+    )
+
+
+def operational_fund_month_show() -> dict:
+    path = "operational-fund"
+    query = [{"key": "month", "value": "8"}, {"key": "year", "value": "2026"}]
+    original = {"method": "GET", "header": header(), "url": url(path, query)}
+    return req(
+        "Show Operational Fund Month",
+        "GET",
+        path,
+        description=(
+            "Monthly Summary cards + daily table with chronological same-month deficit coverage. "
+            "`deficit_coverage_status` is null on surplus/balanced days; covered | not_covered on deficits. "
+            "Realtime: room `operational-fund.{YYYY}-{MM}`, event `operational-fund.updated`."
+        ),
+        roles=OPERATIONAL_FUND_ROLES,
+        enums=(
+            "`day_status`: operational_surplus | operational_deficit | balanced\n"
+            "`deficit_coverage_status`: covered | not_covered | null"
+        ),
+        query=query,
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok("Operational fund fetched successfully.", SAMPLE_OPERATIONAL_FUND_MONTH),
+                original_request=original,
+            ),
+            *std_auth_errors(original, include_validation=True),
+        ],
+    )
+
+
+def operational_fund_update_day() -> dict:
+    path = "operational-fund/{{operational_fund_date}}"
+    body = {"operational_expense": 200}
+    original = {"method": "PUT", "header": header(json_body=True), "body": body_raw(body), "url": url(path)}
+    return req(
+        "Update Operational Fund Day",
+        "PUT",
+        path,
+        description=(
+            "Upsert `operational_expense` for one day (`Y-m-d`). Null clears to 0. "
+            "Only this field is allowed. Returns full rebuilt month (coverage recalculated). "
+            "Also refreshes Administrative Fund Operational Administration for that month."
+        ),
+        roles=OPERATIONAL_FUND_ROLES,
+        enums="Editable: operational_expense only",
+        body=body,
+        json_body=True,
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok("Operational fund day updated successfully.", SAMPLE_OPERATIONAL_FUND_MONTH),
+                original_request=original,
+            ),
+            *std_auth_errors(original, include_validation=True),
+        ],
+    )
+
+
+def operational_fund_folder_items() -> list:
+    return [
+        operational_fund_day_show(),
+        operational_fund_month_show(),
+        operational_fund_update_day(),
+    ]
+
+
+# --- Operational Rate ---
+
+SAMPLE_OPERATIONAL_RATE_PAYLOAD = {
+    "summary": {
+        "relative_operational_deduction": "540.50",
+        "fixed_operational_deduction": "200.00",
+        "total_operational_deduction": "740.50",
+    },
+    "month": {"month": 8, "year": 2026},
+    "daily_records": [
+        {
+            "date": "2026-08-01",
+            "day_name": "Saturday",
+            "total_income": "0.00",
+            "operational_deduction": "0.00",
+            "administrative_percentage": "0.00",
+        },
+        {
+            "date": "2026-08-05",
+            "day_name": "Wednesday",
+            "total_income": "1200.00",
+            "operational_deduction": "740.50",
+            "administrative_percentage": "110.00",
+        },
+    ],
+    "monthly_totals": {
+        "total_income": "1200.00",
+        "total_operational_deduction": "740.50",
+        "total_administrative_percentage": "110.00",
+    },
+}
+
+OPERATIONAL_RATE_ROLES = ["super-admin", "finance"]
+
+
+def operational_rate_show() -> dict:
+    path = "operational-rate"
+    query = [
+        {"key": "month", "value": "8"},
+        {"key": "year", "value": "2026"},
+    ]
+    original = {"method": "GET", "header": header(), "url": url(path, query)}
+    return req(
+        "Show Operational Rate",
+        "GET",
+        path,
+        description=(
+            "Read-only month report of Daily Journal operational deductions and collected "
+            "administrative percentage. Summary cards are month totals split by relative vs fixed "
+            "project deduction types (exempt contributes 0). "
+            "Administrative percentage = SUM(fee - debt + contribution) for non-admin-exempt projects. "
+            "Realtime: room `operational-rate.{YYYY}-{MM}`, event `operational-rate.updated`."
+        ),
+        roles=OPERATIONAL_RATE_ROLES,
+        enums=(
+            "`month` 1–12, `year` 2000–2100\n"
+            "`daily_records` covers every calendar day in the month (zeros when empty)\n"
+            "Operational deduction values come from persisted Daily Journal rows (not recomputed)"
+        ),
+        query=query,
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok("Operational rate fetched successfully.", SAMPLE_OPERATIONAL_RATE_PAYLOAD),
+                original_request=original,
+            ),
+            *std_auth_errors(original, include_validation=True),
+        ],
+    )
+
+
+def operational_rate_folder_items() -> list:
+    return [
+        operational_rate_show(),
+    ]
+
+
 # --- Administrative Debt Settlement ---
 
 SAMPLE_ADS_PROJECT = {
@@ -3099,6 +3442,9 @@ def build() -> dict:
             folder("Cash Station", cash_station_folder_items()),
             folder("Monthly Summary", monthly_summary_folder_items()),
             folder("Cash Fund Expenses", cash_fund_expenses_folder_items()),
+            folder("Administrative Fund", administrative_fund_folder_items()),
+            folder("Operational Fund", operational_fund_folder_items()),
+            folder("Operational Rate", operational_rate_folder_items()),
             folder("Administrative Debt Settlement", administrative_debt_settlement_folder_items()),
             folder("Inventory", inventory_folder_items()),
         ],
@@ -3133,13 +3479,16 @@ def build() -> dict:
             folder("Cash Station", cash_station_folder_items()),
             folder("Monthly Summary", monthly_summary_folder_items()),
             folder("Cash Fund Expenses", cash_fund_expenses_folder_items()),
+            folder("Administrative Fund", administrative_fund_folder_items()),
+            folder("Operational Fund", operational_fund_folder_items()),
+            folder("Operational Rate", operational_rate_folder_items()),
             folder("Administrative Debt Settlement", administrative_debt_settlement_folder_items()),
         ],
         description=(
             "**Allowed:** list/show projects & categories, financial settings GET, "
             "calculate deductions, daily journal CRUD, administration rates, cash station "
             "(show / carry-forward / settlements), monthly summary, cash fund expenses, "
-            "administrative debt settlement.\n\n"
+            "administrative fund, operational fund, operational rate, administrative debt settlement.\n\n"
             "**Denied (403):** create/update/delete projects & categories, update financial settings, "
             "inventory module, user/role/settings admin endpoints."
         ),
@@ -3186,6 +3535,7 @@ def build() -> dict:
             ),
             folder("Daily Journal", [journal_show(), journal_save(), journal_update(), journal_repay_debt()]),
             folder("Administration Rates", [administration_rates_show()]),
+            folder("Operational Rate", operational_rate_folder_items()),
             folder("Cash Station", cash_station_folder_items()),
             folder("Administrative Debt Settlement", administrative_debt_settlement_folder_items()),
             folder("Inventory", inventory_folder_items()),

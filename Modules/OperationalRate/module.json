@@ -1,0 +1,11 @@
+{
+    "name": "OperationalRate",
+    "alias": "operationalrate",
+    "description": "Read-only monthly operational deduction and administrative percentage report from Daily Journal",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\OperationalRate\\Providers\\OperationalRateServiceProvider"
+    ],
+    "files": []
+}

@@ -1,0 +1,23 @@
+{
+    "name": "nwidart/operationalrate",
+    "description": "",
+    "authors": [],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {}
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\OperationalRate\\": "app/",
+            "Modules\\OperationalRate\\Database\\Factories\\": "database/factories/",
+            "Modules\\OperationalRate\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\OperationalRate\\Tests\\": "tests/"
+        }
+    }
+}
