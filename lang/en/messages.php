@@ -98,6 +98,7 @@ return [
     'monthly_summary_beneficiary_no_fund_deficit' => 'The beneficiary project has no fund deficit to cover.',
     'monthly_summary_beneficiary_no_administrative_debt' => 'The beneficiary project has no administrative debt to cover.',
     'monthly_summary_contribution_exceeds_maximum' => 'The contribution amount exceeds the maximum allowed (:max).',
+    'monthly_summary_carried_forward_successfully' => 'Monthly summary month carried forward successfully.',
     'administrative_debt_settlements_fetched_successfully' => 'Administrative debt settlements fetched successfully.',
     'administrative_debt_settlement_created_successfully' => 'Administrative debt settlement created successfully.',
     'administrative_debt_settlement_project_not_found' => 'The selected project was not found or is not active.',

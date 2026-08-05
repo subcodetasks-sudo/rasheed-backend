@@ -5,6 +5,7 @@ namespace Tests\Feature\DailyJournal;
 use Illuminate\Support\Facades\Event;
 use Modules\DailyJournal\Events\DailyJournalUpdated;
 use Modules\DailyJournal\Models\DailyJournalEntry;
+use Modules\MonthlySummary\Events\MonthlySummaryUpdated;
 use Modules\Project\Enums\OperationalDeductionType;
 use Modules\Project\Enums\ProjectStatus;
 use Modules\Project\Models\Project;
@@ -387,6 +388,27 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
         Event::assertDispatched(DailyJournalUpdated::class, function (DailyJournalUpdated $event) use ($project) {
             return $event->journalDate->toDateString() === now()->toDateString()
                 && $event->entries->contains(fn ($entry) => $entry->project_id === $project->id);
+        });
+    }
+
+    public function test_broadcasts_monthly_summary_updated_after_successful_save(): void
+    {
+        Event::fake([MonthlySummaryUpdated::class]);
+        $this->actAsFinanceUser();
+        $project = $this->createActiveProject([
+            'operational_deduction_type' => OperationalDeductionType::Exempt,
+            'administrative_exempt' => true,
+        ]);
+
+        $this->putJson('/api/v1/daily-journals', [
+            'journal_date' => '2026-07-20',
+            'entries' => [['project_id' => $project->id, 'daily_income' => 100]],
+        ])->assertOk();
+
+        Event::assertDispatched(MonthlySummaryUpdated::class, function (MonthlySummaryUpdated $event) {
+            return $event->year === 2026
+                && $event->month === 7
+                && isset($event->payload['projects']);
         });
     }
 

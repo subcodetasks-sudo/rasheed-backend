@@ -11,6 +11,7 @@ use Modules\CashStation\Models\CashStationMonthCarry;
 use Modules\DailyJournal\Models\AdminPercentageBalanceCredit;
 use Modules\DailyJournal\Models\DailyJournalEntry;
 use Modules\DailyJournal\Services\AdministrativePercentageBalanceService;
+use Modules\MonthlySummary\Events\MonthlySummaryUpdated;
 use Modules\Project\Enums\OperationalDeductionType;
 use Modules\Project\Enums\ProjectStatus;
 use Modules\Project\Models\Project;
@@ -477,6 +478,34 @@ class AdministrativeDebtSettlementApiTest extends TestCase
             return $row !== null
                 && (float) $row['administrative_debt'] >= 100
                 && ! isset($event->payload['summary']);
+        });
+    }
+
+    public function test_settle_broadcasts_monthly_summary_updated(): void
+    {
+        $this->actAs('finance');
+        $project = $this->createProject();
+
+        $this->seedEntry($project->id, '2026-07-15', [
+            'daily_income' => 50,
+            'administrative_fee' => 100,
+            'administrative_debt' => 100,
+            'accumulated_administrative_debt' => 100,
+        ]);
+
+        Event::fake([MonthlySummaryUpdated::class]);
+
+        $this->postJson(self::ENDPOINT, [
+            'year' => 2026,
+            'month' => 7,
+            'project_id' => $project->id,
+            'amount' => 20,
+        ])->assertCreated();
+
+        Event::assertDispatched(MonthlySummaryUpdated::class, function (MonthlySummaryUpdated $event) {
+            return $event->year === 2026
+                && $event->month === 7
+                && isset($event->payload['projects']);
         });
     }
 }

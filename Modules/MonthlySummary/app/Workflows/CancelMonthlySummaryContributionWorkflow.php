@@ -3,12 +3,16 @@
 namespace Modules\MonthlySummary\Workflows;
 
 use Illuminate\Support\Facades\DB;
+use Modules\AdministrativeDebtSettlement\Actions\BuildAdministrativeDebtSettlementAction;
+use Modules\AdministrativeDebtSettlement\Events\AdministrativeDebtSettlementUpdated;
 use Modules\CashStation\Actions\BuildCashStationAction;
 use Modules\CashStation\Events\CashStationSettlementDeleted;
 use Modules\CashStation\Events\CashStationUpdated;
 use Modules\CashStation\Models\CashStationSettlement;
+use Modules\MonthlySummary\Actions\BroadcastContributionJournalTipAction;
 use Modules\MonthlySummary\Actions\BuildMonthlySummaryAction;
 use Modules\MonthlySummary\Actions\ReverseContributionAdministrativeDebtAction;
+use Modules\MonthlySummary\Actions\ReverseContributionFundBalanceAction;
 use Modules\MonthlySummary\Enums\ContributionType;
 use Modules\MonthlySummary\Events\MonthlySummaryUpdated;
 use Modules\Project\Exceptions\BusinessException;
@@ -17,8 +21,11 @@ class CancelMonthlySummaryContributionWorkflow
 {
     public function __construct(
         private readonly ReverseContributionAdministrativeDebtAction $reverseContributionAdministrativeDebtAction,
+        private readonly ReverseContributionFundBalanceAction $reverseContributionFundBalanceAction,
+        private readonly BroadcastContributionJournalTipAction $broadcastContributionJournalTipAction,
         private readonly BuildCashStationAction $buildCashStationAction,
         private readonly BuildMonthlySummaryAction $buildMonthlySummaryAction,
+        private readonly BuildAdministrativeDebtSettlementAction $buildAdministrativeDebtSettlementAction,
     ) {}
 
     public function handle(int $settlementId): array
@@ -49,6 +56,13 @@ class CancelMonthlySummaryContributionWorkflow
                     $month,
                     $amount,
                 );
+            } elseif ($type === ContributionType::FundDeficit) {
+                $this->reverseContributionFundBalanceAction->execute(
+                    $toProjectId,
+                    $year,
+                    $month,
+                    $amount,
+                );
             }
 
             $settlement->delete();
@@ -57,6 +71,8 @@ class CancelMonthlySummaryContributionWorkflow
                 'settlement_id' => $settlementId,
                 'year' => $year,
                 'month' => $month,
+                'to_project_id' => $toProjectId,
+                'contribution_type' => $type,
             ];
         });
 
@@ -75,6 +91,22 @@ class CancelMonthlySummaryContributionWorkflow
             $result['month'],
             $this->buildMonthlySummaryAction->execute($result['month'], $result['year']),
         );
+        AdministrativeDebtSettlementUpdated::dispatch(
+            $result['year'],
+            $result['month'],
+            $this->buildAdministrativeDebtSettlementAction->execute($result['month'], $result['year']),
+        );
+
+        if (in_array($result['contribution_type'], [
+            ContributionType::AdministrativeDebt,
+            ContributionType::FundDeficit,
+        ], true)) {
+            $this->broadcastContributionJournalTipAction->execute(
+                $result['to_project_id'],
+                $result['year'],
+                $result['month'],
+            );
+        }
 
         return $result;
     }

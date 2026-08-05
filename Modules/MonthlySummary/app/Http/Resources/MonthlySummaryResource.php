@@ -12,6 +12,7 @@ class MonthlySummaryResource extends JsonResource
         return [
             'month' => $this->resource['month'],
             'calculation_date' => $this->resource['calculation_date'],
+            'carried_forward_from_previous' => $this->resource['carried_forward_from_previous'],
             'projects' => $this->resource['projects'],
             'contributions' => $this->resource['contributions'],
         ];

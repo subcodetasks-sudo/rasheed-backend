@@ -3,12 +3,16 @@
 namespace Modules\MonthlySummary\Workflows;
 
 use Illuminate\Support\Facades\DB;
+use Modules\AdministrativeDebtSettlement\Actions\BuildAdministrativeDebtSettlementAction;
+use Modules\AdministrativeDebtSettlement\Events\AdministrativeDebtSettlementUpdated;
 use Modules\CashStation\Actions\BuildCashStationAction;
 use Modules\CashStation\Actions\CreateCashStationSettlementAction;
 use Modules\CashStation\Events\CashStationSettlementCreated;
 use Modules\CashStation\Events\CashStationUpdated;
 use Modules\CashStation\Models\CashStationSettlement;
 use Modules\MonthlySummary\Actions\ApplyContributionAdministrativeDebtAction;
+use Modules\MonthlySummary\Actions\ApplyContributionFundBalanceAction;
+use Modules\MonthlySummary\Actions\BroadcastContributionJournalTipAction;
 use Modules\MonthlySummary\Actions\BuildMonthlySummaryAction;
 use Modules\MonthlySummary\Actions\ValidateMonthlySummaryContributionAction;
 use Modules\MonthlySummary\Enums\ContributionType;
@@ -20,8 +24,11 @@ class StoreMonthlySummaryContributionWorkflow
         private readonly ValidateMonthlySummaryContributionAction $validateMonthlySummaryContributionAction,
         private readonly CreateCashStationSettlementAction $createCashStationSettlementAction,
         private readonly ApplyContributionAdministrativeDebtAction $applyContributionAdministrativeDebtAction,
+        private readonly ApplyContributionFundBalanceAction $applyContributionFundBalanceAction,
+        private readonly BroadcastContributionJournalTipAction $broadcastContributionJournalTipAction,
         private readonly BuildCashStationAction $buildCashStationAction,
         private readonly BuildMonthlySummaryAction $buildMonthlySummaryAction,
+        private readonly BuildAdministrativeDebtSettlementAction $buildAdministrativeDebtSettlementAction,
     ) {}
 
     public function handle(
@@ -66,6 +73,13 @@ class StoreMonthlySummaryContributionWorkflow
                     $month,
                     $amount,
                 );
+            } elseif ($contributionType === ContributionType::FundDeficit) {
+                $this->applyContributionFundBalanceAction->execute(
+                    $toProjectId,
+                    $year,
+                    $month,
+                    $amount,
+                );
             }
 
             return $settlement;
@@ -82,6 +96,22 @@ class StoreMonthlySummaryContributionWorkflow
             $settlement->month,
             $this->buildMonthlySummaryAction->execute($settlement->month, $settlement->year),
         );
+        AdministrativeDebtSettlementUpdated::dispatch(
+            $settlement->year,
+            $settlement->month,
+            $this->buildAdministrativeDebtSettlementAction->execute($settlement->month, $settlement->year),
+        );
+
+        if (in_array($contributionType, [
+            ContributionType::AdministrativeDebt,
+            ContributionType::FundDeficit,
+        ], true)) {
+            $this->broadcastContributionJournalTipAction->execute(
+                $toProjectId,
+                $settlement->year,
+                $settlement->month,
+            );
+        }
 
         return $settlement;
     }

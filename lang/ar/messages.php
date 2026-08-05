@@ -98,6 +98,7 @@ return [
     'monthly_summary_beneficiary_no_fund_deficit' => 'المشروع المستفيد ليس لديه عجز صندوق لتغطيته.',
     'monthly_summary_beneficiary_no_administrative_debt' => 'المشروع المستفيد ليس لديه دين إداري لتغطيته.',
     'monthly_summary_contribution_exceeds_maximum' => 'مبلغ المساهمة يتجاوز الحد الأقصى المسموح (:max).',
+    'monthly_summary_carried_forward_successfully' => 'تم ترحيل شهر الملخص الشهري بنجاح.',
     'administrative_debt_settlements_fetched_successfully' => 'تم جلب تسويات الدين الإداري بنجاح.',
     'administrative_debt_settlement_created_successfully' => 'تم إنشاء تسوية الدين الإداري بنجاح.',
     'administrative_debt_settlement_project_not_found' => 'المشروع المحدد غير موجود أو غير نشط.',

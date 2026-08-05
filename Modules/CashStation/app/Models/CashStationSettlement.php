@@ -19,6 +19,7 @@ class CashStationSettlement extends Model
         'to_project_id',
         'amount',
         'contribution_type',
+        'journal_anchor_date',
         'created_by',
     ];
 
@@ -29,6 +30,7 @@ class CashStationSettlement extends Model
             'month' => 'integer',
             'amount' => 'decimal:2',
             'contribution_type' => ContributionType::class,
+            'journal_anchor_date' => 'date',
         ];
     }
 

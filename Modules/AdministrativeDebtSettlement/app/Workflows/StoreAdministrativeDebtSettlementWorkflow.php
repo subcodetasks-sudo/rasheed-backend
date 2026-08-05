@@ -13,6 +13,8 @@ use Modules\AdministrativeDebtSettlement\Models\AdministrativeDebtSettlement;
 use Modules\CashStation\Actions\BuildCashStationAction;
 use Modules\CashStation\Events\CashStationUpdated;
 use Modules\DailyJournal\Services\AdministrativePercentageBalanceService;
+use Modules\MonthlySummary\Actions\BuildMonthlySummaryAction;
+use Modules\MonthlySummary\Events\MonthlySummaryUpdated;
 
 class StoreAdministrativeDebtSettlementWorkflow
 {
@@ -23,6 +25,7 @@ class StoreAdministrativeDebtSettlementWorkflow
         private readonly AdministrativePercentageBalanceService $administrativePercentageBalanceService,
         private readonly BuildCashStationAction $buildCashStationAction,
         private readonly BuildAdministrativeDebtSettlementAction $buildAdministrativeDebtSettlementAction,
+        private readonly BuildMonthlySummaryAction $buildMonthlySummaryAction,
     ) {}
 
     public function handle(int $year, int $month, int $projectId, ?float $amount): AdministrativeDebtSettlement
@@ -71,6 +74,11 @@ class StoreAdministrativeDebtSettlementWorkflow
             $settlement->year,
             $settlement->month,
             $this->buildCashStationAction->execute($settlement->month, $settlement->year),
+        );
+        MonthlySummaryUpdated::dispatch(
+            $settlement->year,
+            $settlement->month,
+            $this->buildMonthlySummaryAction->execute($settlement->month, $settlement->year),
         );
 
         return $settlement;

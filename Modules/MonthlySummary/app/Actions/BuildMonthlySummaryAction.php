@@ -5,6 +5,7 @@ namespace Modules\MonthlySummary\Actions;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Modules\CashStation\Actions\BuildCashStationAction;
+use Modules\CashStation\Models\CashStationMonthCarry;
 use Modules\CashStation\Models\CashStationSettlement;
 use Modules\Project\Models\Project;
 
@@ -17,6 +18,15 @@ class BuildMonthlySummaryAction
     public function execute(int $month, int $year): array
     {
         [$start, $end, $calculationDate] = $this->calculationWindow($month, $year);
+
+        $startOfMonth = Carbon::create($year, $month, 1)->startOfDay();
+        $previousMonth = $startOfMonth->copy()->subMonthNoOverflow();
+        $carriedFromPrevious = CashStationMonthCarry::query()
+            ->where('from_year', (int) $previousMonth->year)
+            ->where('from_month', (int) $previousMonth->month)
+            ->where('to_year', $year)
+            ->where('to_month', $month)
+            ->exists();
 
         /** @var Collection<int, Project> $projects */
         $projects = Project::query()
@@ -45,7 +55,6 @@ class BuildMonthlySummaryAction
             $added = (float) ($contributions[$project->id]['added'] ?? 0);
             $deducted = (float) ($contributions[$project->id]['deducted'] ?? 0);
             $debt = (float) ($debts[$project->id] ?? 0);
-            $netResult = $monthlyTotal + $added - $deducted;
 
             $projectRows[] = [
                 'project_id' => $project->id,
@@ -54,8 +63,8 @@ class BuildMonthlySummaryAction
                 'project_status' => $project->administrative_exempt
                     ? 'exempt'
                     : 'subject',
-                'project_net_result' => $this->decimal($netResult),
-                'net_result_state' => $this->netResultState($netResult),
+                'project_net_result' => $this->decimal($monthlyTotal),
+                'net_result_state' => $this->netResultState($monthlyTotal),
                 'administrative_debt' => $this->decimal($debt),
                 'total_received_contributions' => $this->decimal($added),
                 'total_deducted_contributions' => $this->decimal($deducted),
@@ -65,6 +74,7 @@ class BuildMonthlySummaryAction
         return [
             'month' => ['month' => $month, 'year' => $year],
             'calculation_date' => $calculationDate,
+            'carried_forward_from_previous' => $carriedFromPrevious,
             'projects' => $projectRows,
             'contributions' => $settlements
                 ->filter(fn (CashStationSettlement $s) => $s->contribution_type !== null)

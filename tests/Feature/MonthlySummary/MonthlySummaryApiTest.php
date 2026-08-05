@@ -3,9 +3,13 @@
 namespace Tests\Feature\MonthlySummary;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Laravel\Sanctum\Sanctum;
+use Modules\AdministrativeDebtSettlement\Events\AdministrativeDebtSettlementUpdated;
+use Modules\DailyJournal\Events\DailyJournalUpdated;
 use Modules\DailyJournal\Models\DailyJournalEntry;
 use Modules\MonthlySummary\Enums\ContributionType;
+use Modules\MonthlySummary\Events\MonthlySummaryUpdated;
 use Modules\Project\Enums\OperationalDeductionType;
 use Modules\Project\Enums\ProjectStatus;
 use Modules\Project\Models\Category;
@@ -174,9 +178,9 @@ class MonthlySummaryApiTest extends TestCase
         $this->assertSame('0.00', $this->findProject($created, $to->id)['total_deducted_contributions']);
         $this->assertSame('300.00', $this->findProject($created, $from->id)['total_deducted_contributions']);
         $this->assertSame('0.00', $this->findProject($created, $from->id)['total_received_contributions']);
-        // Net result is monthly_total adjusted for this month's contributions given/received
-        $this->assertSame('700.00', $this->findProject($created, $from->id)['project_net_result']);
-        $this->assertSame('-100.00', $this->findProject($created, $to->id)['project_net_result']);
+        // Net result remains monthly_total (unaffected by contribution)
+        $this->assertSame('1000.00', $this->findProject($created, $from->id)['project_net_result']);
+        $this->assertSame('-400.00', $this->findProject($created, $to->id)['project_net_result']);
         $this->assertCount(1, $created['contributions']);
 
         $fromCs = $this->cashStationProject(7, 2026, $from->id);
@@ -235,11 +239,9 @@ class MonthlySummaryApiTest extends TestCase
         $this->assertSame('40.00', $this->findProject($data, $to->id)['administrative_debt']);
         $this->assertSame('80.00', $this->findProject($data, $to->id)['total_received_contributions']);
         $this->assertSame('80.00', $this->findProject($data, $from->id)['total_deducted_contributions']);
-        // from: monthly_total 800 − 80 deducted = 720
-        $this->assertSame('720.00', $this->findProject($data, $from->id)['project_net_result']);
-        // to: collected admin = fee − debt + contribution = 0 − 50 + 0 = −50 → monthly_total = 100 − (−50) = 150,
-        // then + 80 added = 230
-        $this->assertSame('230.00', $this->findProject($data, $to->id)['project_net_result']);
+        $this->assertSame('800.00', $this->findProject($data, $from->id)['project_net_result']);
+        // collected admin = fee − debt + contribution = 0 − 50 + 0 = −50 → monthly_total = 100 − (−50) = 150
+        $this->assertSame('150.00', $this->findProject($data, $to->id)['project_net_result']);
 
         $settlementId = $data['contributions'][0]['id'];
         $restored = $this->deleteJson(self::ENDPOINT.'/contributions/'.$settlementId)
@@ -452,7 +454,7 @@ class MonthlySummaryApiTest extends TestCase
         ])->assertCreated()->json('data');
 
         $this->assertSame('200.00', $this->findProject($exactSurplus, $to->id)['total_received_contributions']);
-        $this->assertSame('-300.00', $this->findProject($exactSurplus, $to->id)['project_net_result']);
+        $this->assertSame('-500.00', $this->findProject($exactSurplus, $to->id)['project_net_result']);
 
         $settlementId = $exactSurplus['contributions'][0]['id'];
         $this->deleteJson(self::ENDPOINT.'/contributions/'.$settlementId)->assertOk();
@@ -478,7 +480,7 @@ class MonthlySummaryApiTest extends TestCase
 
         $this->assertSame('350.00', $beneOpts[$to->id]['remaining_need']);
         $this->assertSame('150.00', $this->findProject($partial, $to->id)['total_received_contributions']);
-        $this->assertSame('-350.00', $this->findProject($partial, $to->id)['project_net_result']);
+        $this->assertSame('-500.00', $this->findProject($partial, $to->id)['project_net_result']);
     }
 
     public function test_exact_administrative_debt_amount_and_partial_remaining_debt(): void
@@ -592,7 +594,7 @@ class MonthlySummaryApiTest extends TestCase
 
         $this->assertSame('90.00', $this->findProject($data, $to->id)['administrative_debt']);
         $this->assertSame('100.00', $this->findProject($data, $to->id)['total_received_contributions']);
-        $this->assertSame('-100.00', $this->findProject($data, $to->id)['project_net_result']);
+        $this->assertSame('-200.00', $this->findProject($data, $to->id)['project_net_result']);
     }
 
     public function test_multiple_contributions_and_cancel_isolation(): void
@@ -629,7 +631,7 @@ class MonthlySummaryApiTest extends TestCase
         $this->assertSame('250.00', $this->findProject($second, $to->id)['total_received_contributions']);
         $this->assertSame('100.00', $this->findProject($second, $fromA->id)['total_deducted_contributions']);
         $this->assertSame('150.00', $this->findProject($second, $fromB->id)['total_deducted_contributions']);
-        $this->assertSame('-250.00', $this->findProject($second, $to->id)['project_net_result']);
+        $this->assertSame('-500.00', $this->findProject($second, $to->id)['project_net_result']);
 
         $firstId = $first['contributions'][0]['id'];
         $secondId = collect($second['contributions'])->firstWhere('from_project_id', $fromB->id)['id'];
@@ -648,5 +650,67 @@ class MonthlySummaryApiTest extends TestCase
         $this->assertSame('150.00', $toCs['added_contribution']);
         $this->assertSame('-350.00', $toCs['net_cash_fund']);
         $this->assertSame('-500.00', $toCs['monthly_total']);
+    }
+
+    public function test_contribution_broadcasts_ads_and_daily_journal_updated(): void
+    {
+        $this->actAs('finance');
+        $category = Category::factory()->create();
+        $from = $this->createProject(['category_id' => $category->id]);
+        $to = $this->createProject(['category_id' => $category->id]);
+
+        $this->seedEntry($from->id, '2026-07-12', ['daily_income' => 800]);
+        $this->seedEntry($to->id, '2026-07-12', [
+            'daily_income' => 100,
+            'administrative_debt' => 50,
+            'accumulated_administrative_debt' => 120,
+        ]);
+
+        Event::fake([
+            DailyJournalUpdated::class,
+            AdministrativeDebtSettlementUpdated::class,
+            MonthlySummaryUpdated::class,
+        ]);
+
+        $created = $this->postJson(self::ENDPOINT.'/contributions', [
+            'month' => 7,
+            'year' => 2026,
+            'from_project_id' => $from->id,
+            'to_project_id' => $to->id,
+            'contribution_type' => ContributionType::AdministrativeDebt->value,
+            'amount' => 80,
+        ])->assertCreated()->json('data');
+
+        Event::assertDispatched(AdministrativeDebtSettlementUpdated::class, function (AdministrativeDebtSettlementUpdated $event) {
+            return $event->year === 2026 && $event->month === 7;
+        });
+        Event::assertDispatched(DailyJournalUpdated::class, function (DailyJournalUpdated $event) use ($to) {
+            return $event->journalDate->toDateString() === '2026-07-12'
+                && $event->entries->contains(fn ($entry) => (int) $entry->project_id === $to->id);
+        });
+        Event::assertDispatched(MonthlySummaryUpdated::class, function (MonthlySummaryUpdated $event) {
+            return $event->year === 2026 && $event->month === 7;
+        });
+
+        $settlementId = $created['contributions'][0]['id'];
+
+        Event::fake([
+            DailyJournalUpdated::class,
+            AdministrativeDebtSettlementUpdated::class,
+            MonthlySummaryUpdated::class,
+        ]);
+
+        $this->deleteJson(self::ENDPOINT.'/contributions/'.$settlementId)->assertOk();
+
+        Event::assertDispatched(AdministrativeDebtSettlementUpdated::class, function (AdministrativeDebtSettlementUpdated $event) {
+            return $event->year === 2026 && $event->month === 7;
+        });
+        Event::assertDispatched(DailyJournalUpdated::class, function (DailyJournalUpdated $event) use ($to) {
+            return $event->journalDate->toDateString() === '2026-07-12'
+                && $event->entries->contains(fn ($entry) => (int) $entry->project_id === $to->id);
+        });
+        Event::assertDispatched(MonthlySummaryUpdated::class, function (MonthlySummaryUpdated $event) {
+            return $event->year === 2026 && $event->month === 7;
+        });
     }
 }

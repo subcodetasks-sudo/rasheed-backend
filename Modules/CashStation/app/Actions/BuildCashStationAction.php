@@ -184,6 +184,18 @@ class BuildCashStationAction
         return max(0.0, $previousMonthlyTotal + $monthlyTotal + $added - $deducted);
     }
 
+    public function hasCarryFromPreviousMonth(int $month, int $year): bool
+    {
+        $previousMonth = Carbon::create($year, $month, 1)->startOfDay()->subMonthNoOverflow();
+
+        return $this->hasCarryFromPrevious(
+            (int) $previousMonth->year,
+            (int) $previousMonth->month,
+            $year,
+            $month,
+        );
+    }
+
     private function hasCarryFromPrevious(int $fromYear, int $fromMonth, int $toYear, int $toMonth): bool
     {
         return CashStationMonthCarry::query()
@@ -355,7 +367,7 @@ class BuildCashStationAction
         foreach ($projectIds as $projectId) {
             $row = DB::table('daily_journal_entries')
                 ->where('project_id', $projectId)
-                ->where('journal_date', '<=', $asOfDate)
+                ->whereDate('journal_date', '<=', $asOfDate)
                 ->orderByDesc('journal_date')
                 ->orderByDesc('id')
                 ->first(['accumulated_administrative_debt']);

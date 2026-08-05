@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Modules\MonthlySummary\Http\Controllers\V1\CancelMonthlySummaryContributionController;
+use Modules\MonthlySummary\Http\Controllers\V1\CarryForwardMonthlySummaryController;
 use Modules\MonthlySummary\Http\Controllers\V1\ListBeneficiaryOptionsController;
 use Modules\MonthlySummary\Http\Controllers\V1\ListContributorOptionsController;
 use Modules\MonthlySummary\Http\Controllers\V1\ShowMonthlySummaryController;
@@ -13,4 +14,5 @@ Route::middleware(['auth:sanctum', 'role:super-admin|finance'])->prefix('v1')->g
     Route::get('monthly-summary/beneficiary-options', ListBeneficiaryOptionsController::class);
     Route::post('monthly-summary/contributions', StoreMonthlySummaryContributionController::class);
     Route::delete('monthly-summary/contributions/{settlement}', CancelMonthlySummaryContributionController::class);
+    Route::post('monthly-summary/carry-forward', CarryForwardMonthlySummaryController::class);
 });
