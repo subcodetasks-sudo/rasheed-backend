@@ -21,6 +21,7 @@ use Modules\Notifications\Listeners\RefreshAdministrativeDebtSettlementOnDailyJo
 use Modules\Notifications\Listeners\RefreshAdministrativeFundOnDailyJournalUpdate;
 use Modules\Notifications\Listeners\RefreshAdministrativeFundOnDebtSettlementCreated;
 use Modules\Notifications\Listeners\RefreshAdministrativeFundOnOperationalFundUpdate;
+use Modules\Notifications\Listeners\RefreshAdvancedReportsOnFinancialUpdate;
 use Modules\Notifications\Listeners\RefreshCashFundExpensesOnDailyJournalUpdate;
 use Modules\Notifications\Listeners\RefreshCashStationOnDailyJournalUpdate;
 use Modules\Notifications\Listeners\RefreshDailyJournalOnInventoryAdministrativeMovement;
@@ -28,6 +29,7 @@ use Modules\Notifications\Listeners\RefreshMonthlySummaryOnCashStationUpdate;
 use Modules\Notifications\Listeners\RefreshMonthlySummaryOnDailyJournalUpdate;
 use Modules\Notifications\Listeners\RefreshOperationalRateOnDailyJournalUpdate;
 use Modules\Notifications\Listeners\RefreshOperationalRateOnProjectUpdate;
+use Modules\Notifications\Listeners\RefreshReportsCenterOnFinancialUpdate;
 use Modules\OperationalFund\Events\OperationalFundUpdated;
 use Modules\Project\Events\ProjectArchived;
 use Modules\Project\Events\ProjectCreated;
@@ -42,6 +44,8 @@ class EventServiceProvider extends ServiceProvider
         ProjectUpdated::class => [
             NotifyProjectActivity::class,
             RefreshOperationalRateOnProjectUpdate::class,
+            RefreshReportsCenterOnFinancialUpdate::class,
+            RefreshAdvancedReportsOnFinancialUpdate::class,
         ],
         ProjectArchived::class => [NotifyProjectActivity::class],
         ProjectDeleted::class => [NotifyProjectActivity::class],
@@ -57,35 +61,48 @@ class EventServiceProvider extends ServiceProvider
             RefreshMonthlySummaryOnDailyJournalUpdate::class,
             RefreshAdministrativeFundOnDailyJournalUpdate::class,
             RefreshOperationalRateOnDailyJournalUpdate::class,
+            RefreshReportsCenterOnFinancialUpdate::class,
+            RefreshAdvancedReportsOnFinancialUpdate::class,
         ],
         AdministrativeDebtRepaid::class => [
             NotifyDailyJournalActivity::class,
             RefreshAdministrativeDebtSettlementOnDailyJournalUpdate::class,
             RefreshMonthlySummaryOnDailyJournalUpdate::class,
             RefreshOperationalRateOnDailyJournalUpdate::class,
+            RefreshReportsCenterOnFinancialUpdate::class,
+            RefreshAdvancedReportsOnFinancialUpdate::class,
         ],
 
-        InventoryItemCreated::class => [NotifyInventoryActivity::class],
+        InventoryItemCreated::class => [
+            NotifyInventoryActivity::class,
+            RefreshAdvancedReportsOnFinancialUpdate::class,
+        ],
         InventoryStockMoved::class => [
             NotifyInventoryActivity::class,
             RefreshDailyJournalOnInventoryAdministrativeMovement::class,
+            RefreshReportsCenterOnFinancialUpdate::class,
+            RefreshAdvancedReportsOnFinancialUpdate::class,
         ],
 
         CashStationSettlementCreated::class => [
             NotifyCashStationActivity::class,
             RefreshMonthlySummaryOnCashStationUpdate::class,
+            RefreshReportsCenterOnFinancialUpdate::class,
         ],
         CashStationSettlementDeleted::class => [
             NotifyCashStationActivity::class,
             RefreshMonthlySummaryOnCashStationUpdate::class,
+            RefreshReportsCenterOnFinancialUpdate::class,
         ],
         CashStationCarriedForward::class => [
             NotifyCashStationActivity::class,
             RefreshMonthlySummaryOnCashStationUpdate::class,
+            RefreshReportsCenterOnFinancialUpdate::class,
         ],
 
         AdministrativeDebtSettlementCreated::class => [
             RefreshAdministrativeFundOnDebtSettlementCreated::class,
+            RefreshReportsCenterOnFinancialUpdate::class,
         ],
 
         OperationalFundUpdated::class => [

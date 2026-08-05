@@ -1,0 +1,11 @@
+{
+    "name": "ReportsCenter",
+    "alias": "reportscenter",
+    "description": "Read-only financial reports center for month or custom date ranges",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\ReportsCenter\\Providers\\ReportsCenterServiceProvider"
+    ],
+    "files": []
+}

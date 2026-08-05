@@ -1,0 +1,11 @@
+{
+    "name": "AdvancedReports",
+    "alias": "advancedreports",
+    "description": "Read-only advanced reports: month comparison and inventory",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\AdvancedReports\\Providers\\AdvancedReportsServiceProvider"
+    ],
+    "files": []
+}

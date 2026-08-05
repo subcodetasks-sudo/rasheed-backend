@@ -14,5 +14,7 @@
     "AdministrativeFund": true,
     "OperationalFund": true,
     "OperationalRate": true,
+    "ReportsCenter": true,
+    "AdvancedReports": true,
     "MonthlySummary": true
 }

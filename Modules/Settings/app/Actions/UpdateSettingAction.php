@@ -18,13 +18,15 @@ class UpdateSettingAction
 
     public function execute(string $key, mixed $value, string $type = 'string', bool $isPublic = true): mixed
     {
+        $resolvedKey = $this->settingService->resolveKey($key);
+
         $this->settingService->update($key, $value, $type, $isPublic);
 
-        if ($key === ResolveTotalOperationalDeductionAction::SETTING_KEY) {
+        if ($resolvedKey === ResolveTotalOperationalDeductionAction::SETTING_KEY) {
             $this->scheduleOperationalDeductionChangeAction->execute((float) $value);
         }
 
-        if ($key === ResolveAdminFeePercentageAction::SETTING_KEY) {
+        if ($resolvedKey === ResolveAdminFeePercentageAction::SETTING_KEY) {
             $this->scheduleAdminFeePercentageChangeAction->execute((float) $value);
         }
 

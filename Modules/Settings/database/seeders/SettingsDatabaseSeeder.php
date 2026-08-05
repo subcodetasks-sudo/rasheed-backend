@@ -12,7 +12,7 @@ class SettingsDatabaseSeeder extends Seeder
         $settings = [
             // --- General Info & Branding ---
             ['key' => 'app_name', 'value' => 'My Project', 'type' => 'string'],
-            ['key' => 'site_logo', 'value' => null, 'type' => 'string'], 
+            ['key' => 'site_logo', 'value' => null, 'type' => 'string'],
             ['key' => 'site_favicon', 'value' => null, 'type' => 'string'],
 
             // --- Contact Information ---

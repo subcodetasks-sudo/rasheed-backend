@@ -419,6 +419,8 @@ ENUMS_DOC = """
   - `administrative-fund.{YYYY}-{MM}` → `administrative-fund.updated`
   - `operational-fund.{YYYY}-{MM}` → `operational-fund.updated`
   - `operational-rate.{YYYY}-{MM}` → `operational-rate.updated`
+  - `reports-center` → `reports-center.updated` (signal with `affected_date`; client refetches current filters)
+  - `advanced-reports` → `advanced-reports.updated` (signal with `affected_date`; client refetches current filters)
   - `administrative-debt-settlements.{YYYY}-{MM}` → `administrative-debt-settlements.updated`
   - `inventory` → `inventory.item-created`, `inventory.stock-moved`
   - `projects.{id}` → (reserved for project payloads)
@@ -897,7 +899,11 @@ def settings_list() -> dict:
         path,
         description="Public (no auth). Rate-limited. Locale via `Accept-Language`.",
         roles=["public"],
-        enums="Setting `type`: string | integer | boolean | json | decimal\nKnown keys: `admin_fee_percentage`, `total_operational_deduction`",
+        enums=(
+            "Setting `type`: string | integer | boolean | json | decimal\n"
+            "Known keys: `admin_fee_percentage`, `total_operational_deduction`, `app_name`, "
+            "`organization_name` (alias of `app_name`), `default_currency`"
+        ),
         locale=True,
         auth_required=False,
         no_auth_header=True,
@@ -988,6 +994,111 @@ def settings_bulk() -> dict:
             *std_auth_errors(original, include_validation=True),
         ],
     )
+
+
+SAMPLE_MONTHLY_EMPLOYEE_SETTINGS = {
+    "month": 8,
+    "year": 2026,
+    "categories": {
+        "fixed_workers": "100.00",
+        "media_staff": "200.00",
+        "administrative_staff": "300.00",
+        "variable_workers": "150.00",
+        "speakers": "50.00",
+        "cooks": "25.00",
+    },
+    "relative_deduction": "825.00",
+    "fixed_project_deductions": "250.00",
+    "total_daily_operational_deduction": "1075.00",
+}
+
+
+def settings_monthly_employees_show() -> dict:
+    path = "settings/monthly-employees"
+    query = [
+        {"key": "month", "value": "8"},
+        {"key": "year", "value": "2026"},
+    ]
+    original = {"method": "GET", "header": header(locale=True), "url": url(path, query)}
+    return req(
+        "Show Monthly Employee Settings",
+        "GET",
+        path,
+        description=(
+            "Month-scoped employee category costs that own the Relative Operational Deduction pool. "
+            "Relative Deduction = sum of 6 categories. Fixed Project Deductions = sum of active Fixed "
+            "project amounts. Total Daily Operational Deduction = Relative + Fixed. "
+            "`organization_name` is an alias of `app_name` on general settings."
+        ),
+        roles=["super-admin"],
+        enums="`month` 1–12, `year` 2000–2100",
+        query=query,
+        locale=True,
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok("Monthly employee settings fetched successfully.", SAMPLE_MONTHLY_EMPLOYEE_SETTINGS),
+                original_request=original,
+            ),
+            *std_auth_errors(original, include_validation=True),
+        ],
+    )
+
+
+def settings_monthly_employees_update() -> dict:
+    path = "settings/monthly-employees"
+    body = {
+        "month": 8,
+        "year": 2026,
+        "fixed_workers": 100,
+        "media_staff": 200,
+        "administrative_staff": 300,
+        "variable_workers": 150,
+        "speakers": 50,
+        "cooks": 25,
+    }
+    original = {
+        "method": "PUT",
+        "header": header(json_body=True, locale=True),
+        "body": body_raw(body),
+        "url": url(path),
+    }
+    return req(
+        "Update Monthly Employee Settings",
+        "PUT",
+        path,
+        description=(
+            "Upsert employee costs for a month and sync Relative Deduction into "
+            "`operational_deduction_rates` (and `total_operational_deduction` when saving the current month). "
+            "Missing category fields default to 0. Does not rewrite historical Daily Journal rows.\n\n"
+            + OP_DEDUCTION_EFFECTIVE_DATE_NOTE
+        ),
+        roles=["super-admin"],
+        enums="Categories: fixed_workers, media_staff, administrative_staff, variable_workers, speakers, cooks (≥ 0)",
+        body=body,
+        json_body=True,
+        locale=True,
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok("Monthly employee settings updated successfully.", SAMPLE_MONTHLY_EMPLOYEE_SETTINGS),
+                original_request=original,
+            ),
+            *std_auth_errors(original, include_validation=True),
+        ],
+    )
+
+
+def settings_folder_items() -> list:
+    return [
+        settings_list(),
+        settings_update(),
+        settings_bulk(),
+        settings_monthly_employees_show(),
+        settings_monthly_employees_update(),
+    ]
 
 
 # --- Categories ---
@@ -3112,6 +3223,264 @@ def operational_rate_folder_items() -> list:
     ]
 
 
+# --- Reports Center ---
+
+SAMPLE_REPORTS_CENTER_PAYLOAD = {
+    "period": {
+        "period_type": "month",
+        "start_date": "2026-08-01",
+        "end_date": "2026-08-31",
+        "month": 8,
+        "year": 2026,
+    },
+    "summary": {
+        "total_income": "1000.00",
+        "total_expense": "100.00",
+        "administrative_percentage": "110.00",
+        "operational_deduction": "50.00",
+        "net_cash_funds": "740.00",
+    },
+    "charts": {
+        "income_expense_movement": [
+            {
+                "date": "2026-08-05",
+                "daily_income": "1000.00",
+                "daily_expense": "100.00",
+                "daily_net_movement": "740.00",
+            }
+        ],
+        "expense_distribution": {
+            "direct_expenses": "100.00",
+            "administrative_percentage": "110.00",
+            "operational_deduction": "50.00",
+        },
+        "project_comparison": [
+            {
+                "project_id": 1,
+                "project_name": "Project A",
+                "income": "1000.00",
+                "expense": "100.00",
+                "net": "740.00",
+            }
+        ],
+    },
+    "projects": [
+        {
+            "project_id": 1,
+            "project_name": "Project A",
+            "fund_type": "variable",
+            "income": "1000.00",
+            "expense": "100.00",
+            "administrative": "110.00",
+            "operational": "50.00",
+            "net": "740.00",
+            "debt": "75.00",
+        }
+    ],
+    "totals": {
+        "total_income": "1000.00",
+        "total_expense": "100.00",
+        "total_administrative": "110.00",
+        "total_operational": "50.00",
+        "total_net": "740.00",
+    },
+}
+
+REPORTS_CENTER_ROLES = ["super-admin", "finance"]
+
+
+def reports_center_show() -> dict:
+    path = "reports-center"
+    query = [
+        {"key": "period_type", "value": "month"},
+        {"key": "month", "value": "8"},
+        {"key": "year", "value": "2026"},
+    ]
+    original = {"method": "GET", "header": header(), "url": url(path, query)}
+    return req(
+        "Show Reports Center",
+        "GET",
+        path,
+        description=(
+            "Read-only financial report for a month or custom date range. "
+            "Reuses Cash Station project aggregates (income, daily_expense, collected admin %, "
+            "operational deduction, net) and tip accumulated administrative debt as of period end. "
+            "Realtime: room `reports-center`, event `reports-center.updated` with `{affected_date}` "
+            "(client should refetch with current filters)."
+        ),
+        roles=REPORTS_CENTER_ROLES,
+        enums=(
+            "`period_type` = month|custom\n"
+            "month mode: `month` 1–12, `year` 2000–2100\n"
+            "custom mode: `start_date`, `end_date` (Y-m-d, start <= end)\n"
+            "Expense = SUM(daily_expense) only (not administrative_expense)\n"
+            "Administrative = fee − debt + contribution (non-exempt)\n"
+            "Net = income − expense − administrative − operational"
+        ),
+        query=query,
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok("Reports center fetched successfully.", SAMPLE_REPORTS_CENTER_PAYLOAD),
+                original_request=original,
+            ),
+            *std_auth_errors(original, include_validation=True),
+        ],
+    )
+
+
+def reports_center_folder_items() -> list:
+    return [
+        reports_center_show(),
+    ]
+
+
+# --- Advanced Reports ---
+
+SAMPLE_ADVANCED_MONTH_COMPARISON = {
+    "report_type": "month_comparison",
+    "period": 3,
+    "months": [
+        {"year": 2026, "month": 6, "label": "Jun 2026"},
+        {"year": 2026, "month": 7, "label": "Jul 2026"},
+        {"year": 2026, "month": 8, "label": "Aug 2026"},
+    ],
+    "summary": {
+        "total_revenue": "1700.00",
+        "total_expenses": "600.00",
+        "net_period": "1100.00",
+    },
+    "charts": {
+        "revenue_expense_trend": [
+            {"year": 2026, "month": 6, "revenue": "1000.00", "expenses": "100.00", "net": "900.00"}
+        ],
+        "administrative_vs_operational": [
+            {
+                "year": 2026,
+                "month": 6,
+                "administrative_deduction": "110.00",
+                "operational_deduction": "50.00",
+            }
+        ],
+    },
+    "comparison_table": [
+        {
+            "year": 2026,
+            "month": 6,
+            "label": "Jun 2026",
+            "total_revenue": "1000.00",
+            "expenses": "100.00",
+            "administrative_deduction": "110.00",
+            "operational_deduction": "50.00",
+            "net": "900.00",
+            "growth_rate_percent": None,
+        }
+    ],
+}
+
+ADVANCED_REPORTS_ROLES = ["super-admin", "finance", "inventory"]
+
+
+def advanced_reports_month_comparison() -> dict:
+    path = "advanced-reports"
+    query = [
+        {"key": "report_type", "value": "month_comparison"},
+        {"key": "period", "value": "3"},
+    ]
+    original = {"method": "GET", "header": header(), "url": url(path, query)}
+    return req(
+        "Show Advanced Reports (Month Comparison)",
+        "GET",
+        path,
+        description=(
+            "Read-only month comparison for last 3/6/12 months. "
+            "Revenue/expenses/admin/operational reuse Cash Station DJ aggregates. "
+            "Net = revenue − expenses only (admin/operational not subtracted). "
+            "Growth rate null when no previous month or previous net is zero. "
+            "Realtime: room `advanced-reports`, event `advanced-reports.updated`."
+        ),
+        roles=ADVANCED_REPORTS_ROLES,
+        enums="`report_type`=month_comparison, `period`=3|6|12",
+        query=query,
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok("Advanced reports fetched successfully.", SAMPLE_ADVANCED_MONTH_COMPARISON),
+                original_request=original,
+            ),
+            *std_auth_errors(original, include_validation=True),
+        ],
+    )
+
+
+def advanced_reports_inventory() -> dict:
+    path = "advanced-reports"
+    query = [
+        {"key": "report_type", "value": "inventory"},
+        {"key": "period", "value": "3"},
+    ]
+    original = {"method": "GET", "header": header(), "url": url(path, query)}
+    sample = {
+        "report_type": "inventory",
+        "period": 3,
+        "summary": {
+            "total_items": 3,
+            "low_stock_items": 1,
+            "inventory_value": "160.00",
+            "most_consumed_item": {
+                "id": 1,
+                "name": "Good Item",
+                "unit": "kg",
+                "quantity_consumed": "30.00",
+            },
+        },
+        "items": [
+            {
+                "item_id": 1,
+                "item_name": "Good Item",
+                "unit": "kg",
+                "total_incoming": "100.00",
+                "total_outgoing": "0.00",
+                "balance": "100.00",
+                "minimum_stock": "10.00",
+                "status": "good",
+            }
+        ],
+    }
+    return req(
+        "Show Advanced Reports (Inventory)",
+        "GET",
+        path,
+        description=(
+            "Read-only inventory report. Status: good|low|out_of_stock. "
+            "Inventory value = SUM(remaining_quantity × unit_cost) on FIFO batches. "
+            "Most consumed = highest outgoing quantity in the selected rolling period. "
+            "Total incoming includes opening quantity."
+        ),
+        roles=ADVANCED_REPORTS_ROLES,
+        enums="`report_type`=inventory, `period`=3|6|12, status=good|low|out_of_stock",
+        query=query,
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok("Advanced reports fetched successfully.", sample),
+                original_request=original,
+            ),
+            *std_auth_errors(original, include_validation=True),
+        ],
+    )
+
+
+def advanced_reports_folder_items() -> list:
+    return [
+        advanced_reports_month_comparison(),
+        advanced_reports_inventory(),
+    ]
+
+
 # --- Administrative Debt Settlement ---
 
 SAMPLE_ADS_PROJECT = {
@@ -3410,7 +3779,12 @@ def build() -> dict:
                     authz_users_status(),
                 ],
             ),
-            folder("Settings (write)", [settings_update(), settings_bulk()]),
+            folder("Settings (write)", [
+                settings_update(),
+                settings_bulk(),
+                settings_monthly_employees_show(),
+                settings_monthly_employees_update(),
+            ]),
             folder(
                 "Categories",
                 [categories_list(), categories_create(), categories_update(), categories_delete()],
@@ -3445,6 +3819,8 @@ def build() -> dict:
             folder("Administrative Fund", administrative_fund_folder_items()),
             folder("Operational Fund", operational_fund_folder_items()),
             folder("Operational Rate", operational_rate_folder_items()),
+            folder("Reports Center", reports_center_folder_items()),
+            folder("Advanced Reports", advanced_reports_folder_items()),
             folder("Administrative Debt Settlement", administrative_debt_settlement_folder_items()),
             folder("Inventory", inventory_folder_items()),
         ],
@@ -3482,13 +3858,16 @@ def build() -> dict:
             folder("Administrative Fund", administrative_fund_folder_items()),
             folder("Operational Fund", operational_fund_folder_items()),
             folder("Operational Rate", operational_rate_folder_items()),
+            folder("Reports Center", reports_center_folder_items()),
+            folder("Advanced Reports", advanced_reports_folder_items()),
             folder("Administrative Debt Settlement", administrative_debt_settlement_folder_items()),
         ],
         description=(
             "**Allowed:** list/show projects & categories, financial settings GET, "
             "calculate deductions, daily journal CRUD, administration rates, cash station "
             "(show / carry-forward / settlements), monthly summary, cash fund expenses, "
-            "administrative fund, operational fund, operational rate, administrative debt settlement.\n\n"
+            "administrative fund, operational fund, operational rate, reports center, "
+            "advanced reports, administrative debt settlement.\n\n"
             "**Denied (403):** create/update/delete projects & categories, update financial settings, "
             "inventory module, user/role/settings admin endpoints."
         ),
@@ -3502,9 +3881,10 @@ def build() -> dict:
                 [projects_list(), projects_show(), categories_list()],
             ),
             folder("Inventory", inventory_folder_items()),
+            folder("Advanced Reports", advanced_reports_folder_items()),
         ],
         description=(
-            "**Allowed:** inventory items & movements CRUD, list/show projects, list categories.\n\n"
+            "**Allowed:** inventory items & movements CRUD, list/show projects, list categories, advanced reports.\n\n"
             "**Denied (403):** project/category writes, financial settings, deductions, daily journal, user admin."
         ),
     )
@@ -3515,7 +3895,7 @@ def build() -> dict:
         [
             folder("Auth", [login_item("Login", "super_admin", role="super-admin"), refresh_item(), logout_item(), realtime_auth_item(), auth_users_list(), auth_users_create(), auth_users_update(), auth_users_delete()]),
             folder("Authorization", [roles_list(), authz_users_list(), authz_users_update(), authz_users_delete(), authz_users_status()]),
-            folder("Settings", [settings_list(), settings_update(), settings_bulk()]),
+            folder("Settings", settings_folder_items()),
             folder("Categories", [categories_list(), categories_create(), categories_update(), categories_delete()]),
             folder(
                 "Projects",
@@ -3536,6 +3916,8 @@ def build() -> dict:
             folder("Daily Journal", [journal_show(), journal_save(), journal_update(), journal_repay_debt()]),
             folder("Administration Rates", [administration_rates_show()]),
             folder("Operational Rate", operational_rate_folder_items()),
+            folder("Reports Center", reports_center_folder_items()),
+            folder("Advanced Reports", advanced_reports_folder_items()),
             folder("Cash Station", cash_station_folder_items()),
             folder("Administrative Debt Settlement", administrative_debt_settlement_folder_items()),
             folder("Inventory", inventory_folder_items()),

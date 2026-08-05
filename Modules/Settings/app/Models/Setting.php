@@ -2,9 +2,9 @@
 
 namespace Modules\Settings\app\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class Setting extends Model
 {
@@ -13,7 +13,7 @@ class Setting extends Model
     /**
      * The attributes that are mass assignable.
      */
-    protected $fillable = ['key', 'value', 'type' , 'is_public'];
+    protected $fillable = ['key', 'value', 'type', 'is_public'];
 
     protected $casts = [
         'is_public' => 'boolean',

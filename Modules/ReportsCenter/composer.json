@@ -1,0 +1,23 @@
+{
+    "name": "nwidart/reportscenter",
+    "description": "",
+    "authors": [],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {}
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\ReportsCenter\\": "app/",
+            "Modules\\ReportsCenter\\Database\\Factories\\": "database/factories/",
+            "Modules\\ReportsCenter\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\ReportsCenter\\Tests\\": "tests/"
+        }
+    }
+}

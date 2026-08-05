@@ -1,0 +1,23 @@
+{
+    "name": "nwidart/advancedreports",
+    "description": "",
+    "authors": [],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {}
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\AdvancedReports\\": "app/",
+            "Modules\\AdvancedReports\\Database\\Factories\\": "database/factories/",
+            "Modules\\AdvancedReports\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\AdvancedReports\\Tests\\": "tests/"
+        }
+    }
+}
