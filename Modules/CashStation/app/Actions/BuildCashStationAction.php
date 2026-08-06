@@ -2,6 +2,7 @@
 
 namespace Modules\CashStation\Actions;
 
+use App\Support\Money\FormatMoneyDecimal;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +14,16 @@ use Modules\Project\Models\Project;
 
 class BuildCashStationAction
 {
+    /**
+     * @var array<string, array{
+     *     carriedFromPrevious: bool,
+     *     currentAggregates: array<int, object>,
+     *     previousAggregates: array<int, object>,
+     *     contributions: array<int, array{added: float, deducted: float}>
+     * }>
+     */
+    private array $monthBalanceContextCache = [];
+
     public function execute(int $month, int $year): array
     {
         $startOfMonth = Carbon::create($year, $month, 1)->startOfDay();
@@ -90,13 +101,13 @@ class BuildCashStationAction
             $projectRows[] = [
                 'project_id' => $project->id,
                 'project_name' => $project->name,
-                'previous_monthly_total' => $this->decimal($previousMonthlyTotal),
-                'monthly_total' => $this->decimal($monthlyTotal),
-                'administrative_debt' => $this->decimal($originatingDisplay),
-                'added_contribution' => $this->decimal($added),
-                'deducted_contribution' => $this->decimal($deducted),
-                'net_cash_fund' => $this->decimal($netCashFund),
-                'remaining_administrative_debt' => $this->decimal($administrativeDebt),
+                'previous_monthly_total' => FormatMoneyDecimal::format($previousMonthlyTotal),
+                'monthly_total' => FormatMoneyDecimal::format($monthlyTotal),
+                'administrative_debt' => FormatMoneyDecimal::format($originatingDisplay),
+                'added_contribution' => FormatMoneyDecimal::format($added),
+                'deducted_contribution' => FormatMoneyDecimal::format($deducted),
+                'net_cash_fund' => FormatMoneyDecimal::format($netCashFund),
+                'remaining_administrative_debt' => FormatMoneyDecimal::format($administrativeDebt),
                 'status' => $this->cashBoxStatus($netCashFund),
             ];
 
@@ -120,15 +131,15 @@ class BuildCashStationAction
             'month' => ['month' => $month, 'year' => $year],
             'carried_forward_from_previous' => $carriedFromPrevious,
             'summary' => [
-                'total_monthly_surplus' => $this->decimal($totalSurplus),
-                'total_monthly_deficit' => $this->decimal($totalDeficit),
-                'administrative_debts' => $this->decimal($totalAdminDebts),
-                'net_cash_funds' => $this->decimal($totalNetCashFunds),
-                'monthly_revenue' => $this->decimal($totalRevenue),
-                'monthly_expenses' => $this->decimal($totalExpenses),
-                'total_administrative_percentage' => $this->decimal($totalAdminPercentage),
-                'total_operational_deduction' => $this->decimal($totalOperationalDeduction),
-                'net_month' => $this->decimal($totalNetMonth),
+                'total_monthly_surplus' => FormatMoneyDecimal::format($totalSurplus),
+                'total_monthly_deficit' => FormatMoneyDecimal::format($totalDeficit),
+                'administrative_debts' => FormatMoneyDecimal::format($totalAdminDebts),
+                'net_cash_funds' => FormatMoneyDecimal::format($totalNetCashFunds),
+                'monthly_revenue' => FormatMoneyDecimal::format($totalRevenue),
+                'monthly_expenses' => FormatMoneyDecimal::format($totalExpenses),
+                'total_administrative_percentage' => FormatMoneyDecimal::format($totalAdminPercentage),
+                'total_operational_deduction' => FormatMoneyDecimal::format($totalOperationalDeduction),
+                'net_month' => FormatMoneyDecimal::format($totalNetMonth),
             ],
             'projects' => $projectRows,
             'settlements' => $settlements->map(fn (CashStationSettlement $settlement) => [
@@ -137,7 +148,7 @@ class BuildCashStationAction
                 'month' => $settlement->month,
                 'from_project_id' => $settlement->from_project_id,
                 'to_project_id' => $settlement->to_project_id,
-                'amount' => $this->decimal($settlement->amount),
+                'amount' => FormatMoneyDecimal::format($settlement->amount),
                 'contribution_type' => $settlement->contribution_type?->value,
             ])->values()->all(),
         ];
@@ -148,41 +159,7 @@ class BuildCashStationAction
      */
     public function transferableBalance(int $projectId, int $month, int $year): float
     {
-        $startOfMonth = Carbon::create($year, $month, 1)->startOfDay();
-        $endOfMonth = $startOfMonth->copy()->endOfMonth()->startOfDay();
-        $previousMonth = $startOfMonth->copy()->subMonthNoOverflow();
-
-        $carriedFromPrevious = $this->hasCarryFromPrevious(
-            (int) $previousMonth->year,
-            (int) $previousMonth->month,
-            $year,
-            $month,
-        );
-
-        $previousMonthlyTotal = 0.0;
-        if ($carriedFromPrevious) {
-            $previousAggregates = $this->monthlyAggregatesByProject(
-                [$projectId],
-                $previousMonth->copy()->startOfMonth()->toDateString(),
-                $previousMonth->copy()->endOfMonth()->toDateString(),
-            );
-            $previousMonthlyTotal = $this->monthlyTotalFromAggregate($previousAggregates[$projectId] ?? null);
-        }
-
-        $aggregates = $this->monthlyAggregatesByProject(
-            [$projectId],
-            $startOfMonth->toDateString(),
-            $endOfMonth->toDateString(),
-        );
-        $contributions = $this->contributionsByProject(
-            $this->settlementsForMonth($year, $month)
-        );
-
-        $monthlyTotal = $this->monthlyTotalFromAggregate($aggregates[$projectId] ?? null);
-        $added = (float) ($contributions[$projectId]['added'] ?? 0);
-        $deducted = (float) ($contributions[$projectId]['deducted'] ?? 0);
-
-        return max(0.0, $previousMonthlyTotal + $monthlyTotal + $added - $deducted);
+        return max(0.0, $this->netCashFundForProject($projectId, $month, $year));
     }
 
     public function hasCarryFromPreviousMonth(int $month, int $year): bool
@@ -316,6 +293,39 @@ class BuildCashStationAction
      */
     public function netCashFundForProject(int $projectId, int $month, int $year): float
     {
+        $context = $this->monthBalanceContext($month, $year);
+
+        $previousMonthlyTotal = 0.0;
+        if ($context['carriedFromPrevious']) {
+            $previousMonthlyTotal = $this->monthlyTotalFromAggregate(
+                $this->aggregateForProjectInContext($context, $projectId, $month, $year, previous: true)
+            );
+        }
+
+        $monthlyTotal = $this->monthlyTotalFromAggregate(
+            $this->aggregateForProjectInContext($context, $projectId, $month, $year, previous: false)
+        );
+        $added = (float) ($context['contributions'][$projectId]['added'] ?? 0);
+        $deducted = (float) ($context['contributions'][$projectId]['deducted'] ?? 0);
+
+        return $previousMonthlyTotal + $monthlyTotal + $added - $deducted;
+    }
+
+    /**
+     * @return array{
+     *     carriedFromPrevious: bool,
+     *     currentAggregates: array<int, object>,
+     *     previousAggregates: array<int, object>,
+     *     contributions: array<int, array{added: float, deducted: float}>
+     * }
+     */
+    private function monthBalanceContext(int $month, int $year): array
+    {
+        $key = "{$year}-{$month}";
+        if (isset($this->monthBalanceContextCache[$key])) {
+            return $this->monthBalanceContextCache[$key];
+        }
+
         $startOfMonth = Carbon::create($year, $month, 1)->startOfDay();
         $endOfMonth = $startOfMonth->copy()->endOfMonth()->startOfDay();
         $previousMonth = $startOfMonth->copy()->subMonthNoOverflow();
@@ -327,30 +337,69 @@ class BuildCashStationAction
             $month,
         );
 
-        $previousMonthlyTotal = 0.0;
-        if ($carriedFromPrevious) {
-            $previousAggregates = $this->monthlyAggregatesByProject(
-                [$projectId],
-                $previousMonth->copy()->startOfMonth()->toDateString(),
-                $previousMonth->copy()->endOfMonth()->toDateString(),
-            );
-            $previousMonthlyTotal = $this->monthlyTotalFromAggregate($previousAggregates[$projectId] ?? null);
-        }
+        $projectIds = Project::query()->active()->pluck('id')->all();
 
-        $aggregates = $this->monthlyAggregatesByProject(
-            [$projectId],
+        $currentAggregates = $this->monthlyAggregatesByProject(
+            $projectIds,
             $startOfMonth->toDateString(),
             $endOfMonth->toDateString(),
         );
+
+        $previousAggregates = [];
+        if ($carriedFromPrevious) {
+            $previousAggregates = $this->monthlyAggregatesByProject(
+                $projectIds,
+                $previousMonth->copy()->startOfMonth()->toDateString(),
+                $previousMonth->copy()->endOfMonth()->toDateString(),
+            );
+        }
+
         $contributions = $this->contributionsByProject(
             $this->settlementsForMonth($year, $month)
         );
 
-        $monthlyTotal = $this->monthlyTotalFromAggregate($aggregates[$projectId] ?? null);
-        $added = (float) ($contributions[$projectId]['added'] ?? 0);
-        $deducted = (float) ($contributions[$projectId]['deducted'] ?? 0);
+        return $this->monthBalanceContextCache[$key] = [
+            'carriedFromPrevious' => $carriedFromPrevious,
+            'currentAggregates' => $currentAggregates,
+            'previousAggregates' => $previousAggregates,
+            'contributions' => $contributions,
+        ];
+    }
 
-        return $previousMonthlyTotal + $monthlyTotal + $added - $deducted;
+    /**
+     * @param  array{
+     *     carriedFromPrevious: bool,
+     *     currentAggregates: array<int, object>,
+     *     previousAggregates: array<int, object>,
+     *     contributions: array<int, array{added: float, deducted: float}>
+     * }  $context
+     */
+    private function aggregateForProjectInContext(
+        array $context,
+        int $projectId,
+        int $month,
+        int $year,
+        bool $previous,
+    ): mixed {
+        $aggregates = $previous ? $context['previousAggregates'] : $context['currentAggregates'];
+
+        if (array_key_exists($projectId, $aggregates)) {
+            return $aggregates[$projectId];
+        }
+
+        $startOfMonth = Carbon::create($year, $month, 1)->startOfDay();
+        if ($previous) {
+            $monthAnchor = $startOfMonth->copy()->subMonthNoOverflow();
+            $start = $monthAnchor->copy()->startOfMonth()->toDateString();
+            $end = $monthAnchor->copy()->endOfMonth()->toDateString();
+        } else {
+            $start = $startOfMonth->toDateString();
+            $end = $startOfMonth->copy()->endOfMonth()->toDateString();
+        }
+
+        $loaded = $this->monthlyAggregatesByProject([$projectId], $start, $end);
+
+        return $loaded[$projectId] ?? null;
     }
 
     /**
@@ -397,10 +446,5 @@ class BuildCashStationAction
         }
 
         return $contributions;
-    }
-
-    private function decimal(mixed $value): string
-    {
-        return number_format((float) $value, 2, '.', '');
     }
 }

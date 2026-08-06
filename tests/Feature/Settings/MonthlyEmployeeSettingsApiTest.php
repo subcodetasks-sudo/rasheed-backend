@@ -108,8 +108,7 @@ class MonthlyEmployeeSettingsApiTest extends TestCase
             'cooks' => 25,
         ]);
 
-        // Current month → updates configured setting + schedules rates
-        $this->assertSame(825.0, (float) app(SettingService::class)->get('total_operational_deduction'));
+        // Current month → schedules rates from relative sum (not total_operational_deduction setting)
         $this->assertNotNull(
             OperationalDeductionRate::query()
                 ->whereDate('effective_from', '2026-08-16')

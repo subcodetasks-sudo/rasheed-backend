@@ -35,6 +35,16 @@ class BuildAdministrationRatesAction
         ];
     }
 
+    public function administrativePercentageForDate(CarbonInterface $date): string
+    {
+        $row = $this->eligibleBaseQuery()
+            ->whereDate('daily_journal_entries.journal_date', $date->toDateString())
+            ->selectRaw('COALESCE(SUM(COALESCE(daily_journal_entries.administrative_fee, 0) - COALESCE(daily_journal_entries.administrative_debt, 0) + COALESCE(daily_journal_entries.contribution, 0)), 0) as administrative_percentage')
+            ->first();
+
+        return $this->decimal($row->administrative_percentage ?? 0);
+    }
+
     private function eligibleBaseQuery(): Builder
     {
         return DB::table('daily_journal_entries')

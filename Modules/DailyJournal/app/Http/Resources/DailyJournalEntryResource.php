@@ -2,6 +2,7 @@
 
 namespace Modules\DailyJournal\Http\Resources;
 
+use App\Support\Money\FormatMoneyDecimal;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -45,6 +46,6 @@ class DailyJournalEntryResource extends JsonResource
 
     private function formatDecimal(mixed $value): string
     {
-        return number_format((float) $value, 2, '.', '');
+        return FormatMoneyDecimal::format($value);
     }
 }

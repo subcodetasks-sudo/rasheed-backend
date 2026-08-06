@@ -2,6 +2,7 @@
 
 namespace Modules\MonthlySummary\Actions;
 
+use App\Support\Money\FormatMoneyDecimal;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Modules\CashStation\Actions\BuildCashStationAction;
@@ -63,11 +64,11 @@ class BuildMonthlySummaryAction
                 'project_status' => $project->administrative_exempt
                     ? 'exempt'
                     : 'subject',
-                'project_net_result' => $this->decimal($monthlyTotal),
+                'project_net_result' => FormatMoneyDecimal::format($monthlyTotal),
                 'net_result_state' => $this->netResultState($monthlyTotal),
-                'administrative_debt' => $this->decimal($debt),
-                'total_received_contributions' => $this->decimal($added),
-                'total_deducted_contributions' => $this->decimal($deducted),
+                'administrative_debt' => FormatMoneyDecimal::format($debt),
+                'total_received_contributions' => FormatMoneyDecimal::format($added),
+                'total_deducted_contributions' => FormatMoneyDecimal::format($deducted),
             ];
         }
 
@@ -85,7 +86,7 @@ class BuildMonthlySummaryAction
                     'from_project_id' => $settlement->from_project_id,
                     'to_project_id' => $settlement->to_project_id,
                     'contribution_type' => $settlement->contribution_type->value,
-                    'amount' => $this->decimal($settlement->amount),
+                    'amount' => FormatMoneyDecimal::format($settlement->amount),
                 ])
                 ->values()
                 ->all(),
@@ -124,10 +125,5 @@ class BuildMonthlySummaryAction
         }
 
         return 'neutral';
-    }
-
-    private function decimal(mixed $value): string
-    {
-        return number_format((float) $value, 2, '.', '');
     }
 }

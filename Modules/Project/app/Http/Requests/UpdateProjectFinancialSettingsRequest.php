@@ -15,7 +15,7 @@ class UpdateProjectFinancialSettingsRequest extends FormRequest
     {
         return [
             'admin_fee_percentage' => ['sometimes', 'numeric', 'min:0', 'max:100'],
-            'total_operational_deduction' => ['sometimes', 'numeric', 'gt:0', 'max:9999999999.99'],
+            'total_operational_deduction' => ['sometimes', 'numeric', 'gt:0', 'max:999.99'],
         ];
     }
 

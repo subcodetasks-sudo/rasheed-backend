@@ -3,18 +3,16 @@
 namespace Modules\Settings\Actions;
 
 use Carbon\Carbon;
-use Modules\Project\Actions\Project\ResolveTotalOperationalDeductionAction;
 use Modules\Project\Actions\Project\ScheduleOperationalDeductionChangeAction;
-use Modules\Project\Models\OperationalDeductionRate;
+use Modules\Project\Actions\Project\UpsertOperationalDeductionRateAction;
 use Modules\Settings\app\Models\MonthlyEmployeeSetting;
-use Modules\Settings\Services\SettingService;
 use Modules\Settings\Support\MonthlyEmployeeCategories;
 
 class UpsertMonthlyEmployeeSettingsAction
 {
     public function __construct(
         private readonly ScheduleOperationalDeductionChangeAction $scheduleOperationalDeductionChangeAction,
-        private readonly SettingService $settingService,
+        private readonly UpsertOperationalDeductionRateAction $upsertOperationalDeductionRateAction,
         private readonly BuildMonthlyEmployeeSettingsViewAction $buildMonthlyEmployeeSettingsViewAction,
     ) {}
 
@@ -23,19 +21,14 @@ class UpsertMonthlyEmployeeSettingsAction
      */
     public function execute(int $month, int $year, array $categories): array
     {
-        $amounts = [];
-        foreach (MonthlyEmployeeCategories::KEYS as $key) {
-            $amounts[$key] = round((float) ($categories[$key] ?? 0), 2);
-        }
-
-        $relative = MonthlyEmployeeCategories::sum($amounts);
+        $amounts = MonthlyEmployeeCategories::normalize($categories);
 
         $row = MonthlyEmployeeSetting::query()->updateOrCreate(
             ['year' => $year, 'month' => $month],
             $amounts,
         );
 
-        $this->syncOperationalPool($month, $year, $relative);
+        $this->syncOperationalPool($month, $year, $row->relativeDeduction());
 
         return $this->buildMonthlyEmployeeSettingsViewAction->execute($month, $year, $row);
     }
@@ -48,34 +41,10 @@ class UpsertMonthlyEmployeeSettingsAction
 
         if ($now->gte($monthStart) && $now->lte($monthEnd)) {
             $this->scheduleOperationalDeductionChangeAction->execute($relative, $now);
-            $this->settingService->update(
-                ResolveTotalOperationalDeductionAction::SETTING_KEY,
-                $relative,
-                'decimal',
-                true,
-            );
 
             return;
         }
 
-        $this->upsertMonthStartRate($monthStart->toDateString(), $relative);
-    }
-
-    private function upsertMonthStartRate(string $date, float $amount): void
-    {
-        $existing = OperationalDeductionRate::query()
-            ->whereDate('effective_from', $date)
-            ->first();
-
-        if ($existing !== null) {
-            $existing->update(['amount' => round($amount, 2)]);
-
-            return;
-        }
-
-        OperationalDeductionRate::query()->create([
-            'effective_from' => $date,
-            'amount' => round($amount, 2),
-        ]);
+        $this->upsertOperationalDeductionRateAction->execute($monthStart->toDateString(), $relative);
     }
 }

@@ -14,6 +14,20 @@ final class MonthlyEmployeeCategories
     ];
 
     /**
+     * @param  array<string, mixed>  $input
+     * @return array<string, float>
+     */
+    public static function normalize(array $input): array
+    {
+        $amounts = [];
+        foreach (self::KEYS as $key) {
+            $amounts[$key] = round((float) ($input[$key] ?? 0), 2);
+        }
+
+        return $amounts;
+    }
+
+    /**
      * @param  array<string, mixed>  $data
      */
     public static function sum(array $data): float

@@ -5,7 +5,7 @@ namespace Tests\Feature\DailyJournal;
 use Illuminate\Support\Carbon;
 use Modules\DailyJournal\Models\DailyJournalEntry;
 use Modules\Project\Enums\OperationalDeductionType;
-use Modules\Settings\Actions\UpdateSettingAction;
+use Modules\Settings\Actions\UpsertMonthlyEmployeeSettingsAction;
 use Modules\Settings\Services\SettingService;
 
 class OperationalDeductionEffectiveDateJournalTest extends DailyJournalFeatureTestCase
@@ -33,7 +33,7 @@ class OperationalDeductionEffectiveDateJournalTest extends DailyJournalFeatureTe
             'administrative_exempt' => true,
         ]);
 
-        app(UpdateSettingAction::class)->execute('total_operational_deduction', 2000, 'decimal', true);
+        $this->upsertRelativePool(2000);
 
         $this->putJson('/api/v1/daily-journals', [
             'journal_date' => '2026-07-30',
@@ -59,7 +59,7 @@ class OperationalDeductionEffectiveDateJournalTest extends DailyJournalFeatureTe
             'administrative_exempt' => true,
         ]);
 
-        app(UpdateSettingAction::class)->execute('total_operational_deduction', 2000, 'decimal', true);
+        $this->upsertRelativePool(2000);
 
         Carbon::setTestNow(Carbon::parse('2026-07-31 09:00:00'));
 
@@ -99,7 +99,7 @@ class OperationalDeductionEffectiveDateJournalTest extends DailyJournalFeatureTe
         ])->assertOk()
             ->assertJsonPath('data.entries.0.operational_deduction', '1081.00');
 
-        app(UpdateSettingAction::class)->execute('total_operational_deduction', 2000, 'decimal', true);
+        $this->upsertRelativePool(2000);
 
         $this->putJson('/api/v1/daily-journals', [
             'journal_date' => '2026-07-29',
@@ -133,7 +133,7 @@ class OperationalDeductionEffectiveDateJournalTest extends DailyJournalFeatureTe
             'administrative_exempt' => true,
         ]);
 
-        app(UpdateSettingAction::class)->execute('total_operational_deduction', 2000, 'decimal', true);
+        $this->upsertRelativePool(2000);
 
         $newProject = $this->createActiveProject([
             'name' => 'New Relative',
@@ -163,5 +163,17 @@ class OperationalDeductionEffectiveDateJournalTest extends DailyJournalFeatureTe
 
         $this->assertSame('1000.00', $byId[$oldProject->id]['operational_deduction']);
         $this->assertSame('1000.00', $byId[$newProject->id]['operational_deduction']);
+    }
+
+    private function upsertRelativePool(float $relative): void
+    {
+        app(UpsertMonthlyEmployeeSettingsAction::class)->execute(7, 2026, [
+            'fixed_workers' => $relative,
+            'media_staff' => 0,
+            'administrative_staff' => 0,
+            'variable_workers' => 0,
+            'speakers' => 0,
+            'cooks' => 0,
+        ]);
     }
 }

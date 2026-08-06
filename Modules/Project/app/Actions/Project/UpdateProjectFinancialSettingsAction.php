@@ -9,7 +9,6 @@ class UpdateProjectFinancialSettingsAction
     public function __construct(
         private readonly SettingService $settingService,
         private readonly GetProjectFinancialSettingsAction $getProjectFinancialSettingsAction,
-        private readonly ScheduleOperationalDeductionChangeAction $scheduleOperationalDeductionChangeAction,
         private readonly ScheduleAdminFeePercentageChangeAction $scheduleAdminFeePercentageChangeAction,
     ) {}
 
@@ -38,10 +37,6 @@ class UpdateProjectFinancialSettingsAction
                 $data['total_operational_deduction'],
                 'decimal',
                 true
-            );
-
-            $this->scheduleOperationalDeductionChangeAction->execute(
-                (float) $data['total_operational_deduction']
             );
         }
 

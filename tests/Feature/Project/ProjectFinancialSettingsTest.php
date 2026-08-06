@@ -8,6 +8,7 @@ use Modules\Project\Enums\ProjectStatus;
 use Modules\Project\Models\Project;
 use Modules\Project\Services\AdministrativeDeductionService;
 use Modules\Project\Services\OperationalDeductionService;
+use Modules\Settings\Actions\UpsertMonthlyEmployeeSettingsAction;
 use Modules\Settings\Services\SettingService;
 
 class ProjectFinancialSettingsTest extends ProjectFeatureTestCase
@@ -68,8 +69,20 @@ class ProjectFinancialSettingsTest extends ProjectFeatureTestCase
 
         $this->patchJson('/api/v1/projects/financial-settings', [
             'admin_fee_percentage' => 15,
-            'total_operational_deduction' => 2000,
         ])->assertOk();
+
+        app(UpsertMonthlyEmployeeSettingsAction::class)->execute(
+            (int) now()->month,
+            (int) now()->year,
+            [
+                'fixed_workers' => 2000,
+                'media_staff' => 0,
+                'administrative_staff' => 0,
+                'variable_workers' => 0,
+                'speakers' => 0,
+                'cooks' => 0,
+            ]
+        );
 
         $projectB = $this->postJson('/api/v1/projects', [
             'name' => 'Project B',
@@ -86,12 +99,12 @@ class ProjectFinancialSettingsTest extends ProjectFeatureTestCase
         $projectAModel = Project::query()->findOrFail($projectA['id']);
         $projectBModel = Project::query()->findOrFail($projectB['id']);
 
-        $admin = new AdministrativeDeductionService;
+        $admin = app(AdministrativeDeductionService::class);
         $this->assertSame(120.0, $admin->calculate($projectAModel, 1000));
-        $this->assertSame(150.0, $admin->calculate($projectBModel, 1000));
+        $this->assertSame(150.0, $admin->calculate($projectBModel, 1000, now()->addDay()));
 
         $operational = app(OperationalDeductionService::class);
-        // Mid-day setting change applies from the next calendar day only.
+        // Mid-day monthly employee pool change applies from the next calendar day only.
         $this->assertSame(1081.0, $operational->calculate($projectBModel, 1000, 1000));
         $this->assertSame(2000.0, $operational->calculate($projectBModel, 1000, 1000, null, now()->addDay()));
     }

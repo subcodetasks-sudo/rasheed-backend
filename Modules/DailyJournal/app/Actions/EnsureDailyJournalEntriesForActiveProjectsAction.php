@@ -15,6 +15,8 @@ class EnsureDailyJournalEntriesForActiveProjectsAction
         $dateString = $date->toDateString();
 
         $projects = Project::query()->active()->with('category')->get();
+        $projectsById = $projects->keyBy('id');
+
         $existing = DailyJournalEntry::query()
             ->whereDate('journal_date', $dateString)
             ->whereIn('project_id', $projects->pluck('id'))
@@ -39,10 +41,18 @@ class EnsureDailyJournalEntriesForActiveProjectsAction
             $existing->put($project->id, $entry);
         }
 
-        return DailyJournalEntry::query()
-            ->with(['project.category'])
-            ->whereDate('journal_date', $dateString)
-            ->whereIn('project_id', $projects->pluck('id'))
-            ->get();
+        return $projects
+            ->map(function (Project $project) use ($existing, $projectsById) {
+                $entry = $existing->get($project->id);
+                if ($entry === null) {
+                    return null;
+                }
+
+                $entry->setRelation('project', $projectsById->get($project->id));
+
+                return $entry;
+            })
+            ->filter()
+            ->values();
     }
 }

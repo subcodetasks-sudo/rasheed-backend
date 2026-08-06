@@ -12,6 +12,7 @@ class ScheduleOperationalDeductionChangeAction
 
     public function __construct(
         private readonly ResolveEffectiveOperationalDeductionAction $resolveEffectiveOperationalDeductionAction,
+        private readonly UpsertOperationalDeductionRateAction $upsertOperationalDeductionRateAction,
     ) {}
 
     public function execute(float $newAmount, CarbonInterface|string|null $today = null): void
@@ -36,27 +37,7 @@ class ScheduleOperationalDeductionChangeAction
 
         // Pin today's pool at the moment of the change so the new amount can never
         // bleed into the current day, whatever the open-ended history row holds.
-        $this->writeRate($todayDate, $effectiveToday, overwrite: false);
-        $this->writeRate($tomorrowDate, $amount, overwrite: true);
-    }
-
-    private function writeRate(string $date, float $amount, bool $overwrite): void
-    {
-        $existing = OperationalDeductionRate::query()
-            ->whereDate('effective_from', $date)
-            ->first();
-
-        if ($existing !== null) {
-            if ($overwrite) {
-                $existing->update(['amount' => $amount]);
-            }
-
-            return;
-        }
-
-        OperationalDeductionRate::query()->create([
-            'effective_from' => $date,
-            'amount' => $amount,
-        ]);
+        $this->upsertOperationalDeductionRateAction->execute($todayDate, $effectiveToday, overwrite: false);
+        $this->upsertOperationalDeductionRateAction->execute($tomorrowDate, $amount, overwrite: true);
     }
 }

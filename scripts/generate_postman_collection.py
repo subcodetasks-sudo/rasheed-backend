@@ -2764,52 +2764,6 @@ def monthly_summary_contribution_cancel() -> dict:
     )
 
 
-def monthly_summary_carry_forward() -> dict:
-    path = "monthly-summary/carry-forward"
-    body = {"month": 7, "year": 2026}
-    original = {"method": "POST", "header": header(json_body=True), "body": body_raw(body), "url": url(path)}
-    carried_payload = {
-        **SAMPLE_MONTHLY_SUMMARY_PAYLOAD,
-        "month": {"month": 8, "year": 2026},
-        "calculation_date": "2026-08-31",
-        "carried_forward_from_previous": True,
-        "projects": [
-            {
-                **SAMPLE_MONTHLY_SUMMARY_PROJECT,
-                "previous_monthly_total": "1000.00",
-                "project_net_result": "1250.00",
-            }
-        ],
-    }
-    return req(
-        "Carry Forward Monthly Summary Month",
-        "POST",
-        path,
-        description=(
-            "Explicit carry-forward of the source month's Monthly Total into the next month's "
-            "previous_monthly_total, reusing the same carry record as Cash Station's carry-forward "
-            "(carrying once keeps both views consistent). Idempotent. Response returns the **target** "
-            "(next) month Monthly Summary payload."
-        ),
-        roles=MONTHLY_SUMMARY_ROLES,
-        enums=(
-            "`month` / `year`: source month being carried (required).\n"
-            "Only Monthly Total is carried. Contributions given/received are never carried."
-        ),
-        body=body,
-        json_body=True,
-        responses=[
-            example(
-                "200 OK",
-                200,
-                ok("Monthly summary month carried forward successfully.", carried_payload),
-                original_request=original,
-            ),
-            *std_auth_errors(original, include_validation=True),
-        ],
-    )
-
-
 def monthly_summary_folder_items() -> list:
     return [
         monthly_summary_show(),
@@ -2817,7 +2771,6 @@ def monthly_summary_folder_items() -> list:
         monthly_summary_beneficiary_options(),
         monthly_summary_contribution_create(),
         monthly_summary_contribution_cancel(),
-        monthly_summary_carry_forward(),
     ]
 
 

@@ -16,13 +16,15 @@ class DailyJournalResource extends JsonResource
     public function toArray(Request $request): array
     {
         $journalDate = $this->resource['journal_date'];
+        $adminBalanceService = app(AdministrativePercentageBalanceService::class);
+        $operationalPoolResolver = app(ResolveEffectiveOperationalDeductionAction::class);
 
         return [
             'journal_date' => $journalDate,
-            'available_administrative_percentage_balance' => app(AdministrativePercentageBalanceService::class)
+            'available_administrative_percentage_balance' => $adminBalanceService
                 ->availableBalance(),
             // Effective operational-deduction pool for this journal date only (not an all-time total).
-            'operational_deduction' => app(ResolveEffectiveOperationalDeductionAction::class)
+            'operational_deduction' => $operationalPoolResolver
                 ->execute($journalDate),
             'entries' => DailyJournalEntryResource::collection($this->resource['entries']),
         ];
