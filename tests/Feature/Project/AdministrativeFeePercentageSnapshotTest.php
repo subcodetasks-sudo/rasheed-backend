@@ -6,19 +6,15 @@ use Modules\Project\Enums\FundType;
 use Modules\Project\Enums\OperationalDeductionType;
 use Modules\Project\Enums\ProjectStatus;
 use Modules\Project\Models\Project;
-use Modules\Settings\app\Models\Setting;
-use Modules\Settings\Services\SettingService;
+use Modules\Settings\Models\SystemGeneralSetting;
 
 class AdministrativeFeePercentageSnapshotTest extends ProjectFeatureTestCase
 {
     private function seedAdminFeeSetting(float|string $value): void
     {
-        Setting::updateOrCreate(
-            ['key' => 'admin_fee_percentage'],
-            ['value' => $value, 'type' => 'decimal', 'is_public' => true]
-        );
-
-        app(SettingService::class)->update('admin_fee_percentage', $value, 'decimal', true);
+        SystemGeneralSetting::singleton()->update([
+            'admin_fee_percentage' => $value,
+        ]);
     }
 
     public function test_new_project_stores_current_admin_fee_percentage_from_settings(): void

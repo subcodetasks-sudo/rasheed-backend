@@ -26,6 +26,7 @@ use Modules\Notifications\Listeners\RefreshCashFundExpensesOnDailyJournalUpdate;
 use Modules\Notifications\Listeners\RefreshCashStationOnDailyJournalUpdate;
 use Modules\Notifications\Listeners\RefreshDailyJournalOnInventoryAdministrativeMovement;
 use Modules\Notifications\Listeners\RefreshDashboardOnFinancialUpdate;
+use Modules\Notifications\Listeners\RefreshModulesOnSettingsUpdate;
 use Modules\Notifications\Listeners\RefreshMonthlySummaryOnCashStationUpdate;
 use Modules\Notifications\Listeners\RefreshMonthlySummaryOnDailyJournalUpdate;
 use Modules\Notifications\Listeners\RefreshOperationalRateOnDailyJournalUpdate;
@@ -37,6 +38,8 @@ use Modules\Project\Events\ProjectCreated;
 use Modules\Project\Events\ProjectDeleted;
 use Modules\Project\Events\ProjectRestored;
 use Modules\Project\Events\ProjectUpdated;
+use Modules\Settings\Events\MonthlyEmployeeSettingsUpdated;
+use Modules\Settings\Events\SystemGeneralSettingsUpdated;
 
 class EventServiceProvider extends ServiceProvider
 {
@@ -118,6 +121,13 @@ class EventServiceProvider extends ServiceProvider
         OperationalFundUpdated::class => [
             RefreshAdministrativeFundOnOperationalFundUpdate::class,
             RefreshDashboardOnFinancialUpdate::class,
+        ],
+
+        SystemGeneralSettingsUpdated::class => [
+            RefreshModulesOnSettingsUpdate::class,
+        ],
+        MonthlyEmployeeSettingsUpdated::class => [
+            RefreshModulesOnSettingsUpdate::class,
         ],
     ];
 

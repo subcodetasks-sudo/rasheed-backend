@@ -11,6 +11,8 @@ return [
     'file_deleted' => "تم حذف الملف ':name' من مجموعة ':collection'",
     'settings_fetched_successfully' => 'تم جلب الإعدادات بنجاح',
     'setting_updated_successfully' => 'تم تحديث الإعداد بنجاح',
+    'general_settings_fetched_successfully' => 'تم جلب الإعدادات العامة بنجاح.',
+    'general_settings_updated_successfully' => 'تم تحديث الإعدادات العامة بنجاح.',
     'monthly_employee_settings_fetched_successfully' => 'تم جلب إعدادات الموظفين الشهرية بنجاح.',
     'monthly_employee_settings_updated_successfully' => 'تم تحديث إعدادات الموظفين الشهرية بنجاح.',
     'failed_to_update_setting' => 'فشل تحديث الإعداد',

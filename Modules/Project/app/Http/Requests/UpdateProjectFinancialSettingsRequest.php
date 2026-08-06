@@ -14,23 +14,7 @@ class UpdateProjectFinancialSettingsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'admin_fee_percentage' => ['sometimes', 'numeric', 'min:0', 'max:100'],
-            'total_operational_deduction' => ['sometimes', 'numeric', 'gt:0', 'max:999.99'],
+            'admin_fee_percentage' => ['required', 'numeric', 'min:0', 'max:100'],
         ];
-    }
-
-    public function withValidator($validator): void
-    {
-        $validator->after(function ($validator): void {
-            if (! $this->exists('admin_fee_percentage') && ! $this->exists('total_operational_deduction')) {
-                $validator->errors()->add(
-                    'admin_fee_percentage',
-                    __('validation.required_without', [
-                        'attribute' => 'admin_fee_percentage',
-                        'values' => 'total_operational_deduction',
-                    ])
-                );
-            }
-        });
     }
 }

@@ -7,7 +7,7 @@ use Illuminate\Support\Carbon;
 use Modules\Project\Actions\Project\ResolveEffectiveAdminFeePercentageAction;
 use Modules\Project\Actions\Project\ScheduleAdminFeePercentageChangeAction;
 use Modules\Project\Models\AdministrativeFeeRate;
-use Modules\Settings\Actions\UpdateSettingAction;
+use Modules\Settings\Actions\UpdateSystemGeneralSettingsAction;
 use Tests\TestCase;
 
 class AdministrativeFeeEffectiveDateTest extends TestCase
@@ -32,7 +32,7 @@ class AdministrativeFeeEffectiveDateTest extends TestCase
 
         $this->assertSame(12.0, $resolve->execute('2026-07-30'));
 
-        app(UpdateSettingAction::class)->execute('admin_fee_percentage', 15, 'decimal', true);
+        app(UpdateSystemGeneralSettingsAction::class)->execute(['admin_fee_percentage' => 15]);
 
         $this->assertSame(12.0, $resolve->execute('2026-07-30'));
         $this->assertSame(15.0, $resolve->execute('2026-07-31'));
@@ -66,7 +66,7 @@ class AdministrativeFeeEffectiveDateTest extends TestCase
     {
         $resolve = app(ResolveEffectiveAdminFeePercentageAction::class);
 
-        app(UpdateSettingAction::class)->execute('admin_fee_percentage', 15, 'decimal', true);
+        app(UpdateSystemGeneralSettingsAction::class)->execute(['admin_fee_percentage' => 15]);
 
         AdministrativeFeeRate::query()
             ->whereDate('effective_from', '<', '2026-07-30')
@@ -80,7 +80,7 @@ class AdministrativeFeeEffectiveDateTest extends TestCase
     {
         $resolve = app(ResolveEffectiveAdminFeePercentageAction::class);
 
-        app(UpdateSettingAction::class)->execute('admin_fee_percentage', 15, 'decimal', true);
+        app(UpdateSystemGeneralSettingsAction::class)->execute(['admin_fee_percentage' => 15]);
 
         $this->assertSame(12.0, $resolve->execute('2026-07-15'));
         $this->assertSame(12.0, $resolve->execute('2026-07-29'));

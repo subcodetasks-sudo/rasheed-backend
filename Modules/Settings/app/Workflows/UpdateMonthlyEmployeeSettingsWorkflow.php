@@ -3,6 +3,7 @@
 namespace Modules\Settings\Workflows;
 
 use Modules\Settings\Actions\UpsertMonthlyEmployeeSettingsAction;
+use Modules\Settings\Events\MonthlyEmployeeSettingsUpdated;
 
 class UpdateMonthlyEmployeeSettingsWorkflow
 {
@@ -15,6 +16,10 @@ class UpdateMonthlyEmployeeSettingsWorkflow
      */
     public function handle(int $month, int $year, array $categories): array
     {
-        return $this->upsertMonthlyEmployeeSettingsAction->execute($month, $year, $categories);
+        $payload = $this->upsertMonthlyEmployeeSettingsAction->execute($month, $year, $categories);
+
+        MonthlyEmployeeSettingsUpdated::dispatch($month, $year, $payload);
+
+        return $payload;
     }
 }

@@ -2,26 +2,20 @@
 
 namespace Modules\Project\Actions\Project;
 
-use Modules\Settings\Services\SettingService;
+use Modules\Settings\Models\SystemGeneralSetting;
 
 class ResolveAdminFeePercentageAction
 {
     public const DEFAULT_PERCENTAGE = 12.0;
 
-    public const SETTING_KEY = 'admin_fee_percentage';
-
-    public function __construct(
-        private readonly SettingService $settingService,
-    ) {}
-
     public function execute(): float
     {
-        $value = $this->settingService->get(self::SETTING_KEY, self::DEFAULT_PERCENTAGE);
+        $row = SystemGeneralSetting::query()->first();
 
-        if ($value === null || $value === '' || ! is_numeric($value)) {
+        if ($row === null) {
             return self::DEFAULT_PERCENTAGE;
         }
 
-        return round((float) $value, 2);
+        return round((float) $row->admin_fee_percentage, 2);
     }
 }

@@ -11,7 +11,7 @@ use Modules\Project\Events\ProjectUpdated;
 use Modules\Project\Models\Project;
 use Modules\Project\Services\AdministrativeDeductionService;
 use Modules\Project\Services\OperationalDeductionService;
-use Modules\Settings\Services\SettingService;
+use Modules\Settings\Models\SystemGeneralSetting;
 
 class DeductionConfigurationTest extends ProjectFeatureTestCase
 {
@@ -30,7 +30,7 @@ class DeductionConfigurationTest extends ProjectFeatureTestCase
     public function test_relative_fixed_and_exempt_projects_store_configuration_only(): void
     {
         $this->actAsSuperAdmin(['create-projects']);
-        app(SettingService::class)->update('admin_fee_percentage', 12, 'decimal', true);
+        SystemGeneralSetting::singleton()->update(['admin_fee_percentage' => 12]);
 
         $relative = $this->postJson('/api/v1/projects', $this->basePayload([
             'name' => 'Relative Project',
@@ -257,7 +257,7 @@ class DeductionConfigurationTest extends ProjectFeatureTestCase
         ]);
 
         $operational = app(OperationalDeductionService::class);
-        $administrative = new AdministrativeDeductionService;
+        $administrative = app(AdministrativeDeductionService::class);
 
         $distributed = $operational->distribute(collect([$relative, $fixed, $exempt]), [
             $relative->id => 1000,

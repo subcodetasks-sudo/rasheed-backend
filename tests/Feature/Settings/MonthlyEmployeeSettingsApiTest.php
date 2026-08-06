@@ -10,8 +10,6 @@ use Modules\Project\Enums\ProjectStatus;
 use Modules\Project\Models\OperationalDeductionRate;
 use Modules\Project\Models\Project;
 use Modules\Settings\app\Models\MonthlyEmployeeSetting;
-use Modules\Settings\app\Models\Setting;
-use Modules\Settings\Services\SettingService;
 use Modules\User\app\Models\User;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -136,15 +134,20 @@ class MonthlyEmployeeSettingsApiTest extends TestCase
             ->assertJsonPath('data.total_daily_operational_deduction', '0.00');
     }
 
-    public function test_past_month_upserts_month_start_rate_without_touching_setting(): void
+    public function test_past_month_upserts_month_start_rate_without_touching_other_months(): void
     {
         $this->actAs('super-admin');
 
-        Setting::updateOrCreate(
-            ['key' => 'total_operational_deduction'],
-            ['value' => '1081', 'type' => 'decimal', 'is_public' => true]
-        );
-        app(SettingService::class)->update('total_operational_deduction', 1081, 'decimal', true);
+        MonthlyEmployeeSetting::query()->create([
+            'year' => 2026,
+            'month' => 8,
+            'fixed_workers' => 100,
+            'media_staff' => 0,
+            'administrative_staff' => 0,
+            'variable_workers' => 0,
+            'speakers' => 0,
+            'cooks' => 0,
+        ]);
 
         $this->putJson(self::ENDPOINT, [
             'month' => 6,
@@ -157,7 +160,11 @@ class MonthlyEmployeeSettingsApiTest extends TestCase
             'cooks' => 0,
         ])->assertOk()->assertJsonPath('data.relative_deduction', '500.00');
 
-        $this->assertSame(1081.0, (float) app(SettingService::class)->get('total_operational_deduction'));
+        $this->assertSame(100.0, (float) MonthlyEmployeeSetting::query()
+            ->where('year', 2026)
+            ->where('month', 8)
+            ->value('fixed_workers'));
+
         $this->assertNotNull(
             OperationalDeductionRate::query()
                 ->whereDate('effective_from', '2026-06-01')
@@ -203,39 +210,17 @@ class MonthlyEmployeeSettingsApiTest extends TestCase
             ->assertJsonPath('data.categories.media_staff', '0.00');
     }
 
-    public function test_organization_name_aliases_app_name(): void
+    public function test_general_settings_endpoint_updates_organization_name(): void
     {
         $this->actAs('super-admin');
 
-        Setting::updateOrCreate(
-            ['key' => 'app_name'],
-            ['value' => 'Rashid Org', 'type' => 'string', 'is_public' => true]
-        );
-        app(SettingService::class)->update('app_name', 'Rashid Org', 'string', true);
+        $this->putJson('/api/v1/settings/general', [
+            'organization_name' => 'New Org Name',
+        ])->assertOk()->assertJsonPath('data.organization_name', 'New Org Name');
 
-        $service = app(SettingService::class);
-        $this->assertSame('Rashid Org', $service->get('organization_name'));
-
-        $this->postJson('/api/v1/settings/organization_name', [
-            'value' => 'New Org Name',
-            'type' => 'string',
-        ])->assertOk();
-
-        $this->assertDatabaseHas('settings', [
-            'key' => 'app_name',
-            'value' => 'New Org Name',
-        ]);
-        $this->assertDatabaseMissing('settings', [
-            'key' => 'organization_name',
-        ]);
-        $this->assertSame('New Org Name', $service->get('organization_name'));
-        $this->assertSame('New Org Name', $service->get('app_name'));
-
-        $index = $this->getJson('/api/v1/settings');
-        $index->assertOk();
-        $keys = collect($index->json('data'))->pluck('key');
-        $this->assertTrue($keys->contains('app_name'));
-        $this->assertTrue($keys->contains('organization_name'));
+        $this->getJson('/api/v1/settings/general')
+            ->assertOk()
+            ->assertJsonPath('data.organization_name', 'New Org Name');
     }
 
     public function test_show_after_save_returns_persisted_row(): void

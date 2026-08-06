@@ -4,8 +4,7 @@ namespace Tests\Feature\Settings;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
-use Modules\Settings\app\Models\Setting;
-use Modules\Settings\Services\SettingService;
+use Modules\Settings\Models\SystemGeneralSetting;
 use Modules\User\app\Models\User;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -13,6 +12,8 @@ use Tests\TestCase;
 class AdminFeePercentageSettingTest extends TestCase
 {
     use RefreshDatabase;
+
+    private const ENDPOINT = '/api/v1/settings/general';
 
     private function actAsSettingsEditor(): User
     {
@@ -27,12 +28,9 @@ class AdminFeePercentageSettingTest extends TestCase
 
     private function seedAdminFeeSetting(float|string $value = 12): void
     {
-        Setting::updateOrCreate(
-            ['key' => 'admin_fee_percentage'],
-            ['value' => $value, 'type' => 'decimal', 'is_public' => true]
-        );
-
-        app(SettingService::class)->update('admin_fee_percentage', $value, 'decimal', true);
+        SystemGeneralSetting::singleton()->update([
+            'admin_fee_percentage' => $value,
+        ]);
     }
 
     public function test_authorized_user_can_update_admin_fee_percentage(): void
@@ -40,18 +38,15 @@ class AdminFeePercentageSettingTest extends TestCase
         $this->seedAdminFeeSetting(12);
         $this->actAsSettingsEditor();
 
-        $this->postJson('/api/v1/settings/admin_fee_percentage', [
-            'value' => 15,
-            'type' => 'decimal',
+        $this->putJson(self::ENDPOINT, [
+            'admin_fee_percentage' => 15,
         ])
             ->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.admin_fee_percentage', 15);
 
-        $this->assertDatabaseHas('settings', [
-            'key' => 'admin_fee_percentage',
-            'value' => '15',
-            'type' => 'decimal',
+        $this->assertDatabaseHas('system_general_settings', [
+            'admin_fee_percentage' => 15,
         ]);
     }
 
@@ -60,21 +55,17 @@ class AdminFeePercentageSettingTest extends TestCase
         $this->seedAdminFeeSetting(12);
         $this->actAsSettingsEditor();
 
-        $this->postJson('/api/v1/settings/admin_fee_percentage', [
-            'value' => -1,
-        ])->assertStatus(422)->assertJsonValidationErrors(['value']);
+        $this->putJson(self::ENDPOINT, [
+            'admin_fee_percentage' => -1,
+        ])->assertStatus(422)->assertJsonValidationErrors(['admin_fee_percentage']);
 
-        $this->postJson('/api/v1/settings/admin_fee_percentage', [
-            'value' => 'abc',
-        ])->assertStatus(422)->assertJsonValidationErrors(['value']);
+        $this->putJson(self::ENDPOINT, [
+            'admin_fee_percentage' => 'abc',
+        ])->assertStatus(422)->assertJsonValidationErrors(['admin_fee_percentage']);
 
-        $this->postJson('/api/v1/settings/admin_fee_percentage', [
-            'value' => null,
-        ])->assertStatus(422)->assertJsonValidationErrors(['value']);
-
-        $this->postJson('/api/v1/settings/admin_fee_percentage', [
-            'value' => 101,
-        ])->assertStatus(422)->assertJsonValidationErrors(['value']);
+        $this->putJson(self::ENDPOINT, [
+            'admin_fee_percentage' => 101,
+        ])->assertStatus(422)->assertJsonValidationErrors(['admin_fee_percentage']);
     }
 
     public function test_admin_fee_percentage_accepts_valid_boundary_values(): void
@@ -83,8 +74,8 @@ class AdminFeePercentageSettingTest extends TestCase
         $this->actAsSettingsEditor();
 
         foreach ([0, 5, 8.5, 10, 12, 15, 20, 100] as $value) {
-            $this->postJson('/api/v1/settings/admin_fee_percentage', [
-                'value' => $value,
+            $this->putJson(self::ENDPOINT, [
+                'admin_fee_percentage' => $value,
             ])->assertOk()
                 ->assertJsonPath('data.admin_fee_percentage', $value);
         }
@@ -94,19 +85,18 @@ class AdminFeePercentageSettingTest extends TestCase
     {
         $this->seedAdminFeeSetting(12);
 
-        $this->postJson('/api/v1/settings/admin_fee_percentage', [
-            'value' => 15,
+        $this->putJson(self::ENDPOINT, [
+            'admin_fee_percentage' => 15,
         ])->assertUnauthorized();
 
         Sanctum::actingAs(User::factory()->create());
 
-        $this->postJson('/api/v1/settings/admin_fee_percentage', [
-            'value' => 15,
+        $this->putJson(self::ENDPOINT, [
+            'admin_fee_percentage' => 15,
         ])->assertForbidden();
 
-        $this->assertDatabaseHas('settings', [
-            'key' => 'admin_fee_percentage',
-            'value' => '12',
+        $this->assertDatabaseHas('system_general_settings', [
+            'admin_fee_percentage' => 12,
         ]);
     }
 }

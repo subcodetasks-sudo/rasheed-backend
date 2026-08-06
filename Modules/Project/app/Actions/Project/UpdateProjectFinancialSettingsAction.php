@@ -2,42 +2,25 @@
 
 namespace Modules\Project\Actions\Project;
 
-use Modules\Settings\Services\SettingService;
+use Modules\Settings\Actions\UpdateSystemGeneralSettingsAction;
 
 class UpdateProjectFinancialSettingsAction
 {
     public function __construct(
-        private readonly SettingService $settingService,
         private readonly GetProjectFinancialSettingsAction $getProjectFinancialSettingsAction,
-        private readonly ScheduleAdminFeePercentageChangeAction $scheduleAdminFeePercentageChangeAction,
+        private readonly UpdateSystemGeneralSettingsAction $updateSystemGeneralSettingsAction,
     ) {}
 
     /**
-     * @param  array{admin_fee_percentage?: float|int|string, total_operational_deduction?: float|int|string}  $data
+     * @param  array{admin_fee_percentage?: float|int|string}  $data
      * @return array{admin_fee_percentage: float, total_operational_deduction: float}
      */
     public function execute(array $data): array
     {
         if (array_key_exists('admin_fee_percentage', $data)) {
-            $this->settingService->update(
-                'admin_fee_percentage',
-                $data['admin_fee_percentage'],
-                'decimal',
-                true
-            );
-
-            $this->scheduleAdminFeePercentageChangeAction->execute(
-                (float) $data['admin_fee_percentage']
-            );
-        }
-
-        if (array_key_exists('total_operational_deduction', $data)) {
-            $this->settingService->update(
-                'total_operational_deduction',
-                $data['total_operational_deduction'],
-                'decimal',
-                true
-            );
+            $this->updateSystemGeneralSettingsAction->execute([
+                'admin_fee_percentage' => $data['admin_fee_percentage'],
+            ]);
         }
 
         return $this->getProjectFinancialSettingsAction->execute();

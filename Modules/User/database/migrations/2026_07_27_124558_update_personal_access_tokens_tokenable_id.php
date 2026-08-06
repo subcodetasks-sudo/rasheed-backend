@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -22,6 +23,9 @@ return new class extends Migration
         if (Schema::getConnection()->getDriverName() === 'sqlite') {
             return;
         }
+
+        // UUID strings cannot cast to bigint — clear tokens before reverting type.
+        DB::table('personal_access_tokens')->delete();
 
         Schema::table('personal_access_tokens', function (Blueprint $table) {
             $table->unsignedBigInteger('tokenable_id')->change();

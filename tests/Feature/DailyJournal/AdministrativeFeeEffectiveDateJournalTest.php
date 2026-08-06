@@ -3,8 +3,8 @@
 namespace Tests\Feature\DailyJournal;
 
 use Illuminate\Support\Carbon;
-use Modules\Settings\Actions\UpdateSettingAction;
-use Modules\Settings\Services\SettingService;
+use Modules\Settings\Actions\UpdateSystemGeneralSettingsAction;
+use Modules\Settings\Models\SystemGeneralSetting;
 
 class AdministrativeFeeEffectiveDateJournalTest extends DailyJournalFeatureTestCase
 {
@@ -23,7 +23,7 @@ class AdministrativeFeeEffectiveDateJournalTest extends DailyJournalFeatureTestC
     public function test_mid_day_setting_change_does_not_affect_todays_journal(): void
     {
         $this->actAsFinanceUser();
-        app(SettingService::class)->update('admin_fee_percentage', 12, 'decimal', true);
+        SystemGeneralSetting::singleton()->update(['admin_fee_percentage' => 12]);
 
         $project = $this->createActiveProject([
             'name' => 'Admin Fee Today',
@@ -31,7 +31,7 @@ class AdministrativeFeeEffectiveDateJournalTest extends DailyJournalFeatureTestC
             'administrative_fee_percentage' => 12,
         ]);
 
-        app(UpdateSettingAction::class)->execute('admin_fee_percentage', 20, 'decimal', true);
+        app(UpdateSystemGeneralSettingsAction::class)->execute(['admin_fee_percentage' => 20]);
 
         $this->putJson('/api/v1/daily-journals', [
             'journal_date' => '2026-07-30',
@@ -49,7 +49,7 @@ class AdministrativeFeeEffectiveDateJournalTest extends DailyJournalFeatureTestC
     public function test_new_admin_fee_starts_on_next_calendar_day(): void
     {
         $this->actAsFinanceUser();
-        app(SettingService::class)->update('admin_fee_percentage', 12, 'decimal', true);
+        SystemGeneralSetting::singleton()->update(['admin_fee_percentage' => 12]);
 
         $project = $this->createActiveProject([
             'name' => 'Admin Fee Tomorrow',
@@ -57,7 +57,7 @@ class AdministrativeFeeEffectiveDateJournalTest extends DailyJournalFeatureTestC
             'administrative_fee_percentage' => 12,
         ]);
 
-        app(UpdateSettingAction::class)->execute('admin_fee_percentage', 20, 'decimal', true);
+        app(UpdateSystemGeneralSettingsAction::class)->execute(['admin_fee_percentage' => 20]);
 
         Carbon::setTestNow(Carbon::parse('2026-07-31 09:00:00'));
 
@@ -77,7 +77,7 @@ class AdministrativeFeeEffectiveDateJournalTest extends DailyJournalFeatureTestC
     public function test_recalculating_historical_journal_keeps_original_percentage(): void
     {
         $this->actAsFinanceUser();
-        app(SettingService::class)->update('admin_fee_percentage', 12, 'decimal', true);
+        SystemGeneralSetting::singleton()->update(['admin_fee_percentage' => 12]);
 
         $project = $this->createActiveProject([
             'name' => 'Admin Fee Historical',
@@ -97,7 +97,7 @@ class AdministrativeFeeEffectiveDateJournalTest extends DailyJournalFeatureTestC
         ])->assertOk()
             ->assertJsonPath('data.entries.0.administrative_fee', '120.00');
 
-        app(UpdateSettingAction::class)->execute('admin_fee_percentage', 20, 'decimal', true);
+        app(UpdateSystemGeneralSettingsAction::class)->execute(['admin_fee_percentage' => 20]);
 
         $this->putJson('/api/v1/daily-journals', [
             'journal_date' => '2026-07-15',

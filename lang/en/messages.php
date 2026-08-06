@@ -11,6 +11,8 @@ return [
     'file_deleted' => "File ':name' deleted from ':collection' collection",
     'settings_fetched_successfully' => 'Settings fetched successfully',
     'setting_updated_successfully' => 'Setting updated successfully',
+    'general_settings_fetched_successfully' => 'General settings fetched successfully.',
+    'general_settings_updated_successfully' => 'General settings updated successfully.',
     'monthly_employee_settings_fetched_successfully' => 'Monthly employee settings fetched successfully.',
     'monthly_employee_settings_updated_successfully' => 'Monthly employee settings updated successfully.',
     'failed_to_update_setting' => 'Failed to update setting',

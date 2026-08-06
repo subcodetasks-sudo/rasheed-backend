@@ -9,48 +9,65 @@ use Modules\Project\Models\Project;
 use Modules\Project\Services\AdministrativeDeductionService;
 use Modules\Project\Services\OperationalDeductionService;
 use Modules\Settings\Actions\UpsertMonthlyEmployeeSettingsAction;
-use Modules\Settings\Services\SettingService;
+use Modules\Settings\Models\SystemGeneralSetting;
 
 class ProjectFinancialSettingsTest extends ProjectFeatureTestCase
 {
-    private function seedFinancialSettings(float $adminFee = 12, float $totalOperational = 1081): void
+    private function seedFinancialSettings(float $adminFee = 12): void
     {
-        $settings = app(SettingService::class);
-        $settings->update('admin_fee_percentage', $adminFee, 'decimal', true);
-        $settings->update('total_operational_deduction', $totalOperational, 'decimal', true);
+        SystemGeneralSetting::singleton()->update([
+            'admin_fee_percentage' => $adminFee,
+        ]);
     }
 
     public function test_can_show_and_update_project_financial_settings(): void
     {
-        $this->seedFinancialSettings(12, 1081);
+        $this->seedFinancialSettings(12);
         $this->actAsSuperAdmin();
+
+        app(UpsertMonthlyEmployeeSettingsAction::class)->execute(
+            (int) now()->month,
+            (int) now()->year,
+            [
+                'fixed_workers' => 500,
+                'media_staff' => 0,
+                'administrative_staff' => 0,
+                'variable_workers' => 0,
+                'speakers' => 0,
+                'cooks' => 0,
+            ]
+        );
 
         $this->getJson('/api/v1/projects/financial-settings')
             ->assertOk()
             ->assertJsonPath('data.admin_fee_percentage', 12)
-            ->assertJsonPath('data.total_operational_deduction', 1081);
+            ->assertJsonPath('data.total_operational_deduction', 500);
 
         $this->patchJson('/api/v1/projects/financial-settings', [
             'admin_fee_percentage' => 15,
-            'total_operational_deduction' => 2000,
         ])
             ->assertOk()
             ->assertJsonPath('data.admin_fee_percentage', 15)
-            ->assertJsonPath('data.total_operational_deduction', 2000);
+            ->assertJsonPath('data.total_operational_deduction', 500);
 
-        $this->assertDatabaseHas('settings', [
-            'key' => 'admin_fee_percentage',
-            'value' => '15',
+        $this->assertDatabaseHas('system_general_settings', [
+            'admin_fee_percentage' => 15,
         ]);
-        $this->assertDatabaseHas('settings', [
-            'key' => 'total_operational_deduction',
-            'value' => '2000',
-        ]);
+    }
+
+    public function test_rejects_total_operational_deduction_on_financial_settings_patch(): void
+    {
+        $this->seedFinancialSettings();
+        $this->actAsSuperAdmin();
+
+        $this->patchJson('/api/v1/projects/financial-settings', [
+            'total_operational_deduction' => 2000,
+        ])->assertStatus(422)->assertJsonValidationErrors(['admin_fee_percentage']);
     }
 
     public function test_new_projects_and_calculations_use_financial_settings(): void
     {
-        $this->seedFinancialSettings(12, 1081);
+        $this->seedFinancialSettings(12);
         $this->actAsSuperAdmin();
 
         $category = $this->createCategory();

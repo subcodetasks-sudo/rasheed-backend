@@ -393,13 +393,14 @@ ENUMS_DOC = """
 - User list excludes the logged-in user; a user **cannot delete their own account** (403)
 
 ## Operational deduction effective date
-- Changing `total_operational_deduction` (Settings or Financial Settings) updates the **configured** value immediately for GET/UI.
+- Relative operational pool is owned by **Monthly Employee Settings** (sum of 6 categories), not a writable settings key.
+- Saving monthly employees syncs Relative Deduction into `operational_deduction_rates`.
 - Journal / deduction **calculations** use the rate effective for the journal date from `operational_deduction_rates`.
 - A mid-day change never affects **today** or earlier dates; the new amount applies from the **next calendar day** only.
 - Recalculating a historical journal still uses the pool that was effective on that journal date.
 
 ## Administrative fee percentage effective date
-- Changing `admin_fee_percentage` (Settings or Financial Settings) updates the **configured** value immediately for GET/UI.
+- Changing `admin_fee_percentage` via **General Settings** (`PUT /settings/general`) or Financial Settings updates the **configured** value immediately for GET/UI (`system_general_settings`).
 - Journal / admin-fee **calculations** use the percentage effective for the journal date from `administrative_fee_rates`.
 - A mid-day change never affects **today** or earlier dates; the new percentage applies from the **next calendar day** only.
 - Recalculating a historical journal still uses the percentage that was effective on that journal date.
@@ -419,6 +420,7 @@ ENUMS_DOC = """
   - `administrative-fund.{YYYY}-{MM}` → `administrative-fund.updated`
   - `operational-fund.{YYYY}-{MM}` → `operational-fund.updated`
   - `operational-rate.{YYYY}-{MM}` → `operational-rate.updated`
+  - `dashboard` → `dashboard.updated` (payload includes `journal_date` + summary `data`; client refetches or applies when date matches)
   - `reports-center` → `reports-center.updated` (signal with `affected_date`; client refetches current filters)
   - `advanced-reports` → `advanced-reports.updated` (signal with `affected_date`; client refetches current filters)
   - `administrative-debt-settlements.{YYYY}-{MM}` → `administrative-debt-settlements.updated`
@@ -433,16 +435,18 @@ ENUMS_DOC = """
 
 OP_DEDUCTION_EFFECTIVE_DATE_NOTE = (
     "### Operational deduction effective date\n"
-    "Changing `total_operational_deduction` stores the new **configured** value immediately (shown on GET).\n"
-    "Daily Journal / deduction math uses the **effective** pool for the journal date "
-    "(scheduled via `operational_deduction_rates`).\n"
-    "A change on day D never affects journals for D or earlier; the new amount starts on **D+1**.\n"
+    "Relative pool comes from **Monthly Employee Settings** (sum of categories), synced into "
+    "`operational_deduction_rates` on save.\n"
+    "Daily Journal / deduction math uses the **effective** pool for the journal date.\n"
+    "A change on day D never affects journals for D or earlier; the new amount starts on **D+1** "
+    "(when saving the current month). Past/future months upsert the rate at month start.\n"
     "Same-day re-edits only replace the scheduled D+1 rate. Historical recalc keeps the original effective pool."
 )
 
 ADMIN_FEE_EFFECTIVE_DATE_NOTE = (
     "### Administrative fee percentage effective date\n"
-    "Changing `admin_fee_percentage` stores the new **configured** value immediately (shown on GET).\n"
+    "Changing `admin_fee_percentage` stores the new **configured** value immediately on "
+    "`system_general_settings` (shown on GET).\n"
     "Daily Journal / admin-fee math uses the **effective** percentage for the journal date "
     "(scheduled via `administrative_fee_rates`).\n"
     "A change on day D never affects journals for D or earlier; the new percentage starts on **D+1**.\n"
@@ -890,91 +894,65 @@ def authz_users_status() -> dict:
 
 # --- Settings ---
 
-def settings_list() -> dict:
-    path = "settings"
-    original = {"method": "GET", "header": header(auth=False, locale=True), "url": url(path)}
+SAMPLE_GENERAL_SETTINGS = {
+    "organization_name": "Rashid Financial",
+    "currency": "SAR",
+    "admin_fee_percentage": 12.0,
+}
+
+
+def settings_general_show() -> dict:
+    path = "settings/general"
+    original = {"method": "GET", "header": header(locale=True), "url": url(path)}
     return req(
-        "List Settings",
+        "Show General Settings",
         "GET",
         path,
-        description="Public (no auth). Rate-limited. Locale via `Accept-Language`.",
-        roles=["public"],
-        enums=(
-            "Setting `type`: string | integer | boolean | json | decimal\n"
-            "Known keys: `admin_fee_percentage`, `total_operational_deduction`, `app_name`, "
-            "`organization_name` (alias of `app_name`), `default_currency`"
+        description=(
+            "Structured system settings singleton: organization name, currency, and administrative percentage. "
+            "Stored on `system_general_settings` (not key/value)."
         ),
+        roles=["super-admin"],
         locale=True,
-        auth_required=False,
-        no_auth_header=True,
         responses=[
             example(
                 "200 OK",
                 200,
-                ok(
-                    "Settings fetched successfully",
-                    [
-                        {"key": "admin_fee_percentage", "value": "12", "type": "decimal", "isPublic": True},
-                        {"key": "total_operational_deduction", "value": "1235", "type": "decimal", "isPublic": True},
-                    ],
-                ),
+                ok("General settings fetched successfully.", SAMPLE_GENERAL_SETTINGS),
                 original_request=original,
             ),
-            example("429 Rate limited", 429, RATE_LIMIT, original_request=original),
+            *std_auth_errors(original),
         ],
     )
 
 
-def settings_update() -> dict:
-    path = "settings/{{setting_key}}"
-    body = {"value": 12, "type": "decimal", "is_public": True}
-    original = {"method": "POST", "header": header(json_body=True, locale=True), "body": body_raw(body), "url": url(path)}
-    return req(
-        "Update Setting by Key",
-        "POST",
-        path,
-        description=(
-            "Update a single setting. Path `{key}` e.g. `admin_fee_percentage` or `total_operational_deduction`.\n"
-            "- admin_fee_percentage: numeric 0–100\n"
-            "- total_operational_deduction: numeric > 0\n\n"
-            + OP_DEDUCTION_EFFECTIVE_DATE_NOTE
-            + "\n\n"
-            + ADMIN_FEE_EFFECTIVE_DATE_NOTE
-        ),
-        roles=["super-admin"],
-        enums="`type`: string | integer | boolean | json | decimal",
-        body=body,
-        json_body=True,
-        locale=True,
-        responses=[
-            example("200 OK", 200, ok("Setting updated successfully", {"admin_fee_percentage": 12}), original_request=original),
-            *std_auth_errors(original, include_validation=True),
-            example("400 Failed", 400, fail("Failed to update setting", "An unexpected error occurred"), original_request=original),
-        ],
-    )
-
-
-def settings_bulk() -> dict:
-    path = "settings"
+def settings_general_update() -> dict:
+    path = "settings/general"
     body = {
-        "settings": [
-            {"key": "admin_fee_percentage", "value": 12, "type": "decimal", "is_public": True},
-            {"key": "total_operational_deduction", "value": 1235, "type": "decimal", "is_public": True},
-        ]
+        "organization_name": "Rashid Financial",
+        "currency": "SAR",
+        "admin_fee_percentage": 12,
     }
-    original = {"method": "PUT", "header": header(json_body=True, locale=True), "body": body_raw(body), "url": url(path)}
+    original = {
+        "method": "PUT",
+        "header": header(json_body=True, locale=True),
+        "body": body_raw(body),
+        "url": url(path),
+    }
     return req(
-        "Bulk Update Settings",
+        "Update General Settings",
         "PUT",
         path,
         description=(
-            "Update multiple settings at once.\n\n"
-            + OP_DEDUCTION_EFFECTIVE_DATE_NOTE
-            + "\n\n"
+            "Partial update allowed (at least one field). "
+            "Does not touch Monthly Employee Settings.\n"
+            "- organization_name: non-empty string\n"
+            "- currency: SAR | USD | AED\n"
+            "- admin_fee_percentage: 0–100 (schedules next-day effective rate when changed)\n\n"
             + ADMIN_FEE_EFFECTIVE_DATE_NOTE
         ),
         roles=["super-admin"],
-        enums="`settings.*.type`: string | integer | boolean | json | decimal",
+        enums="`currency`: SAR | USD | AED",
         body=body,
         json_body=True,
         locale=True,
@@ -982,13 +960,7 @@ def settings_bulk() -> dict:
             example(
                 "200 OK",
                 200,
-                ok(
-                    "Setting updated successfully",
-                    [
-                        {"key": "admin_fee_percentage", "value": "12", "type": "decimal", "isPublic": True},
-                        {"key": "total_operational_deduction", "value": "1235", "type": "decimal", "isPublic": True},
-                    ],
-                ),
+                ok("General settings updated successfully.", SAMPLE_GENERAL_SETTINGS),
                 original_request=original,
             ),
             *std_auth_errors(original, include_validation=True),
@@ -1027,8 +999,8 @@ def settings_monthly_employees_show() -> dict:
         description=(
             "Month-scoped employee category costs that own the Relative Operational Deduction pool. "
             "Relative Deduction = sum of 6 categories. Fixed Project Deductions = sum of active Fixed "
-            "project amounts. Total Daily Operational Deduction = Relative + Fixed. "
-            "`organization_name` is an alias of `app_name` on general settings."
+            "project amounts (read from Project settings). "
+            "Total Daily Operational Deduction = Relative + Fixed."
         ),
         roles=["super-admin"],
         enums="`month` 1–12, `year` 2000–2100",
@@ -1070,8 +1042,8 @@ def settings_monthly_employees_update() -> dict:
         path,
         description=(
             "Upsert employee costs for a month and sync Relative Deduction into "
-            "`operational_deduction_rates` (and `total_operational_deduction` when saving the current month). "
-            "Missing category fields default to 0. Does not rewrite historical Daily Journal rows.\n\n"
+            "`operational_deduction_rates`. Missing category fields default to 0. "
+            "Does not modify General Settings and does not rewrite historical Daily Journal rows.\n\n"
             + OP_DEDUCTION_EFFECTIVE_DATE_NOTE
         ),
         roles=["super-admin"],
@@ -1093,9 +1065,8 @@ def settings_monthly_employees_update() -> dict:
 
 def settings_folder_items() -> list:
     return [
-        settings_list(),
-        settings_update(),
-        settings_bulk(),
+        settings_general_show(),
+        settings_general_update(),
         settings_monthly_employees_show(),
         settings_monthly_employees_update(),
     ]
@@ -1386,9 +1357,11 @@ def financial_settings_show() -> dict:
         "GET",
         path,
         description=(
-            "Global financial settings used by projects/journals "
-            "(`admin_fee_percentage`, `total_operational_deduction`).\n"
-            "Configured values here may differ from today's effective journal rates until the next calendar day.\n\n"
+            "Compatibility read of global financial values: "
+            "`admin_fee_percentage` from `system_general_settings`, "
+            "`total_operational_deduction` = current month Relative Deduction "
+            "(monthly employee category sum; 0 if no row).\n"
+            "Prefer System Settings endpoints for writes.\n\n"
             + OP_DEDUCTION_EFFECTIVE_DATE_NOTE
             + "\n\n"
             + ADMIN_FEE_EFFECTIVE_DATE_NOTE
@@ -1400,7 +1373,7 @@ def financial_settings_show() -> dict:
                 200,
                 ok(
                     "Settings fetched successfully",
-                    {"admin_fee_percentage": 12.0, "total_operational_deduction": 1235.0},
+                    {"admin_fee_percentage": 12.0, "total_operational_deduction": 825.0},
                 ),
                 original_request=original,
             ),
@@ -1411,18 +1384,16 @@ def financial_settings_show() -> dict:
 
 def financial_settings_update() -> dict:
     path = "projects/financial-settings"
-    body = {"admin_fee_percentage": 12, "total_operational_deduction": 1235}
+    body = {"admin_fee_percentage": 12}
     original = {"method": "PATCH", "header": header(json_body=True), "body": body_raw(body), "url": url(path)}
     return req(
         "Update Project Financial Settings",
         "PATCH",
         path,
         description=(
-            "At least one of the two fields required.\n"
-            "- admin_fee_percentage: 0–100\n"
-            "- total_operational_deduction: > 0\n\n"
-            + OP_DEDUCTION_EFFECTIVE_DATE_NOTE
-            + "\n\n"
+            "Updates `admin_fee_percentage` only (shared writer with General Settings). "
+            "`total_operational_deduction` is **not** writable here — manage Relative Deduction via "
+            "`PUT /settings/monthly-employees`.\n\n"
             + ADMIN_FEE_EFFECTIVE_DATE_NOTE
         ),
         roles=["super-admin"],
@@ -1434,7 +1405,7 @@ def financial_settings_update() -> dict:
                 200,
                 ok(
                     "Setting updated successfully",
-                    {"admin_fee_percentage": 12.0, "total_operational_deduction": 1235.0},
+                    {"admin_fee_percentage": 12.0, "total_operational_deduction": 825.0},
                 ),
                 original_request=original,
             ),
@@ -3706,13 +3677,12 @@ def build() -> dict:
     public_folder = folder(
         "02. Public (no auth / no role)",
         [
-            folder("Settings", [settings_list()]),
             folder(
                 "Media",
                 [media_upload(), media_show(), media_download(), media_delete()],
             ),
         ],
-        description="Endpoints without `auth:sanctum` / role middleware.",
+        description="Endpoints without `auth:sanctum` / role middleware. System Settings require super-admin.",
     )
 
     super_admin = folder(
@@ -3732,12 +3702,7 @@ def build() -> dict:
                     authz_users_status(),
                 ],
             ),
-            folder("Settings (write)", [
-                settings_update(),
-                settings_bulk(),
-                settings_monthly_employees_show(),
-                settings_monthly_employees_update(),
-            ]),
+            folder("Settings", settings_folder_items()),
             folder(
                 "Categories",
                 [categories_list(), categories_create(), categories_update(), categories_delete()],
@@ -3913,7 +3878,6 @@ def build() -> dict:
             {"key": "inventory_item_id", "value": "1"},
             {"key": "settlement_id", "value": "1"},
             {"key": "media_id", "value": "1"},
-            {"key": "setting_key", "value": "admin_fee_percentage"},
             {"key": "socket_io_url", "value": "http://127.0.0.1:3001"},
         ],
         "item": [

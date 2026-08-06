@@ -31,7 +31,7 @@ class UpdateProjectRequest extends FormRequest
                 'nullable',
                 'numeric',
                 'gt:0',
-                'max:999.99',
+                'max:9999.99',
                 new OperationalFixedAmountRule($this->input('operational_deduction_type')),
             ],
             'administrative_exempt' => ['sometimes', 'boolean'],

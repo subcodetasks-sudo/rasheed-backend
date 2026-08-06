@@ -2,26 +2,28 @@
 
 namespace Modules\Project\Actions\Project;
 
-use Modules\Settings\Services\SettingService;
+use Carbon\Carbon;
+use Modules\Settings\app\Models\MonthlyEmployeeSetting;
 
 class ResolveTotalOperationalDeductionAction
 {
-    public const DEFAULT_TOTAL = 1081.0;
-
-    public const SETTING_KEY = 'total_operational_deduction';
-
-    public function __construct(
-        private readonly SettingService $settingService,
-    ) {}
-
+    /**
+     * Relative operational pool for display: current month's employee category sum.
+     * Journal math uses ResolveEffectiveOperationalDeductionAction (rates table).
+     */
     public function execute(): float
     {
-        $value = $this->settingService->get(self::SETTING_KEY, self::DEFAULT_TOTAL);
+        $today = Carbon::now()->startOfDay();
 
-        if ($value === null || $value === '' || ! is_numeric($value)) {
-            return self::DEFAULT_TOTAL;
+        $row = MonthlyEmployeeSetting::query()
+            ->where('year', (int) $today->year)
+            ->where('month', (int) $today->month)
+            ->first();
+
+        if ($row === null) {
+            return 0.0;
         }
 
-        return round((float) $value, 2);
+        return $row->relativeDeduction();
     }
 }
