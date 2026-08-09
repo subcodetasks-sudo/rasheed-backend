@@ -23,23 +23,50 @@ class DatabaseSeeder extends Seeder
             SettingsDatabaseSeeder::class,
         ]);
 
-        $superAdminRole = Role::firstOrCreate(
-            ['name' => 'super-admin', 'guard_name' => 'api']
-        );
-
-        $admin = User::firstOrCreate(
-            ['user_name' => 'super_admin'],
+        $accounts = [
             [
-                'uuid' => (string) Str::uuid(),
+                'role' => 'super-admin',
+                'user_name' => 'super_admin',
                 'full_name' => 'Super Admin',
                 'email' => 'admin@system.com',
-                'password' => bcrypt('password123'),
-                'status' => 'active',
-            ]
-        );
+            ],
+            [
+                'role' => 'finance',
+                'user_name' => 'finance_user',
+                'full_name' => 'Finance Manager',
+                'email' => 'finance@system.com',
+            ],
+            [
+                'role' => 'inventory',
+                'user_name' => 'inventory_user',
+                'full_name' => 'Inventory Manager',
+                'email' => 'inventory@system.com',
+            ],
+        ];
 
-        if (! $admin->hasRole('super-admin')) {
-            $admin->assignRole($superAdminRole);
+        foreach ($accounts as $account) {
+            $role = Role::firstOrCreate([
+                'name' => $account['role'],
+                'guard_name' => 'web',
+            ]);
+
+            $user = User::query()->where('user_name', $account['user_name'])->first();
+
+            if (! $user) {
+                $user = new User;
+                $user->forceFill([
+                    'uuid' => (string) Str::uuid(),
+                    'user_name' => $account['user_name'],
+                    'full_name' => $account['full_name'],
+                    'email' => $account['email'],
+                    'password' => 'password123',
+                    'status' => 'active',
+                ])->save();
+            }
+
+            if (! $user->hasRole($account['role'])) {
+                $user->assignRole($role);
+            }
         }
 
         $this->call([

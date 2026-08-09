@@ -5,6 +5,7 @@ namespace Modules\Notifications\Providers;
 use Illuminate\Support\ServiceProvider;
 use Modules\Notifications\Rules\InventoryStockNotificationRule;
 use Modules\Notifications\Services\NotificationService;
+use Modules\Notifications\Services\NotificationSseService;
 use Modules\Notifications\Support\NotificationRuleRegistry;
 use Nwidart\Modules\Traits\PathNamespace;
 use RecursiveDirectoryIterator;
@@ -27,7 +28,10 @@ class NotificationsServiceProvider extends ServiceProvider
 
     public function register(): void
     {
+        $this->app->register(RouteServiceProvider::class);
+
         $this->app->singleton(NotificationService::class);
+        $this->app->singleton(NotificationSseService::class);
 
         $this->app->singleton(NotificationRuleRegistry::class, function ($app) {
             return new NotificationRuleRegistry([

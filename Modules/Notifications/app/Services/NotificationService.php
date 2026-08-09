@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Modules\Notifications\Enums\NotificationType;
 use Modules\Notifications\Events\NotificationCreated;
 use Modules\Notifications\Models\Notification;
+use Modules\Project\Models\Project;
 
 class NotificationService
 {
@@ -66,10 +67,29 @@ class NotificationService
             'meta' => $meta,
             'subject_type' => $subject ? $subject::class : null,
             'subject_id' => $subject?->getKey(),
+            'project_id' => $this->resolveProjectId($meta, $subject),
         ]);
 
         NotificationCreated::dispatch($notification);
 
         return $notification;
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    protected function resolveProjectId(array $meta, ?Model $subject): ?int
+    {
+        if (isset($meta['project_id']) && is_numeric($meta['project_id'])) {
+            $projectId = (int) $meta['project_id'];
+
+            return $projectId > 0 ? $projectId : null;
+        }
+
+        if ($subject instanceof Project) {
+            return (int) $subject->getKey();
+        }
+
+        return null;
     }
 }

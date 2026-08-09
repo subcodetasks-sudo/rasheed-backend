@@ -3,7 +3,9 @@
 namespace Modules\Notifications\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Notifications\Enums\NotificationType;
+use Modules\Project\Models\Project;
 
 class Notification extends Model
 {
@@ -16,6 +18,7 @@ class Notification extends Model
         'meta',
         'subject_type',
         'subject_id',
+        'project_id',
     ];
 
     protected function casts(): array
@@ -24,5 +27,10 @@ class Notification extends Model
             'type' => NotificationType::class,
             'meta' => 'array',
         ];
+    }
+
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(Project::class);
     }
 }

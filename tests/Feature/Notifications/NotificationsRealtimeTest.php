@@ -9,6 +9,7 @@ use Modules\Inventory\Enums\InventoryExpenseType;
 use Modules\Inventory\Events\InventoryItemCreated;
 use Modules\Inventory\Events\InventoryStockMoved;
 use Modules\Inventory\Models\InventoryCategory;
+use Modules\Inventory\Models\InventoryItem;
 use Modules\Notifications\Enums\NotificationType;
 use Modules\Notifications\Events\NotificationCreated;
 use Modules\Notifications\Models\Notification;
@@ -82,7 +83,7 @@ class NotificationsRealtimeTest extends TestCase
         Event::fake([NotificationCreated::class]);
 
         $rule = app(InventoryStockNotificationRule::class);
-        $item = new \Modules\Inventory\Models\InventoryItem([
+        $item = new InventoryItem([
             'id' => 1,
             'name' => 'Gloves',
             'code' => 'INV-1',
@@ -196,7 +197,7 @@ class NotificationsRealtimeTest extends TestCase
         Event::assertDispatched(InventoryItemCreated::class);
     }
 
-    public function test_notification_service_broadcasts_created_event(): void
+    public function test_notification_service_dispatches_created_event(): void
     {
         Event::fake([NotificationCreated::class]);
 

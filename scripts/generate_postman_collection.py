@@ -406,13 +406,13 @@ ENUMS_DOC = """
 - Recalculating a historical journal still uses the percentage that was effective on that journal date.
 - Project `administrative_fee_percentage` remains a create-time display snapshot; calculation uses the effective global rate (exempt projects still pay 0).
 
-## Realtime (Socket.IO)
-- Transport: Socket.IO only (no Pusher). Node sidecar: `realtime/` (`npm start`). Frontend: `socket.io-client`.
+## Realtime
+- **Notifications** use **SSE** (`GET /notifications/stream`), not Socket.IO. Auth: Sanctum + roles `super-admin|finance|inventory`.
+- Other live views still use Socket.IO (no Pusher). Node sidecar: `realtime/` (`npm start`). Frontend: `socket.io-client`.
 - Prod `https` → **WSS** (TLS at reverse proxy); local `http` → WS.
 - Handshake: connect with `auth: { token: <Sanctum PAT> }`. Server validates via `GET /api/v1/realtime/auth`.
-- Client emits `join` / `leave` for rooms. Notifications are **socket-only** (no notification REST CRUD).
-- Rooms / events:
-  - `notifications` → `notification.created`
+- Client emits `join` / `leave` for Socket.IO rooms (non-notification modules).
+- Rooms / events (Socket.IO):
   - `daily-journals.{Y-m-d}` → `daily-journal.updated`
   - `cash-station.{YYYY}-{MM}` → `cash-station.updated`
   - `monthly-summary.{YYYY}-{MM}` → `monthly-summary.updated`
@@ -426,8 +426,16 @@ ENUMS_DOC = """
   - `administrative-debt-settlements.{YYYY}-{MM}` → `administrative-debt-settlements.updated`
   - `inventory` → `inventory.item-created`, `inventory.stock-moved`
   - `projects.{id}` → (reserved for project payloads)
-- Env (Laravel): `BROADCAST_CONNECTION=socketio`, `SOCKET_IO_URL`, `SOCKET_IO_PATH`, `SOCKET_IO_SECRET`
+- Env (Laravel Socket.IO): `BROADCAST_CONNECTION=socketio`, `SOCKET_IO_URL`, `SOCKET_IO_PATH`, `SOCKET_IO_SECRET`
+- Env (Notifications SSE): `NOTIFICATIONS_SSE_POLL_SECONDS`, `NOTIFICATIONS_SSE_HEARTBEAT_SECONDS`, `NOTIFICATIONS_SSE_MAX_DURATION_SECONDS`, `NOTIFICATIONS_SSE_RETRY_MILLISECONDS`
+- **Frontend:** Do **not** await `/notifications/stream` in page load / `Promise.all` (it never completes like JSON). Load list+statistics with normal XHR; open SSE separately via `fetch` + ReadableStream (Bearer) or EventSource. Reconnect with `Last-Event-ID`. Avoid `php artisan serve` when testing SSE + other APIs (single-threaded).
 - Env (realtime/): `PORT`, `LARAVEL_URL`, `SOCKET_IO_SECRET` (must match), `CORS_ORIGIN`
+
+## Notification page types (API mapping)
+Stored DB types remain `activity|success|warning|danger|info`. Page API maps:
+- `danger` → `urgent`
+- `activity|success|warning` → `notification`
+- `info` → `information`
 
 ## Base URL
 `{{base_url}}` → e.g. `http://localhost:8000/api/v1` or XAMPP public path + `/api/v1`
@@ -544,8 +552,9 @@ def realtime_auth_item() -> dict:
         description=(
             "Any authenticated Sanctum user. Used by the Node Socket.IO sidecar to validate "
             "`auth.token` on connect. Returns user uuid / roles. "
-            "**Not** a notifications CRUD endpoint — notifications are delivered only over Socket.IO "
-            "(`notifications` room, event `notification.created`). "
+            "**Not** a notifications CRUD endpoint — activity notifications use "
+            "`GET /notifications` + SSE `GET /notifications/stream`. "
+            "This handshake is for the Socket.IO sidecar used by other live modules. "
             "See collection docs for rooms/events and `SOCKET_IO_*` env."
         ),
         roles=["super-admin", "finance", "inventory", "any authenticated"],
@@ -1067,6 +1076,138 @@ def settings_folder_items() -> list:
         settings_general_update(),
         settings_monthly_employees_show(),
         settings_monthly_employees_update(),
+    ]
+
+
+SAMPLE_NOTIFICATION = {
+    "id": 12,
+    "type": "urgent",
+    "title": "Out of stock",
+    "details": "Paper (P-001) is out of stock.",
+    "project": {"id": 10, "name": "مشروع الصحة"},
+    "created_at": "2026-08-09T10:00:00.000000Z",
+}
+
+SAMPLE_NOTIFICATION_STATS = {
+    "total": 10,
+    "urgent": 2,
+    "notification": 6,
+    "information": 2,
+}
+
+
+def notifications_list() -> dict:
+    path = "notifications"
+    query = [
+        {"key": "per_page", "value": "15"},
+        {"key": "filter[type]", "value": "urgent", "disabled": True},
+    ]
+    original = {
+        "method": "GET",
+        "header": header(locale=True),
+        "url": url(path, query),
+    }
+    return req(
+        "List Notifications",
+        "GET",
+        path,
+        description=(
+            "Paginated global activity feed. Page `type` values: urgent | notification | information "
+            "(mapped from DB activity|success|warning|danger|info). "
+            "Optional `filter[type]` uses page vocabulary. `project` may be null. "
+            "No POST — notifications are system-generated only."
+        ),
+        roles=["super-admin", "finance", "inventory"],
+        enums="`filter[type]`: urgent | notification | information",
+        query=query,
+        locale=True,
+        responses=[
+            example(
+                "200 OK",
+                200,
+                {
+                    **ok("Notifications fetched successfully.", [SAMPLE_NOTIFICATION]),
+                    "meta": {"total": 1, "per_page": 15, "current_page": 1, "last_page": 1},
+                    "links": {"next": None},
+                },
+                original_request=original,
+            ),
+            *std_auth_errors(original),
+        ],
+    )
+
+
+def notifications_statistics() -> dict:
+    path = "notifications/statistics"
+    original = {"method": "GET", "header": header(locale=True), "url": url(path)}
+    return req(
+        "Notification Statistics",
+        "GET",
+        path,
+        description=(
+            "Card counts from the same `activity_notifications` feed: "
+            "total, urgent (danger), notification (activity|success|warning), information (info)."
+        ),
+        roles=["super-admin", "finance", "inventory"],
+        locale=True,
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok("Notification statistics fetched successfully.", SAMPLE_NOTIFICATION_STATS),
+                original_request=original,
+            ),
+            *std_auth_errors(original),
+        ],
+    )
+
+
+def notifications_stream() -> dict:
+    path = "notifications/stream"
+    query = [{"key": "last_event_id", "value": "0", "disabled": True}]
+    original = {
+        "method": "GET",
+        "header": header(locale=True) + [{"key": "Last-Event-ID", "value": "0", "type": "text"}],
+        "url": url(path, query),
+    }
+    return req(
+        "Notifications SSE Stream",
+        "GET",
+        path,
+        description=(
+            "Authenticated Server-Sent Events stream. Emits `retry:` then `event: notification.created` "
+            "with `id` + JSON `data` (same shape as list items). Heartbeat comments `: heartbeat`. "
+            "Supports `Last-Event-ID` / `last_event_id` for reconnect replay. "
+            "Does not use Socket.IO. Configurable via `NOTIFICATIONS_SSE_*` env.\n\n"
+            "**Client usage (important):** Do not call this with axios/fetch expecting a finished JSON body — "
+            "the connection stays open and will keep the request Pending. "
+            "Do not put it in the same Promise.all / loading spinner as list, statistics, or other page APIs. "
+            "Use fetch + ReadableStream with `Accept: text/event-stream` (Bearer token) or EventSource; "
+            "reconnect after close using Last-Event-ID. "
+            "Calls with `Accept: application/json` (typical axios) receive **406** immediately so the page does not hang. "
+            "`php artisan serve` is single-threaded: one open stream blocks all other API calls — prefer Apache/XAMPP. "
+            "Default stream window is ~25s then reconnect (NOTIFICATIONS_SSE_MAX_DURATION_SECONDS)."
+        ),
+        roles=["super-admin", "finance", "inventory"],
+        query=query,
+        locale=True,
+        responses=[
+            example(
+                "200 OK (text/event-stream)",
+                200,
+                "retry: 3000\n\n: heartbeat\n\nevent: notification.created\nid: 12\ndata: {\"id\":12,\"type\":\"urgent\",...}\n\n",
+                original_request=original,
+            ),
+            *std_auth_errors(original),
+        ],
+    )
+
+
+def notifications_folder_items() -> list:
+    return [
+        notifications_list(),
+        notifications_statistics(),
+        notifications_stream(),
     ]
 
 
@@ -3701,6 +3842,7 @@ def build() -> dict:
                 ],
             ),
             folder("Settings", settings_folder_items()),
+            folder("Notifications", notifications_folder_items()),
             folder(
                 "Categories",
                 [categories_list(), categories_create(), categories_update(), categories_delete()],
@@ -3760,6 +3902,7 @@ def build() -> dict:
                     calculate_project_deduction(),
                 ],
             ),
+            folder("Notifications", notifications_folder_items()),
             folder(
                 "Daily Journal",
                 [journal_show(), journal_save(), journal_update(), journal_repay_debt()],
@@ -3796,11 +3939,12 @@ def build() -> dict:
                 "Projects & Categories (read-only)",
                 [projects_list(), projects_show(), categories_list()],
             ),
+            folder("Notifications", notifications_folder_items()),
             folder("Inventory", inventory_folder_items()),
             folder("Advanced Reports", advanced_reports_folder_items()),
         ],
         description=(
-            "**Allowed:** inventory items & movements CRUD, list/show projects, list categories, advanced reports.\n\n"
+            "**Allowed:** inventory items & movements CRUD, list/show projects, list categories, notifications, advanced reports.\n\n"
             "**Denied (403):** project/category writes, financial settings, deductions, daily journal, user admin."
         ),
     )
@@ -3812,6 +3956,7 @@ def build() -> dict:
             folder("Auth", [login_item("Login", "super_admin", role="super-admin"), refresh_item(), logout_item(), realtime_auth_item(), auth_users_list(), auth_users_create(), auth_users_update(), auth_users_delete()]),
             folder("Authorization", [roles_list(), authz_users_list(), authz_users_update(), authz_users_delete(), authz_users_status()]),
             folder("Settings", settings_folder_items()),
+            folder("Notifications", notifications_folder_items()),
             folder("Categories", [categories_list(), categories_create(), categories_update(), categories_delete()]),
             folder(
                 "Projects",
@@ -3854,9 +3999,10 @@ def build() -> dict:
                 "2. Run **Login as …** under Auth to store Bearer `token`.\n"
                 "3. Open the folder matching the role you logged in as.\n"
                 "4. Each request includes saved example responses for success and error statuses.\n"
-                "5. For live updates: start `realtime/` (`npm start`), set Laravel "
+                "5. Notifications: use `GET /notifications` + SSE `GET /notifications/stream` "
+                "(not Socket.IO). For other live modules: start `realtime/` (`npm start`), set Laravel "
                 "`BROADCAST_CONNECTION=socketio`, then use `socket.io-client` with the Sanctum token. "
-                "Call **Realtime Auth** to verify handshake. Notifications have **no REST CRUD**.\n"
+                "Call **Realtime Auth** to verify the Socket.IO handshake.\n"
             ),
             "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
         },

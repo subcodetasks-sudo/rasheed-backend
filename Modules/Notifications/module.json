@@ -1,7 +1,7 @@
 {
     "name": "Notifications",
     "alias": "notifications",
-    "description": "Persisted activity notifications delivered over Socket.IO",
+    "description": "Persisted activity notifications with REST list/statistics and SSE realtime delivery",
     "keywords": [],
     "priority": 0,
     "providers": [
