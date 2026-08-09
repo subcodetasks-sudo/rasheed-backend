@@ -70,6 +70,7 @@ class NotificationService
             'project_id' => $this->resolveProjectId($meta, $subject),
         ]);
 
+        NotificationSseService::announce((int) $notification->id);
         NotificationCreated::dispatch($notification);
 
         return $notification;

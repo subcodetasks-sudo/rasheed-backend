@@ -188,6 +188,7 @@ class NotificationsApiTest extends TestCase
         $body = $response->streamedContent();
 
         $this->assertStringContainsString('retry: ', $body);
+        $this->assertStringContainsString('event: stream.ready', $body);
         $this->assertStringContainsString('event: notification.created', $body);
         $this->assertStringContainsString('id: '.$first->id, $body);
         $this->assertStringContainsString('id: '.$second->id, $body);
@@ -212,7 +213,8 @@ class NotificationsApiTest extends TestCase
             ->get('/api/v1/notifications/stream')
             ->streamedContent();
 
-        $this->assertStringNotContainsString('id: '.$existing->id, $body);
+        $this->assertStringNotContainsString('event: notification.created', $body);
+        $this->assertStringContainsString('event: stream.ready', $body);
         $this->assertStringContainsString(': heartbeat', $body);
     }
 }

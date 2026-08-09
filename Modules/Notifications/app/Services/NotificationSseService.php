@@ -3,6 +3,9 @@
 namespace Modules\Notifications\Services;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Modules\Notifications\Http\Resources\NotificationResource;
 use Modules\Notifications\Models\Notification;
@@ -11,11 +14,13 @@ use Throwable;
 
 class NotificationSseService
 {
+    public const LATEST_ID_CACHE_KEY = 'notifications:sse:latest_id';
+
     public function stream(Request $request): StreamedResponse
     {
-        $pollSeconds = max(0, (int) config('notifications.sse.poll_seconds', 2));
-        $heartbeatSeconds = max(1, (int) config('notifications.sse.heartbeat_seconds', 15));
-        $maxDurationSeconds = max(1, (int) config('notifications.sse.max_duration_seconds', 300));
+        $pollSeconds = max(0, (int) config('notifications.sse.poll_seconds', 1));
+        $heartbeatSeconds = max(1, (int) config('notifications.sse.heartbeat_seconds', 10));
+        $maxDurationSeconds = max(1, (int) config('notifications.sse.max_duration_seconds', 25));
         $replayLimit = max(1, (int) config('notifications.sse.replay_limit', 100));
         $batchLimit = max(1, (int) config('notifications.sse.batch_limit', 50));
         $retryMilliseconds = max(1000, (int) config('notifications.sse.retry_milliseconds', 3000));
@@ -42,40 +47,35 @@ class NotificationSseService
             $replayed = false;
 
             $this->writeRetry($retryMilliseconds);
+            $this->writeEvent('stream.ready', '0', [
+                'cursor' => $lastId,
+                'message' => 'SSE connected. New notifications with id > cursor will be pushed.',
+            ]);
             $this->writeHeartbeat();
 
             try {
                 while (true) {
-                    if (connection_aborted()) {
-                        break;
-                    }
-
                     if ((time() - $startedAt) >= $maxDurationSeconds) {
                         break;
                     }
 
                     $limit = $replayed ? $batchLimit : $replayLimit;
 
-                    $notifications = Notification::query()
-                        ->with('project')
-                        ->where('id', '>', $lastId)
-                        ->orderBy('id')
-                        ->limit($limit)
-                        ->get();
+                    $notifications = $this->fetchNewerThan($lastId, $limit);
 
                     foreach ($notifications as $notification) {
-                        if (connection_aborted()) {
-                            return;
-                        }
-
                         $payload = (new NotificationResource($notification))
                             ->resolve(request());
 
-                        $this->writeEvent(
+                        $written = $this->writeEvent(
                             'notification.created',
                             (string) $notification->id,
                             $payload
                         );
+
+                        if (! $written) {
+                            return;
+                        }
 
                         $lastId = (int) $notification->id;
                     }
@@ -84,14 +84,14 @@ class NotificationSseService
 
                     $now = time();
                     if (($now - $lastHeartbeatAt) >= $heartbeatSeconds) {
-                        $this->writeHeartbeat();
+                        if (! $this->writeHeartbeat()) {
+                            return;
+                        }
                         $lastHeartbeatAt = $now;
                     }
 
-                    if ($pollSeconds > 0) {
-                        sleep($pollSeconds);
-                    } else {
-                        usleep(100_000);
+                    if (! $this->waitForNewerOrTimeout($lastId, $pollSeconds, $startedAt, $maxDurationSeconds)) {
+                        break;
                     }
                 }
             } catch (Throwable $e) {
@@ -106,6 +106,14 @@ class NotificationSseService
             'Connection' => 'keep-alive',
             'X-Accel-Buffering' => 'no',
         ]);
+    }
+
+    /**
+     * Called after a notification row is persisted so open streams wake quickly.
+     */
+    public static function announce(int $notificationId): void
+    {
+        Cache::put(self::LATEST_ID_CACHE_KEY, $notificationId, now()->addDay());
     }
 
     protected function resolveCursor(Request $request): int
@@ -130,7 +138,6 @@ class NotificationSseService
     {
         $this->releaseSessionLock();
 
-        // Allow the stream to run for its configured window; detect disconnect via connection_aborted().
         @set_time_limit($maxDurationSeconds + 30);
         @ignore_user_abort(true);
 
@@ -150,35 +157,106 @@ class NotificationSseService
     }
 
     /**
+     * @return Collection<int, Notification>
+     */
+    protected function fetchNewerThan(int $lastId, int $limit)
+    {
+        if (! app()->runningUnitTests() && DB::getDriverName() !== 'sqlite') {
+            try {
+                DB::reconnect();
+            } catch (Throwable) {
+                // Keep going with the existing connection if reconnect fails.
+            }
+        }
+
+        return Notification::query()
+            ->with('project')
+            ->where('id', '>', $lastId)
+            ->orderBy('id')
+            ->limit($limit)
+            ->get();
+    }
+
+    protected function hasNewerThan(int $lastId): bool
+    {
+        $cachedLatest = (int) Cache::get(self::LATEST_ID_CACHE_KEY, 0);
+
+        if ($cachedLatest > $lastId) {
+            return true;
+        }
+
+        try {
+            return Notification::query()->where('id', '>', $lastId)->exists();
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Sleep in short slices so new rows are picked up quickly and the stream can end on schedule.
+     */
+    protected function waitForNewerOrTimeout(
+        int $lastId,
+        int $pollSeconds,
+        int $startedAt,
+        int $maxDurationSeconds,
+    ): bool {
+        if ($pollSeconds <= 0) {
+            usleep(100_000);
+
+            return (time() - $startedAt) < $maxDurationSeconds;
+        }
+
+        $deadline = min(time() + $pollSeconds, $startedAt + $maxDurationSeconds);
+
+        while (time() < $deadline) {
+            if ($this->hasNewerThan($lastId)) {
+                return true;
+            }
+
+            usleep(200_000);
+        }
+
+        return (time() - $startedAt) < $maxDurationSeconds;
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      */
-    protected function writeEvent(string $event, string $id, array $payload): void
+    protected function writeEvent(string $event, string $id, array $payload): bool
     {
         echo 'event: '.$event."\n";
         echo 'id: '.$id."\n";
         echo 'data: '.json_encode($payload, JSON_UNESCAPED_UNICODE)."\n\n";
 
-        $this->flushOutput();
+        return $this->flushOutput();
     }
 
-    protected function writeHeartbeat(): void
+    protected function writeHeartbeat(): bool
     {
         echo ": heartbeat\n\n";
 
-        $this->flushOutput();
+        return $this->flushOutput();
     }
 
-    protected function writeRetry(int $milliseconds): void
+    protected function writeRetry(int $milliseconds): bool
     {
         echo 'retry: '.$milliseconds."\n\n";
 
-        $this->flushOutput();
+        return $this->flushOutput();
     }
 
-    protected function flushOutput(): void
+    protected function flushOutput(): bool
     {
+        if (function_exists('ob_flush') && ob_get_level() > 0) {
+            @ob_flush();
+        }
+
         if (function_exists('flush')) {
             @flush();
         }
+
+        // connection_aborted() is unreliable on some Windows SAPIs; only stop after a write attempt.
+        return ! connection_aborted();
     }
 }
