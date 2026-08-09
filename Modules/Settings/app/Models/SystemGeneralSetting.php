@@ -31,7 +31,7 @@ class SystemGeneralSetting extends Model
 
         return static::query()->create([
             'organization_name' => 'Rashid Financial',
-            'currency' => 'SAR',
+            'currency' => 'Shekel',
             'admin_fee_percentage' => 12,
         ]);
     }

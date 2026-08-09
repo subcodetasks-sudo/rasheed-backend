@@ -17,7 +17,7 @@ class UpdateSystemGeneralSettingsRequest extends FormRequest
     {
         return [
             'organization_name' => ['sometimes', 'string', 'min:1', 'max:255'],
-            'currency' => ['sometimes', 'string', Rule::in(SupportedCurrencies::ALLOWED)],
+            'currency' => ['sometimes', 'string', 'max:3'],
             'admin_fee_percentage' => ['sometimes', 'numeric', 'min:0', 'max:100'],
         ];
     }
