@@ -60,17 +60,16 @@ class SystemGeneralSettingsApiTest extends TestCase
 
             $this->putJson(self::ENDPOINT, [
                 'organization_name' => 'Org X',
-                'currency' => 'USD',
                 'admin_fee_percentage' => 15,
             ])
                 ->assertOk()
                 ->assertJsonPath('data.organization_name', 'Org X')
-                ->assertJsonPath('data.currency', 'USD')
+                ->assertJsonPath('data.currency', 'SAR')
                 ->assertJsonPath('data.admin_fee_percentage', 15);
 
             $this->assertDatabaseHas('system_general_settings', [
                 'organization_name' => 'Org X',
-                'currency' => 'USD',
+                'currency' => 'SAR',
                 'admin_fee_percentage' => 15,
             ]);
 
@@ -98,7 +97,7 @@ class SystemGeneralSettingsApiTest extends TestCase
             ->assertJsonPath('data.admin_fee_percentage', 12);
     }
 
-    public function test_rejects_empty_organization_name_and_unsupported_currency(): void
+    public function test_rejects_empty_organization_name_and_readonly_currency(): void
     {
         $this->actAs('super-admin');
 
@@ -107,7 +106,8 @@ class SystemGeneralSettingsApiTest extends TestCase
         ])->assertStatus(422)->assertJsonValidationErrors(['organization_name']);
 
         $this->putJson(self::ENDPOINT, [
-            'currency' => 'EUR',
+            'currency' => 'USD',
+            'organization_name' => 'Keep Name',
         ])->assertStatus(422)->assertJsonValidationErrors(['currency']);
 
         $this->putJson(self::ENDPOINT, [

@@ -930,7 +930,6 @@ def settings_general_update() -> dict:
     path = "settings/general"
     body = {
         "organization_name": "Rashid Financial",
-        "currency": "SAR",
         "admin_fee_percentage": 12,
     }
     original = {
@@ -944,15 +943,14 @@ def settings_general_update() -> dict:
         "PUT",
         path,
         description=(
-            "Partial update allowed (at least one field). "
+            "Partial update allowed (at least one writable field). "
             "Does not touch Monthly Employee Settings.\n"
             "- organization_name: non-empty string\n"
-            "- currency: SAR | USD | AED\n"
-            "- admin_fee_percentage: 0–100 (schedules next-day effective rate when changed)\n\n"
+            "- admin_fee_percentage: 0–100 (schedules next-day effective rate when changed)\n"
+            "- currency: **read-only** for now (returned on GET; sending it returns 422 prohibited)\n\n"
             + ADMIN_FEE_EFFECTIVE_DATE_NOTE
         ),
         roles=["super-admin"],
-        enums="`currency`: SAR | USD | AED",
         body=body,
         json_body=True,
         locale=True,

@@ -15,7 +15,7 @@ class UpdateSystemGeneralSettingsAction
     ) {}
 
     /**
-     * @param  array{organization_name?: string, currency?: string, admin_fee_percentage?: float|int|string}  $data
+     * @param  array{organization_name?: string, admin_fee_percentage?: float|int|string}  $data
      * @return array{organization_name: string, currency: string, admin_fee_percentage: float}
      */
     public function execute(array $data): array
@@ -27,10 +27,6 @@ class UpdateSystemGeneralSettingsAction
 
             if (array_key_exists('organization_name', $data)) {
                 $updates['organization_name'] = (string) $data['organization_name'];
-            }
-
-            if (array_key_exists('currency', $data)) {
-                $updates['currency'] = strtoupper((string) $data['currency']);
             }
 
             $adminFeeChanged = false;

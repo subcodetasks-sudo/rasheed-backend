@@ -3,8 +3,6 @@
 namespace Modules\Settings\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
-use Modules\Settings\Support\SupportedCurrencies;
 
 class UpdateSystemGeneralSettingsRequest extends FormRequest
 {
@@ -17,7 +15,8 @@ class UpdateSystemGeneralSettingsRequest extends FormRequest
     {
         return [
             'organization_name' => ['sometimes', 'string', 'min:1', 'max:255'],
-            'currency' => ['sometimes', 'string', 'max:3'],
+            // Currency is exposed on GET but not writable for now.
+            'currency' => ['prohibited'],
             'admin_fee_percentage' => ['sometimes', 'numeric', 'min:0', 'max:100'],
         ];
     }
@@ -27,14 +26,13 @@ class UpdateSystemGeneralSettingsRequest extends FormRequest
         $validator->after(function ($validator): void {
             if (
                 ! $this->exists('organization_name')
-                && ! $this->exists('currency')
                 && ! $this->exists('admin_fee_percentage')
             ) {
                 $validator->errors()->add(
                     'organization_name',
                     __('validation.required_without_all', [
                         'attribute' => 'organization_name',
-                        'values' => 'currency / admin_fee_percentage',
+                        'values' => 'admin_fee_percentage',
                     ])
                 );
             }
@@ -42,13 +40,12 @@ class UpdateSystemGeneralSettingsRequest extends FormRequest
     }
 
     /**
-     * @return array{organization_name?: string, currency?: string, admin_fee_percentage?: float|int|string}
+     * @return array{organization_name?: string, admin_fee_percentage?: float|int|string}
      */
     public function settings(): array
     {
         return $this->safe()->only([
             'organization_name',
-            'currency',
             'admin_fee_percentage',
         ]);
     }
