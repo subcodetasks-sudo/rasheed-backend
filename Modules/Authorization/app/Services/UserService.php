@@ -3,6 +3,9 @@
 namespace Modules\Authorization\app\Services;
 
 use Illuminate\Support\Facades\Hash;
+use Modules\User\app\Events\UserCreated;
+use Modules\User\app\Events\UserDeleted;
+use Modules\User\app\Events\UserUpdated;
 use Modules\User\app\Models\User;
 
 class UserService
@@ -22,16 +25,19 @@ class UserService
             'status' => 'active',
         ]);
 
-        if (!empty($data['role'])) {
+        if (! empty($data['role'])) {
             $user->assignRole($data['role']);
         }
 
-        return $user->load('roles');
+        $user->load('roles');
+        UserCreated::dispatch($user);
+
+        return $user;
     }
 
     public function update($user, array $data)
     {
-        if (!empty($data['password'])) {
+        if (! empty($data['password'])) {
             $data['password'] = Hash::make($data['password']);
         } else {
             unset($data['password']);
@@ -43,11 +49,19 @@ class UserService
             $user->syncRoles($data['roles']);
         }
 
-        return $user->load('roles');
+        $user->load('roles');
+        UserUpdated::dispatch($user);
+
+        return $user;
     }
 
     public function delete($user)
     {
-        return $user->delete();
+        $uuid = (string) $user->uuid;
+        $fullName = (string) $user->full_name;
+        $deleted = $user->delete();
+        UserDeleted::dispatch($uuid, $fullName);
+
+        return $deleted;
     }
 }

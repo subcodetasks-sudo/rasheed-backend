@@ -4,6 +4,7 @@ namespace Modules\Inventory\Workflows\Category;
 
 use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Actions\Category\CreateInventoryCategoryAction;
+use Modules\Inventory\Events\InventoryCategoryCreated;
 use Modules\Inventory\Models\InventoryCategory;
 
 class CreateInventoryCategoryWorkflow
@@ -14,6 +15,11 @@ class CreateInventoryCategoryWorkflow
 
     public function handle(array $data): InventoryCategory
     {
-        return DB::transaction(fn () => $this->createInventoryCategoryAction->execute($data));
+        return DB::transaction(function () use ($data) {
+            $category = $this->createInventoryCategoryAction->execute($data);
+            InventoryCategoryCreated::dispatch($category);
+
+            return $category;
+        });
     }
 }

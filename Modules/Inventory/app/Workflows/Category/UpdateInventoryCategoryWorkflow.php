@@ -4,6 +4,7 @@ namespace Modules\Inventory\Workflows\Category;
 
 use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Actions\Category\UpdateInventoryCategoryAction;
+use Modules\Inventory\Events\InventoryCategoryUpdated;
 use Modules\Inventory\Models\InventoryCategory;
 
 class UpdateInventoryCategoryWorkflow
@@ -14,8 +15,11 @@ class UpdateInventoryCategoryWorkflow
 
     public function handle(InventoryCategory $category, array $data): InventoryCategory
     {
-        return DB::transaction(
-            fn () => $this->updateInventoryCategoryAction->execute($category, $data)
-        );
+        return DB::transaction(function () use ($category, $data) {
+            $category = $this->updateInventoryCategoryAction->execute($category, $data);
+            InventoryCategoryUpdated::dispatch($category);
+
+            return $category;
+        });
     }
 }

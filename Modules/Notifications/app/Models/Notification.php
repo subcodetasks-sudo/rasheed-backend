@@ -4,6 +4,7 @@ namespace Modules\Notifications\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Notifications\Enums\NotificationType;
 use Modules\Project\Models\Project;
 
@@ -31,6 +32,11 @@ class Notification extends Model
 
     public function project(): BelongsTo
     {
-        return $this->belongsTo(Project::class);
+        return $this->belongsTo(Project::class)->withTrashed();
+    }
+
+    public function reads(): HasMany
+    {
+        return $this->hasMany(NotificationRead::class, 'notification_id');
     }
 }

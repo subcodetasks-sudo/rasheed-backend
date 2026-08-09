@@ -11,8 +11,13 @@ class ListNotificationsAction
 {
     public function execute(Request $request): LengthAwarePaginator
     {
+        $userId = (string) $request->user()->getAuthIdentifier();
+
         $query = Notification::query()
-            ->with('project')
+            ->with([
+                'project',
+                'reads' => fn ($q) => $q->where('user_id', $userId),
+            ])
             ->orderByDesc('id');
 
         $pageType = $request->input('filter.type');
@@ -23,6 +28,11 @@ class ListNotificationsAction
             if ($dbTypes !== []) {
                 $query->whereIn('type', $dbTypes);
             }
+        }
+
+        $unread = $request->input('filter.unread');
+        if ($unread === true || $unread === 1 || $unread === '1' || $unread === 'true') {
+            $query->whereDoesntHave('reads', fn ($q) => $q->where('user_id', $userId));
         }
 
         $perPage = (int) $request->input('per_page', 15);

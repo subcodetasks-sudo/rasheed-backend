@@ -3,6 +3,8 @@
 namespace Modules\Notifications\Services;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Modules\Notifications\Enums\NotificationType;
 use Modules\Notifications\Events\NotificationCreated;
 use Modules\Notifications\Models\Notification;
@@ -60,6 +62,9 @@ class NotificationService
         array $meta = [],
         ?Model $subject = null,
     ): Notification {
+        $meta = $this->withActorMeta($meta);
+        $message = $this->appendActorToMessage($message, $meta);
+
         $notification = Notification::query()->create([
             'type' => $type,
             'title' => $title,
@@ -70,10 +75,58 @@ class NotificationService
             'project_id' => $this->resolveProjectId($meta, $subject),
         ]);
 
-        NotificationSseService::announce((int) $notification->id);
-        NotificationCreated::dispatch($notification);
+        // Listeners often run inside workflow DB::transaction(); publish only after commit
+        // so SSE clients never see rows that later roll back.
+        DB::afterCommit(function () use ($notification): void {
+            NotificationSseService::announce((int) $notification->id);
+            NotificationCreated::dispatch($notification);
+        });
 
         return $notification;
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     * @return array<string, mixed>
+     */
+    protected function withActorMeta(array $meta): array
+    {
+        $user = Auth::guard('sanctum')->user() ?? Auth::user() ?? request()->user();
+
+        if ($user === null) {
+            return $meta;
+        }
+
+        if (! array_key_exists('actor_id', $meta)) {
+            $meta['actor_id'] = $user->uuid ?? $user->getAuthIdentifier();
+        }
+
+        if (! array_key_exists('actor_name', $meta)) {
+            $meta['actor_name'] = (string) ($user->full_name ?? '');
+        }
+
+        return $meta;
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    protected function appendActorToMessage(string $message, array $meta): string
+    {
+        $actorName = trim((string) ($meta['actor_name'] ?? ''));
+
+        if ($actorName === '') {
+            return $message;
+        }
+
+        $suffix = __('messages.notification_by_actor', ['name' => $actorName]);
+        $trimmed = rtrim($message);
+
+        if (str_ends_with($trimmed, '.')) {
+            return substr($trimmed, 0, -1).' '.$suffix.'.';
+        }
+
+        return $trimmed.' '.$suffix;
     }
 
     /**

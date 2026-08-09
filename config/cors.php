@@ -21,9 +21,14 @@ return [
     | Allowed Origins
     |--------------------------------------------------------------------------
     */
-    'allowed_origins' => array_filter(
-        explode(',', env('CORS_ALLOWED_ORIGINS', ['http://localhost:5174', 'http://192.168.1.10:5174']))
-    ),
+    'allowed_origins' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env(
+            'CORS_ALLOWED_ORIGINS',
+            'http://localhost:5174,http://192.168.1.11:5174,http://localhost:5175'
+        ))
+    ))),
+
     /*
     |--------------------------------------------------------------------------
     | Allowed Headers

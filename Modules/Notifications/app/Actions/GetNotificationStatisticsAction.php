@@ -9,7 +9,7 @@ use Modules\Notifications\Support\NotificationPageTypeMapper;
 class GetNotificationStatisticsAction
 {
     /**
-     * @return array{total: int, urgent: int, notification: int, information: int}
+     * @return array{total: int, urgent: int, warning: int, info: int}
      */
     public function execute(): array
     {
@@ -17,21 +17,21 @@ class GetNotificationStatisticsAction
             ->selectRaw('COUNT(*) as total')
             ->selectRaw('SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) as urgent', [NotificationType::Danger->value])
             ->selectRaw(
-                'SUM(CASE WHEN type IN (?, ?, ?) THEN 1 ELSE 0 END) as notification_count',
+                'SUM(CASE WHEN type IN (?, ?, ?) THEN 1 ELSE 0 END) as warning_count',
                 [
                     NotificationType::Activity->value,
                     NotificationType::Success->value,
                     NotificationType::Warning->value,
                 ]
             )
-            ->selectRaw('SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) as information', [NotificationType::Info->value])
+            ->selectRaw('SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) as info_count', [NotificationType::Info->value])
             ->first();
 
         return [
             'total' => (int) ($row->total ?? 0),
             NotificationPageTypeMapper::URGENT => (int) ($row->urgent ?? 0),
-            NotificationPageTypeMapper::NOTIFICATION => (int) ($row->notification_count ?? 0),
-            NotificationPageTypeMapper::INFORMATION => (int) ($row->information ?? 0),
+            NotificationPageTypeMapper::WARNING => (int) ($row->warning_count ?? 0),
+            NotificationPageTypeMapper::INFO => (int) ($row->info_count ?? 0),
         ];
     }
 }

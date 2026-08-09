@@ -6,6 +6,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Modules\Notifications\Enums\NotificationType;
 use Modules\Notifications\Services\NotificationService;
+use Modules\Notifications\Services\NotificationSseService;
 use Modules\Project\Models\Project;
 use Modules\User\app\Models\User;
 use Spatie\Permission\Models\Role;
@@ -39,7 +40,7 @@ class NotificationsApiTest extends TestCase
 
     public function test_list_returns_mapped_types_project_and_pagination(): void
     {
-        $this->actAs('finance');
+        $user = $this->actAs('finance');
         $project = Project::factory()->create(['name' => 'مشروع إشعار']);
 
         app(NotificationService::class)->notifyDanger('Urgent title', 'Urgent details', [
@@ -60,15 +61,103 @@ class NotificationsApiTest extends TestCase
             ->keyBy('title');
 
         $this->assertSame('urgent', $byTitle['Urgent title']['type']);
-        $this->assertSame('Urgent details', $byTitle['Urgent title']['details']);
+        $this->assertStringStartsWith('Urgent details', $byTitle['Urgent title']['details']);
         $this->assertSame($project->id, $byTitle['Urgent title']['project']['id']);
         $this->assertSame('مشروع إشعار', $byTitle['Urgent title']['project']['name']);
+        $this->assertSame($user->full_name, $byTitle['Urgent title']['actor']['full_name']);
 
-        $this->assertSame('notification', $byTitle['Activity title']['type']);
+        $this->assertSame('warning', $byTitle['Activity title']['type']);
         $this->assertSame($project->id, $byTitle['Activity title']['project']['id']);
 
-        $this->assertSame('information', $byTitle['Info title']['type']);
+        $this->assertSame('info', $byTitle['Info title']['type']);
         $this->assertNull($byTitle['Info title']['project']);
+        $this->assertNull($byTitle['Urgent title']['read_at']);
+    }
+
+    public function test_mark_one_and_all_read_are_per_user(): void
+    {
+        $this->actAs('finance');
+
+        $first = app(NotificationService::class)->notifyInfo('First', 'details');
+        $second = app(NotificationService::class)->notifyWarning('Second', 'details');
+
+        $this->postJson('/api/v1/notifications/'.$first->id.'/read')
+            ->assertOk()
+            ->assertJsonPath('data.id', $first->id)
+            ->assertJsonPath('success', true);
+
+        $byId = collect($this->getJson('/api/v1/notifications')->json('data'))->keyBy('id');
+        $this->assertNotNull($byId[$first->id]['read_at']);
+        $this->assertNull($byId[$second->id]['read_at']);
+
+        $this->getJson('/api/v1/notifications?filter[unread]=1')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $second->id);
+
+        $this->postJson('/api/v1/notifications/read-all')
+            ->assertOk()
+            ->assertJsonPath('data.marked', 1);
+
+        $this->getJson('/api/v1/notifications?filter[unread]=1')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+
+        Role::findOrCreate('inventory', 'web');
+        $other = User::factory()->create();
+        $other->assignRole('inventory');
+        Sanctum::actingAs($other);
+
+        $otherList = collect($this->getJson('/api/v1/notifications')->json('data'))->keyBy('id');
+        $this->assertNull($otherList[$first->id]['read_at']);
+        $this->assertNull($otherList[$second->id]['read_at']);
+    }
+
+    public function test_show_requires_authentication(): void
+    {
+        $this->getJson('/api/v1/notifications/1')->assertUnauthorized();
+    }
+
+    public function test_show_rejects_user_without_allowed_role(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+
+        $notification = app(NotificationService::class)->notifyInfo('Hidden', 'details');
+
+        $this->getJson('/api/v1/notifications/'.$notification->id)->assertForbidden();
+    }
+
+    public function test_show_returns_notification_and_read_at_without_marking_read(): void
+    {
+        $this->actAs('finance');
+
+        $notification = app(NotificationService::class)->notifyDanger('Show me', 'details');
+
+        $this->getJson('/api/v1/notifications/'.$notification->id)
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.id', $notification->id)
+            ->assertJsonPath('data.type', 'urgent')
+            ->assertJsonPath('data.title', 'Show me')
+            ->assertJsonPath('data.read_at', null);
+
+        $this->postJson('/api/v1/notifications/'.$notification->id.'/read')->assertOk();
+
+        $this->getJson('/api/v1/notifications/'.$notification->id)
+            ->assertOk()
+            ->assertJsonPath('data.id', $notification->id)
+            ->assertJsonPath('data.type', 'urgent');
+
+        $this->assertNotNull(
+            $this->getJson('/api/v1/notifications/'.$notification->id)->json('data.read_at')
+        );
+    }
+
+    public function test_show_returns_404_for_missing_notification(): void
+    {
+        $this->actAs('super-admin');
+
+        $this->getJson('/api/v1/notifications/999999')->assertNotFound();
     }
 
     public function test_list_filter_type_uses_page_vocabulary(): void
@@ -84,15 +173,15 @@ class NotificationsApiTest extends TestCase
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.type', 'urgent');
 
-        $this->getJson('/api/v1/notifications?filter[type]=notification')
+        $this->getJson('/api/v1/notifications?filter[type]=warning')
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.type', 'notification');
+            ->assertJsonPath('data.0.type', 'warning');
 
-        $this->getJson('/api/v1/notifications?filter[type]=information')
+        $this->getJson('/api/v1/notifications?filter[type]=info')
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.type', 'information');
+            ->assertJsonPath('data.0.type', 'info');
     }
 
     public function test_statistics_match_mapped_buckets(): void
@@ -109,8 +198,8 @@ class NotificationsApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.total', 5)
             ->assertJsonPath('data.urgent', 1)
-            ->assertJsonPath('data.notification', 3)
-            ->assertJsonPath('data.information', 1);
+            ->assertJsonPath('data.warning', 3)
+            ->assertJsonPath('data.info', 1);
     }
 
     public function test_create_endpoint_is_not_exposed(): void
@@ -190,11 +279,61 @@ class NotificationsApiTest extends TestCase
         $this->assertStringContainsString('retry: ', $body);
         $this->assertStringContainsString('event: stream.ready', $body);
         $this->assertStringContainsString('event: notification.created', $body);
-        $this->assertStringContainsString('id: '.$first->id, $body);
-        $this->assertStringContainsString('id: '.$second->id, $body);
+        $this->assertStringContainsString('id: notification-'.$first->id, $body);
+        $this->assertStringContainsString('id: notification-'.$second->id, $body);
         $this->assertStringContainsString('"type":"urgent"', $body);
-        $this->assertStringContainsString('"type":"information"', $body);
+        $this->assertStringContainsString('"type":"info"', $body);
+        $this->assertStringContainsString('"read_at":null', $body);
         $this->assertStringContainsString(': heartbeat', $body);
+        $this->assertStringContainsString('event: stream.ended', $body);
+    }
+
+    public function test_stream_accepts_prefixed_last_event_id(): void
+    {
+        $this->actAs('finance');
+
+        config([
+            'notifications.sse.poll_seconds' => 0,
+            'notifications.sse.heartbeat_seconds' => 1,
+            'notifications.sse.max_duration_seconds' => 2,
+            'notifications.sse.replay_limit' => 100,
+        ]);
+
+        $first = app(NotificationService::class)->notifyDanger('A', 'd');
+        $second = app(NotificationService::class)->notifyInfo('B', 'd');
+
+        $body = $this->withHeaders([
+            'Accept' => 'text/event-stream',
+            'Last-Event-ID' => 'notification-'.$first->id,
+        ])->get('/api/v1/notifications/stream')->streamedContent();
+
+        $this->assertStringContainsString('id: notification-'.$second->id, $body);
+        $this->assertStringNotContainsString('id: notification-'.$first->id."\n", $body);
+    }
+
+    public function test_announce_waits_until_transaction_commits(): void
+    {
+        $this->actAs('super-admin');
+
+        \Illuminate\Support\Facades\Event::fake([
+            \Modules\Notifications\Events\NotificationCreated::class,
+        ]);
+
+        \Illuminate\Support\Facades\DB::beginTransaction();
+
+        app(NotificationService::class)->notifyInfo('Inside txn', 'details');
+
+        $this->assertNull(cache()->get(NotificationSseService::LATEST_ID_CACHE_KEY));
+        \Illuminate\Support\Facades\Event::assertNotDispatched(
+            \Modules\Notifications\Events\NotificationCreated::class
+        );
+
+        \Illuminate\Support\Facades\DB::commit();
+
+        $this->assertNotNull(cache()->get(NotificationSseService::LATEST_ID_CACHE_KEY));
+        \Illuminate\Support\Facades\Event::assertDispatched(
+            \Modules\Notifications\Events\NotificationCreated::class
+        );
     }
 
     public function test_stream_without_last_event_id_starts_from_latest(): void

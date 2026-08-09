@@ -14,5 +14,7 @@ class CashStationSettlementDeleted
         public readonly int $settlementId,
         public readonly int $year,
         public readonly int $month,
+        public readonly ?string $contributionType = null,
+        public readonly ?int $toProjectId = null,
     ) {}
 }

@@ -70,6 +70,10 @@ class CancelMonthlySummaryContributionWorkflow
             $result['settlement_id'],
             $result['year'],
             $result['month'],
+            $result['contribution_type'] instanceof ContributionType
+                ? $result['contribution_type']->value
+                : null,
+            (int) $result['to_project_id'],
         );
         CashStationUpdated::dispatch(
             $result['year'],

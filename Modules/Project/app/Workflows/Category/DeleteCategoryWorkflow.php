@@ -5,6 +5,7 @@ namespace Modules\Project\Workflows\Category;
 use Illuminate\Support\Facades\DB;
 use Modules\Project\Actions\Category\DeleteCategoryAction;
 use Modules\Project\Actions\Project\ValidateProjectDeletionAction;
+use Modules\Project\Events\CategoryDeleted;
 use Modules\Project\Models\Category;
 use Modules\Project\Workflows\Project\DeleteProjectWorkflow;
 
@@ -19,6 +20,8 @@ class DeleteCategoryWorkflow
     public function handle(Category $category): void
     {
         DB::transaction(function () use ($category) {
+            $categoryId = (int) $category->id;
+            $categoryName = (string) $category->name;
             $projects = $category->projects()->get();
 
             foreach ($projects as $project) {
@@ -30,6 +33,7 @@ class DeleteCategoryWorkflow
             }
 
             $this->deleteCategoryAction->execute($category);
+            CategoryDeleted::dispatch($categoryId, $categoryName);
         });
     }
 }

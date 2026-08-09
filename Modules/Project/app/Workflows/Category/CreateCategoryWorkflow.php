@@ -4,6 +4,7 @@ namespace Modules\Project\Workflows\Category;
 
 use Illuminate\Support\Facades\DB;
 use Modules\Project\Actions\Category\CreateCategoryAction;
+use Modules\Project\Events\CategoryCreated;
 use Modules\Project\Models\Category;
 
 class CreateCategoryWorkflow
@@ -14,6 +15,11 @@ class CreateCategoryWorkflow
 
     public function handle(array $data): Category
     {
-        return DB::transaction(fn () => $this->createCategoryAction->execute($data));
+        return DB::transaction(function () use ($data) {
+            $category = $this->createCategoryAction->execute($data);
+            CategoryCreated::dispatch($category);
+
+            return $category;
+        });
     }
 }

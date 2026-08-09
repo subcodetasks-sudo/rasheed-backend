@@ -428,14 +428,14 @@ ENUMS_DOC = """
   - `projects.{id}` → (reserved for project payloads)
 - Env (Laravel Socket.IO): `BROADCAST_CONNECTION=socketio`, `SOCKET_IO_URL`, `SOCKET_IO_PATH`, `SOCKET_IO_SECRET`
 - Env (Notifications SSE): `NOTIFICATIONS_SSE_POLL_SECONDS`, `NOTIFICATIONS_SSE_HEARTBEAT_SECONDS`, `NOTIFICATIONS_SSE_MAX_DURATION_SECONDS`, `NOTIFICATIONS_SSE_RETRY_MILLISECONDS`
-- **Frontend:** Do **not** await `/notifications/stream` in page load / `Promise.all` (it never completes like JSON). Load list+statistics with normal XHR; open SSE separately via `fetch` + ReadableStream (Bearer) or EventSource. Reconnect with `Last-Event-ID`. Avoid `php artisan serve` when testing SSE + other APIs (single-threaded).
+- **Frontend:** Do **not** await `/notifications/stream` in page load / `Promise.all` (it never completes like JSON). Load list+statistics with normal XHR; open SSE separately via `fetch` + ReadableStream with `Authorization: Bearer` + `Accept: text/event-stream` (native `EventSource` cannot set Bearer headers unless the SPA uses Sanctum cookie auth on a stateful domain). Reconnect with `Last-Event-ID` (`notification-{id}`). On reconnect, also re-fetch the list API and dedupe by notification `id`. Avoid `php artisan serve` when testing SSE + other APIs (single-threaded).
 - Env (realtime/): `PORT`, `LARAVEL_URL`, `SOCKET_IO_SECRET` (must match), `CORS_ORIGIN`
 
 ## Notification page types (API mapping)
 Stored DB types remain `activity|success|warning|danger|info`. Page API maps:
 - `danger` → `urgent`
-- `activity|success|warning` → `notification`
-- `info` → `information`
+- `activity|success|warning` → `warning`
+- `info` → `info`
 
 ## Base URL
 `{{base_url}}` → e.g. `http://localhost:8000/api/v1` or XAMPP public path + `/api/v1`
@@ -1084,15 +1084,17 @@ SAMPLE_NOTIFICATION = {
     "type": "urgent",
     "title": "Out of stock",
     "details": "Paper (P-001) is out of stock.",
+    "actor": {"uuid": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "full_name": "Admin User"},
     "project": {"id": 10, "name": "مشروع الصحة"},
     "created_at": "2026-08-09T10:00:00.000000Z",
+    "read_at": None,
 }
 
 SAMPLE_NOTIFICATION_STATS = {
     "total": 10,
     "urgent": 2,
-    "notification": 6,
-    "information": 2,
+    "warning": 6,
+    "info": 2,
 }
 
 
@@ -1101,6 +1103,7 @@ def notifications_list() -> dict:
     query = [
         {"key": "per_page", "value": "15"},
         {"key": "filter[type]", "value": "urgent", "disabled": True},
+        {"key": "filter[unread]", "value": "1", "disabled": True},
     ]
     original = {
         "method": "GET",
@@ -1112,13 +1115,15 @@ def notifications_list() -> dict:
         "GET",
         path,
         description=(
-            "Paginated global activity feed. Page `type` values: urgent | notification | information "
+            "Paginated global activity feed. Page `type` values: urgent | warning | info "
             "(mapped from DB activity|success|warning|danger|info). "
-            "Optional `filter[type]` uses page vocabulary. `project` may be null. "
-            "No POST — notifications are system-generated only."
+            "Optional `filter[type]` uses page vocabulary. Optional `filter[unread]=1` returns "
+            "only items the current user has not marked read. "
+            "`read_at` is per authenticated user (shared feed rows, personal read state). "
+            "`project` may be null. Creating notifications is system-only — no user POST create."
         ),
         roles=["super-admin", "finance", "inventory"],
-        enums="`filter[type]`: urgent | notification | information",
+        enums="`filter[type]`: urgent | warning | info; `filter[unread]`: 1 | true",
         query=query,
         locale=True,
         responses=[
@@ -1137,6 +1142,82 @@ def notifications_list() -> dict:
     )
 
 
+def notifications_show() -> dict:
+    path = "notifications/{{notification_id}}"
+    original = {"method": "GET", "header": header(locale=True), "url": url(path)}
+    return req(
+        "Show Notification",
+        "GET",
+        path,
+        description=(
+            "Fetch one activity notification by id. Same payload shape as list items "
+            "(including per-user `read_at`). Does not mark the notification as read."
+        ),
+        roles=["super-admin", "finance", "inventory"],
+        locale=True,
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok("Notification fetched successfully.", SAMPLE_NOTIFICATION),
+                original_request=original,
+            ),
+            *std_auth_errors(original),
+        ],
+    )
+
+
+def notifications_mark_read() -> dict:
+    path = "notifications/{{notification_id}}/read"
+    original = {"method": "POST", "header": header(locale=True), "url": url(path)}
+    sample = {**SAMPLE_NOTIFICATION, "read_at": "2026-08-09T10:05:00.000000Z"}
+    return req(
+        "Mark Notification Read",
+        "POST",
+        path,
+        description=(
+            "Marks one activity notification as read for the authenticated user only. "
+            "Idempotent — repeats keep the same personal read row."
+        ),
+        roles=["super-admin", "finance", "inventory"],
+        locale=True,
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok("Notification marked as read.", sample),
+                original_request=original,
+            ),
+            *std_auth_errors(original),
+        ],
+    )
+
+
+def notifications_mark_all_read() -> dict:
+    path = "notifications/read-all"
+    original = {"method": "POST", "header": header(locale=True), "url": url(path)}
+    return req(
+        "Mark All Notifications Read",
+        "POST",
+        path,
+        description=(
+            "Marks every currently unread activity notification as read for the authenticated user. "
+            "Does not affect other users' read state. Returns `{ marked: N }`."
+        ),
+        roles=["super-admin", "finance", "inventory"],
+        locale=True,
+        responses=[
+            example(
+                "200 OK",
+                200,
+                ok("All notifications marked as read.", {"marked": 3}),
+                original_request=original,
+            ),
+            *std_auth_errors(original),
+        ],
+    )
+
+
 def notifications_statistics() -> dict:
     path = "notifications/statistics"
     original = {"method": "GET", "header": header(locale=True), "url": url(path)}
@@ -1146,7 +1227,7 @@ def notifications_statistics() -> dict:
         path,
         description=(
             "Card counts from the same `activity_notifications` feed: "
-            "total, urgent (danger), notification (activity|success|warning), information (info)."
+            "total, urgent (danger), warning (activity|success|warning), info (info)."
         ),
         roles=["super-admin", "finance", "inventory"],
         locale=True,
@@ -1175,15 +1256,21 @@ def notifications_stream() -> dict:
         "GET",
         path,
         description=(
-            "Authenticated Server-Sent Events stream. Emits `retry:` then `event: notification.created` "
-            "with `id` + JSON `data` (same shape as list items). Heartbeat comments `: heartbeat`. "
-            "Supports `Last-Event-ID` / `last_event_id` for reconnect replay. "
+            "Authenticated Server-Sent Events stream. Emits `retry:` then `event: stream.ready` "
+            "(no SSE id), then `event: notification.created` with stable `id: notification-{dbId}` "
+            "+ JSON `data` (same shape as list items, including `read_at`). Heartbeat comments `: heartbeat`. "
+            "Ends with `event: stream.ended` (`max_duration` or `unauthenticated`) so clients reconnect "
+            "using the configured `retry:` (~3s). Supports `Last-Event-ID` / `last_event_id` as "
+            "`notification-{id}` or bare numeric id for missed-event replay (capped by replay_limit). "
+            "Fresh connections (no Last-Event-ID) start at latest id — sync history via list API. "
+            "Auth: same Sanctum middleware as other notification routes (Bearer header via fetch stream, "
+            "or cookie session on SANCTUM_STATEFUL_DOMAINS). No query-string tokens. "
             "Does not use Socket.IO. Configurable via `NOTIFICATIONS_SSE_*` env.\n\n"
             "**Client usage (important):** Do not call this with axios/fetch expecting a finished JSON body — "
             "the connection stays open and will keep the request Pending. "
             "Do not put it in the same Promise.all / loading spinner as list, statistics, or other page APIs. "
-            "Use fetch + ReadableStream with `Accept: text/event-stream` (Bearer token) or EventSource; "
-            "reconnect after close using Last-Event-ID. "
+            "Use fetch + ReadableStream with `Accept: text/event-stream` (Bearer token) or cookie-based EventSource; "
+            "reconnect after close using Last-Event-ID and re-sync the list API (dedupe by `id`). "
             "Calls with `Accept: application/json` (typical axios) receive **406** immediately so the page does not hang. "
             "`php artisan serve` is single-threaded: one open stream blocks all other API calls — prefer Apache/XAMPP. "
             "Default stream window is ~25s then reconnect (NOTIFICATIONS_SSE_MAX_DURATION_SECONDS)."
@@ -1195,7 +1282,7 @@ def notifications_stream() -> dict:
             example(
                 "200 OK (text/event-stream)",
                 200,
-                "retry: 3000\n\n: heartbeat\n\nevent: notification.created\nid: 12\ndata: {\"id\":12,\"type\":\"urgent\",...}\n\n",
+                "retry: 3000\n\nevent: stream.ready\ndata: {\"cursor\":11,...}\n\n: heartbeat\n\nevent: notification.created\nid: notification-12\ndata: {\"id\":12,\"type\":\"urgent\",\"read_at\":null,...}\n\nevent: stream.ended\ndata: {\"reason\":\"max_duration\",...}\n\n",
                 original_request=original,
             ),
             *std_auth_errors(original),
@@ -1206,7 +1293,10 @@ def notifications_stream() -> dict:
 def notifications_folder_items() -> list:
     return [
         notifications_list(),
+        notifications_show(),
         notifications_statistics(),
+        notifications_mark_read(),
+        notifications_mark_all_read(),
         notifications_stream(),
     ]
 

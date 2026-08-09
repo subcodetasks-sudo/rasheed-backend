@@ -8,9 +8,9 @@ class NotificationPageTypeMapper
 {
     public const URGENT = 'urgent';
 
-    public const NOTIFICATION = 'notification';
+    public const WARNING = 'warning';
 
-    public const INFORMATION = 'information';
+    public const INFO = 'info';
 
     /**
      * @return list<string>
@@ -19,8 +19,8 @@ class NotificationPageTypeMapper
     {
         return [
             self::URGENT,
-            self::NOTIFICATION,
-            self::INFORMATION,
+            self::WARNING,
+            self::INFO,
         ];
     }
 
@@ -30,8 +30,8 @@ class NotificationPageTypeMapper
 
         return match ($value) {
             NotificationType::Danger => self::URGENT,
-            NotificationType::Info => self::INFORMATION,
-            default => self::NOTIFICATION,
+            NotificationType::Info => self::INFO,
+            default => self::WARNING,
         };
     }
 
@@ -42,8 +42,8 @@ class NotificationPageTypeMapper
     {
         return match ($pageType) {
             self::URGENT => [NotificationType::Danger->value],
-            self::INFORMATION => [NotificationType::Info->value],
-            self::NOTIFICATION => [
+            self::INFO => [NotificationType::Info->value],
+            self::WARNING => [
                 NotificationType::Activity->value,
                 NotificationType::Success->value,
                 NotificationType::Warning->value,

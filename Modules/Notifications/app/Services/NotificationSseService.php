@@ -7,6 +7,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Laravel\Sanctum\PersonalAccessToken;
 use Modules\Notifications\Http\Resources\NotificationResource;
 use Modules\Notifications\Models\Notification;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -16,6 +17,11 @@ class NotificationSseService
 {
     public const LATEST_ID_CACHE_KEY = 'notifications:sse:latest_id';
 
+    public static function eventId(int $notificationId): string
+    {
+        return 'notification-'.$notificationId;
+    }
+
     public function stream(Request $request): StreamedResponse
     {
         $pollSeconds = max(0, (int) config('notifications.sse.poll_seconds', 1));
@@ -23,14 +29,17 @@ class NotificationSseService
         $maxDurationSeconds = max(1, (int) config('notifications.sse.max_duration_seconds', 25));
         $replayLimit = max(1, (int) config('notifications.sse.replay_limit', 100));
         $batchLimit = max(1, (int) config('notifications.sse.batch_limit', 50));
-        $retryMilliseconds = max(1000, (int) config('notifications.sse.retry_milliseconds', 3000));
+        $retryMilliseconds = max(1000, (int) config('notifications.sse.retry_milliseconds', 300000));
 
+        $userId = (string) ($request->user()?->getAuthIdentifier() ?? '');
         $cursor = $this->resolveCursor($request);
 
         // Release the session lock before the long-lived stream so concurrent API calls are not blocked.
         $this->releaseSessionLock();
 
         return response()->stream(function () use (
+            $request,
+            $userId,
             $cursor,
             $pollSeconds,
             $heartbeatSeconds,
@@ -47,29 +56,49 @@ class NotificationSseService
             $replayed = false;
 
             $this->writeRetry($retryMilliseconds);
-            $this->writeEvent('stream.ready', '0', [
+            $this->writeEvent('stream.ready', null, [
                 'cursor' => $lastId,
                 'message' => 'SSE connected. New notifications with id > cursor will be pushed.',
             ]);
             $this->writeHeartbeat();
 
             try {
+                $endReason = 'max_duration';
+
                 while (true) {
+                    if ($this->clientDisconnected()) {
+                        return;
+                    }
+
                     if ((time() - $startedAt) >= $maxDurationSeconds) {
+                        $endReason = 'max_duration';
                         break;
+                    }
+
+                    if (! $this->authStillValid($request)) {
+                        $this->writeEvent('stream.ended', null, [
+                            'reason' => 'unauthenticated',
+                            'cursor' => $lastId,
+                        ]);
+
+                        return;
                     }
 
                     $limit = $replayed ? $batchLimit : $replayLimit;
 
-                    $notifications = $this->fetchNewerThan($lastId, $limit);
+                    $notifications = $this->fetchNewerThan($lastId, $limit, $userId);
 
                     foreach ($notifications as $notification) {
+                        if ($this->clientDisconnected()) {
+                            return;
+                        }
+
                         $payload = (new NotificationResource($notification))
-                            ->resolve(request());
+                            ->resolve($request);
 
                         $written = $this->writeEvent(
                             'notification.created',
-                            (string) $notification->id,
+                            self::eventId((int) $notification->id),
                             $payload
                         );
 
@@ -91,9 +120,19 @@ class NotificationSseService
                     }
 
                     if (! $this->waitForNewerOrTimeout($lastId, $pollSeconds, $startedAt, $maxDurationSeconds)) {
+                        $endReason = $this->clientDisconnected() ? 'client_disconnected' : 'max_duration';
+                        if ($endReason === 'client_disconnected') {
+                            return;
+                        }
                         break;
                     }
                 }
+
+                $this->writeEvent('stream.ended', null, [
+                    'reason' => $endReason,
+                    'cursor' => $lastId,
+                    'retry_ms' => $retryMilliseconds,
+                ]);
             } catch (Throwable $e) {
                 Log::error('Notification SSE stream failed.', [
                     'message' => $e->getMessage(),
@@ -109,7 +148,7 @@ class NotificationSseService
     }
 
     /**
-     * Called after a notification row is persisted so open streams wake quickly.
+     * Called after a notification row is committed so open streams wake quickly.
      */
     public static function announce(int $notificationId): void
     {
@@ -120,11 +159,39 @@ class NotificationSseService
     {
         $raw = $request->headers->get('Last-Event-ID', $request->query('last_event_id'));
 
-        if ($raw !== null && $raw !== '' && is_numeric($raw) && (int) $raw >= 0) {
-            return (int) $raw;
+        if ($raw === null || $raw === '') {
+            // Fresh connection: do not replay history — client should sync via list API.
+            return (int) (Notification::query()->max('id') ?? 0);
+        }
+
+        if (preg_match('/^(?:notification-)?(\d+)$/', trim((string) $raw), $matches) === 1) {
+            return (int) $matches[1];
         }
 
         return (int) (Notification::query()->max('id') ?? 0);
+    }
+
+    protected function authStillValid(Request $request): bool
+    {
+        $user = $request->user();
+
+        if ($user === null) {
+            return false;
+        }
+
+        $token = $user->currentAccessToken();
+
+        if (! $token instanceof PersonalAccessToken) {
+            return true;
+        }
+
+        $expiresAt = $token->expires_at;
+
+        if ($expiresAt instanceof \DateTimeInterface && now()->greaterThan($expiresAt)) {
+            return false;
+        }
+
+        return true;
     }
 
     protected function releaseSessionLock(): void
@@ -139,7 +206,8 @@ class NotificationSseService
         $this->releaseSessionLock();
 
         @set_time_limit($maxDurationSeconds + 30);
-        @ignore_user_abort(true);
+        // Allow connection_aborted() to become true when the client disconnects.
+        @ignore_user_abort(false);
 
         // PHPUnit captures StreamedResponse via its own output buffers; do not tear them down.
         if (app()->runningUnitTests()) {
@@ -159,7 +227,7 @@ class NotificationSseService
     /**
      * @return Collection<int, Notification>
      */
-    protected function fetchNewerThan(int $lastId, int $limit)
+    protected function fetchNewerThan(int $lastId, int $limit, string $userId)
     {
         if (! app()->runningUnitTests() && DB::getDriverName() !== 'sqlite') {
             try {
@@ -170,7 +238,12 @@ class NotificationSseService
         }
 
         return Notification::query()
-            ->with('project')
+            ->with([
+                'project',
+                'reads' => fn ($q) => $userId !== ''
+                    ? $q->where('user_id', $userId)
+                    : $q->whereRaw('1 = 0'),
+            ])
             ->where('id', '>', $lastId)
             ->orderBy('id')
             ->limit($limit)
@@ -204,12 +277,16 @@ class NotificationSseService
         if ($pollSeconds <= 0) {
             usleep(100_000);
 
-            return (time() - $startedAt) < $maxDurationSeconds;
+            return ! $this->clientDisconnected() && (time() - $startedAt) < $maxDurationSeconds;
         }
 
         $deadline = min(time() + $pollSeconds, $startedAt + $maxDurationSeconds);
 
         while (time() < $deadline) {
+            if ($this->clientDisconnected()) {
+                return false;
+            }
+
             if ($this->hasNewerThan($lastId)) {
                 return true;
             }
@@ -217,16 +294,32 @@ class NotificationSseService
             usleep(200_000);
         }
 
-        return (time() - $startedAt) < $maxDurationSeconds;
+        return ! $this->clientDisconnected() && (time() - $startedAt) < $maxDurationSeconds;
+    }
+
+    /**
+     * PHPUnit's streamed response capture makes connection_aborted() unreliable.
+     */
+    protected function clientDisconnected(): bool
+    {
+        if (app()->runningUnitTests()) {
+            return false;
+        }
+
+        return connection_aborted();
     }
 
     /**
      * @param  array<string, mixed>  $payload
      */
-    protected function writeEvent(string $event, string $id, array $payload): bool
+    protected function writeEvent(string $event, ?string $id, array $payload): bool
     {
         echo 'event: '.$event."\n";
-        echo 'id: '.$id."\n";
+
+        if ($id !== null && $id !== '') {
+            echo 'id: '.$id."\n";
+        }
+
         echo 'data: '.json_encode($payload, JSON_UNESCAPED_UNICODE)."\n\n";
 
         return $this->flushOutput();
@@ -256,7 +349,6 @@ class NotificationSseService
             @flush();
         }
 
-        // connection_aborted() is unreliable on some Windows SAPIs; only stop after a write attempt.
-        return ! connection_aborted();
+        return ! $this->clientDisconnected();
     }
 }

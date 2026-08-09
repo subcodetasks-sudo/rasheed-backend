@@ -32,6 +32,10 @@ class DeleteCashStationSettlementAction
 
         $year = $settlement->year;
         $month = $settlement->month;
+        $contributionType = $settlement->contribution_type?->value;
+        $toProjectId = $settlement->contribution_type !== null
+            ? (int) $settlement->to_project_id
+            : null;
 
         DB::transaction(function () use ($settlementId) {
             $locked = CashStationSettlement::query()
@@ -55,7 +59,7 @@ class DeleteCashStationSettlementAction
             $locked->delete();
         });
 
-        CashStationSettlementDeleted::dispatch($settlementId, $year, $month);
+        CashStationSettlementDeleted::dispatch($settlementId, $year, $month, $contributionType, $toProjectId);
         CashStationUpdated::dispatch(
             $year,
             $month,
