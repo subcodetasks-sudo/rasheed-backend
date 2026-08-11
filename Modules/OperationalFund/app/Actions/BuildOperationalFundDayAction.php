@@ -2,6 +2,7 @@
 
 namespace Modules\OperationalFund\Actions;
 
+use App\Support\Money\FormatMoneyDecimal;
 use Carbon\Carbon;
 use Modules\OperationalFund\Enums\DayStatus;
 
@@ -23,9 +24,9 @@ class BuildOperationalFundDayAction
 
         return [
             'date' => $dateString,
-            'expected_operational_income' => $this->decimal($income),
+            'expected_operational_income' => FormatMoneyDecimal::formatRounded($income),
             'operational_expense' => $this->decimal($expense),
-            'daily_operational_net' => $this->decimal($net),
+            'daily_operational_net' => FormatMoneyDecimal::formatRounded($net),
             'day_status' => $this->status($net)->value,
         ];
     }

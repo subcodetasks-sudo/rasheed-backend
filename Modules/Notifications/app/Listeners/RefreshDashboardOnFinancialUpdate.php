@@ -12,6 +12,7 @@ use Modules\DailyJournal\Events\DailyJournalUpdated;
 use Modules\Dashboard\Actions\BuildDashboardSummaryAction;
 use Modules\Dashboard\Events\DashboardUpdated;
 use Modules\Inventory\Events\InventoryItemCreated;
+use Modules\Inventory\Events\InventoryMovementDeleted;
 use Modules\Inventory\Events\InventoryStockMoved;
 use Modules\OperationalFund\Events\OperationalFundUpdated;
 use Modules\Project\Events\ProjectUpdated;
@@ -27,6 +28,7 @@ class RefreshDashboardOnFinancialUpdate
         AdministrativeDebtRepaid|
         InventoryStockMoved|
         InventoryItemCreated|
+        InventoryMovementDeleted|
         CashStationSettlementCreated|
         CashStationSettlementDeleted|
         CashStationCarriedForward|
@@ -52,6 +54,10 @@ class RefreshDashboardOnFinancialUpdate
 
         if ($event instanceof InventoryStockMoved) {
             return Carbon::parse($event->movement->movement_date)->toDateString();
+        }
+
+        if ($event instanceof InventoryMovementDeleted) {
+            return $event->movementDate->toDateString();
         }
 
         if ($event instanceof CashStationSettlementCreated) {

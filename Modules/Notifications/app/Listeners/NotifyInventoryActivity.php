@@ -6,6 +6,8 @@ use Modules\Inventory\Events\InventoryCategoryCreated;
 use Modules\Inventory\Events\InventoryCategoryDeleted;
 use Modules\Inventory\Events\InventoryCategoryUpdated;
 use Modules\Inventory\Events\InventoryItemCreated;
+use Modules\Inventory\Events\InventoryItemDeleted;
+use Modules\Inventory\Events\InventoryMovementDeleted;
 use Modules\Inventory\Events\InventoryStockMoved;
 use Modules\Notifications\Services\NotificationService;
 
@@ -16,8 +18,43 @@ class NotifyInventoryActivity
     ) {}
 
     public function handle(
-        InventoryItemCreated|InventoryStockMoved|InventoryCategoryCreated|InventoryCategoryUpdated|InventoryCategoryDeleted $event,
+        InventoryItemCreated|InventoryItemDeleted|InventoryStockMoved|InventoryMovementDeleted|InventoryCategoryCreated|InventoryCategoryUpdated|InventoryCategoryDeleted $event,
     ): void {
+        if ($event instanceof InventoryItemDeleted) {
+            $this->notificationService->notifyActivity(
+                __('messages.notification_inventory_item_deleted_title'),
+                __('messages.notification_inventory_item_deleted_message', [
+                    'name' => $event->itemName,
+                    'code' => $event->itemCode,
+                ]),
+                [
+                    'action' => 'item_deleted',
+                    'inventory_item_id' => $event->itemId,
+                ],
+            );
+
+            return;
+        }
+
+        if ($event instanceof InventoryMovementDeleted) {
+            $this->notificationService->notifyActivity(
+                __('messages.notification_inventory_movement_deleted_title'),
+                __('messages.notification_inventory_movement_deleted_message', [
+                    'type' => $event->type->value,
+                    'quantity' => $event->quantity,
+                    'name' => $event->itemName,
+                ]),
+                [
+                    'action' => 'movement_deleted',
+                    'movement_id' => $event->movementId,
+                    'inventory_item_id' => $event->inventoryItemId,
+                    'type' => $event->type->value,
+                ],
+            );
+
+            return;
+        }
+
         if ($event instanceof InventoryCategoryDeleted) {
             $this->notificationService->notifyActivity(
                 __('messages.notification_inventory_category_deleted_title'),

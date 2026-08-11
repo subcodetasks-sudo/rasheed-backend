@@ -47,7 +47,7 @@ class DatabaseSeeder extends Seeder
         foreach ($accounts as $account) {
             $role = Role::firstOrCreate([
                 'name' => $account['role'],
-                'guard_name' => 'web',
+                'guard_name' => 'api',
             ]);
 
             $user = User::query()->where('user_name', $account['user_name'])->first();
@@ -69,9 +69,9 @@ class DatabaseSeeder extends Seeder
             }
         }
 
-        $this->call([
-            ProjectDatabaseSeeder::class,
-            InventoryDatabaseSeeder::class,
-        ]);
+        // $this->call([
+        //     ProjectDatabaseSeeder::class,
+        //     InventoryDatabaseSeeder::class,
+        // ]);
     }
 }

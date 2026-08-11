@@ -2,6 +2,7 @@
 
 namespace Modules\CashFundExpenses\Actions;
 
+use App\Support\Money\FormatMoneyDecimal;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -70,7 +71,7 @@ class BuildCashFundExpensesAction
             foreach ($days as $day) {
                 $amount = round((float) ($project['daily_amounts'][$day] ?? 0.0), 2);
                 if ($amount > 0) {
-                    $dailyExpenses[(string) $day] = $this->decimal($amount);
+                    $dailyExpenses[(string) $day] = FormatMoneyDecimal::formatRounded($amount);
                     $monthlyTotal += $amount;
                 } else {
                     $dailyExpenses[(string) $day] = null;
@@ -86,7 +87,7 @@ class BuildCashFundExpensesAction
                 'project_id' => $project['project_id'],
                 'project_name' => $project['project_name'],
                 'daily_expenses' => (object) $dailyExpenses,
-                'monthly_total' => $this->decimal($monthlyTotal),
+                'monthly_total' => FormatMoneyDecimal::formatRounded($monthlyTotal),
             ];
         }
 
@@ -96,10 +97,5 @@ class BuildCashFundExpensesAction
             'days' => $days,
             'projects' => $projects,
         ];
-    }
-
-    private function decimal(mixed $value): string
-    {
-        return number_format((float) $value, 2, '.', '');
     }
 }

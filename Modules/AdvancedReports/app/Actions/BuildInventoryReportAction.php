@@ -2,6 +2,7 @@
 
 namespace Modules\AdvancedReports\Actions;
 
+use App\Support\Money\FormatMoneyDecimal;
 use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Enums\InventoryMovementType;
 use Modules\Inventory\Models\InventoryItem;
@@ -52,9 +53,9 @@ class BuildInventoryReportAction
                 'item_id' => (int) $item->id,
                 'item_name' => (string) $item->name,
                 'unit' => (string) $item->unit,
-                'total_incoming' => $this->decimal($incoming),
-                'total_outgoing' => $this->decimal($outgoing),
-                'balance' => $this->decimal($balance),
+                'total_incoming' => FormatMoneyDecimal::formatRounded($incoming),
+                'total_outgoing' => FormatMoneyDecimal::formatRounded($outgoing),
+                'balance' => FormatMoneyDecimal::formatRounded($balance),
                 'minimum_stock' => $this->decimal($minimum),
                 'status' => $status,
             ];
@@ -66,7 +67,7 @@ class BuildInventoryReportAction
             'summary' => [
                 'total_items' => $items->count(),
                 'low_stock_items' => $lowStockCount,
-                'inventory_value' => $this->decimal($this->computeInventoryFifoValueAction->execute()),
+                'inventory_value' => FormatMoneyDecimal::formatRounded($this->computeInventoryFifoValueAction->execute()),
                 'most_consumed_item' => $this->mostConsumedItem(
                     $range['start_date'],
                     $range['end_bound'],
@@ -122,7 +123,7 @@ class BuildInventoryReportAction
             'id' => (int) $row->id,
             'name' => (string) $row->name,
             'unit' => (string) $row->unit,
-            'quantity_consumed' => $this->decimal($row->quantity_consumed),
+            'quantity_consumed' => FormatMoneyDecimal::formatRounded($row->quantity_consumed),
         ];
     }
 

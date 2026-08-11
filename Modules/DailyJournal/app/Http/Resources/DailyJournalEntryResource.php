@@ -25,13 +25,13 @@ class DailyJournalEntryResource extends JsonResource
             'daily_income' => $this->nullableDecimal($this->daily_income),
             'daily_expense' => $this->nullableDecimal($this->daily_expense),
             'contribution' => $this->nullableDecimal($this->contribution),
-            'administrative_expense' => $this->formatDecimal($this->administrative_expense),
-            'administrative_fee' => $this->formatDecimal($this->administrative_fee),
-            'operational_deduction' => $this->formatDecimal($this->operational_deduction),
-            'daily_total' => $this->formatDecimal($this->daily_total),
-            'fund_balance' => $this->formatDecimal($this->fund_balance),
-            'administrative_debt' => $this->formatDecimal($this->administrative_debt),
-            'accumulated_administrative_debt' => $this->formatDecimal($this->accumulated_administrative_debt),
+            'administrative_expense' => FormatMoneyDecimal::formatRounded($this->administrative_expense),
+            'administrative_fee' => FormatMoneyDecimal::formatRounded($this->administrative_fee),
+            'operational_deduction' => FormatMoneyDecimal::formatRounded($this->operational_deduction),
+            'daily_total' => FormatMoneyDecimal::formatRounded($this->daily_total),
+            'fund_balance' => FormatMoneyDecimal::formatRounded($this->fund_balance),
+            'administrative_debt' => FormatMoneyDecimal::formatRounded($this->administrative_debt),
+            'accumulated_administrative_debt' => FormatMoneyDecimal::formatRounded($this->accumulated_administrative_debt),
         ];
     }
 
@@ -41,11 +41,6 @@ class DailyJournalEntryResource extends JsonResource
             return null;
         }
 
-        return $this->formatDecimal($value);
-    }
-
-    private function formatDecimal(mixed $value): string
-    {
         return FormatMoneyDecimal::format($value);
     }
 }

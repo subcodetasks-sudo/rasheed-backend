@@ -13,6 +13,8 @@ use Modules\Inventory\Events\InventoryCategoryCreated;
 use Modules\Inventory\Events\InventoryCategoryDeleted;
 use Modules\Inventory\Events\InventoryCategoryUpdated;
 use Modules\Inventory\Events\InventoryItemCreated;
+use Modules\Inventory\Events\InventoryItemDeleted;
+use Modules\Inventory\Events\InventoryMovementDeleted;
 use Modules\Inventory\Events\InventoryStockMoved;
 use Modules\Notifications\Listeners\ApplyPendingContributionAdministrativeDebtOnDailyJournalUpdate;
 use Modules\Notifications\Listeners\ApplyPendingContributionFundBalanceOnDailyJournalUpdate;
@@ -32,6 +34,7 @@ use Modules\Notifications\Listeners\RefreshAdvancedReportsOnFinancialUpdate;
 use Modules\Notifications\Listeners\RefreshCashFundExpensesOnDailyJournalUpdate;
 use Modules\Notifications\Listeners\RefreshCashStationOnDailyJournalUpdate;
 use Modules\Notifications\Listeners\RefreshDailyJournalOnInventoryAdministrativeMovement;
+use Modules\Notifications\Listeners\RefreshDailyJournalOnInventoryMovementDeletion;
 use Modules\Notifications\Listeners\RefreshDashboardOnFinancialUpdate;
 use Modules\Notifications\Listeners\RefreshModulesOnSettingsUpdate;
 use Modules\Notifications\Listeners\RefreshMonthlySummaryOnCashStationUpdate;
@@ -121,6 +124,14 @@ class EventServiceProvider extends ServiceProvider
         InventoryCategoryCreated::class => [NotifyInventoryActivity::class],
         InventoryCategoryUpdated::class => [NotifyInventoryActivity::class],
         InventoryCategoryDeleted::class => [NotifyInventoryActivity::class],
+        InventoryItemDeleted::class => [NotifyInventoryActivity::class],
+        InventoryMovementDeleted::class => [
+            NotifyInventoryActivity::class,
+            RefreshDailyJournalOnInventoryMovementDeletion::class,
+            RefreshReportsCenterOnFinancialUpdate::class,
+            RefreshAdvancedReportsOnFinancialUpdate::class,
+            RefreshDashboardOnFinancialUpdate::class,
+        ],
 
         CashStationSettlementCreated::class => [
             NotifyCashStationActivity::class,

@@ -188,6 +188,35 @@ class AdministrativeFundApiTest extends TestCase
         $this->assertSame('115.50', $data['summary']['administrative_net']);
     }
 
+    public function test_put_updates_operational_administration_and_recalculates(): void
+    {
+        $this->actAs('finance');
+
+        $data = $this->putJson(self::ENDPOINT.'/2026-08-05', [
+            'operational_administration' => 60,
+        ])
+            ->assertOk()
+            ->json('data');
+
+        $day = $this->findDay($data, '2026-08-05');
+        $this->assertSame('60.00', $day['operational_administration']);
+        $this->assertSame('60.00', $day['total_expenses']);
+        $this->assertSame('-60.00', $day['net']);
+        $this->assertSame('60.00', $data['summary']['operational_administration']);
+        $this->assertSame('60.00', $data['totals']['operational_administration']);
+
+        $data = $this->putJson(self::ENDPOINT.'/2026-08-05', [
+            'operational_administration' => 90,
+        ])
+            ->assertOk()
+            ->json('data');
+
+        $day = $this->findDay($data, '2026-08-05');
+        $this->assertSame('90.00', $day['operational_administration']);
+        $this->assertSame('90.00', $day['total_expenses']);
+        $this->assertSame('-90.00', $day['net']);
+    }
+
     public function test_notes_only_put_recalculates(): void
     {
         $this->actAs('finance');

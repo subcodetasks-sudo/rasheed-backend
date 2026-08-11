@@ -10,6 +10,7 @@ class UpdateAdministrativeFundDayRequest extends FormRequest
     private const EDITABLE = [
         'individual_contributions',
         'asset_administration',
+        'operational_administration',
         'notes',
     ];
 
@@ -17,7 +18,6 @@ class UpdateAdministrativeFundDayRequest extends FormRequest
         'project_administration',
         'cash_fund_contributions',
         'debt_recovery',
-        'operational_administration',
         'total_income',
         'total_expenses',
         'administrative_net',
@@ -41,6 +41,7 @@ class UpdateAdministrativeFundDayRequest extends FormRequest
         return [
             'individual_contributions' => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'asset_administration' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'operational_administration' => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'notes' => ['sometimes', 'nullable', 'string'],
         ];
     }
@@ -61,7 +62,7 @@ class UpdateAdministrativeFundDayRequest extends FormRequest
     }
 
     /**
-     * @return array{individual_contributions?: float|null, asset_administration?: float|null, notes?: string|null}
+     * @return array{individual_contributions?: float|null, asset_administration?: float|null, operational_administration?: float|null, notes?: string|null}
      */
     public function editablePayload(): array
     {
@@ -78,6 +79,12 @@ class UpdateAdministrativeFundDayRequest extends FormRequest
             $payload['asset_administration'] = $validated['asset_administration'] === null
                 ? 0.0
                 : (float) $validated['asset_administration'];
+        }
+
+        if (array_key_exists('operational_administration', $validated)) {
+            $payload['operational_administration'] = $validated['operational_administration'] === null
+                ? 0.0
+                : (float) $validated['operational_administration'];
         }
 
         if (array_key_exists('notes', $validated)) {

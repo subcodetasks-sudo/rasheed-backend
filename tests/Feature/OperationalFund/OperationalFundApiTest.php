@@ -206,7 +206,7 @@ class OperationalFundApiTest extends TestCase
         ])->assertStatus(422);
     }
 
-    public function test_admin_fund_reads_operational_expense(): void
+    public function test_admin_fund_operational_administration_is_independent_of_operational_fund(): void
     {
         $this->actAs('finance');
 
@@ -227,8 +227,18 @@ class OperationalFundApiTest extends TestCase
         }
 
         $this->assertNotNull($day);
-        $this->assertSame('77.50', $day['operational_administration']);
-        $this->assertSame('77.50', $day['total_expenses']);
+        $this->assertSame('0.00', $day['operational_administration']);
+        $this->assertSame('0.00', $day['total_expenses']);
+
+        $this->putJson('/api/v1/administrative-fund/2026-08-10', [
+            'operational_administration' => 40,
+        ])->assertOk();
+
+        $operationalFundDay = $this->getJson(self::DAY.'?date=2026-08-10')
+            ->assertOk()
+            ->json('data');
+
+        $this->assertSame('77.50', $operationalFundDay['operational_expense']);
     }
 
     public function test_clear_expense_with_null(): void

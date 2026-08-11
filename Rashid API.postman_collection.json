@@ -14880,10 +14880,10 @@
                     "{{administrative_fund_date}}"
                   ]
                 },
-                "description": "**Roles:** `super-admin, finance`\n\nUpsert manual fields for one day (`Y-m-d`). Only `individual_contributions`, `asset_administration`, `notes` are allowed. Sending any auto/calculated field returns 422. Response is the full rebuilt month payload.\n\n**Enums / allowed values:**\nEditable: individual_contributions, asset_administration, notes\nForbidden: project_administration, cash_fund_contributions, debt_recovery, operational_administration, total_income, total_expenses, net, administrative_net",
+                "description": "**Roles:** `super-admin, finance`\n\nUpsert manual fields for one day (`Y-m-d`). Only `individual_contributions`, `asset_administration`, `operational_administration`, `notes` are allowed. Sending any auto/calculated field returns 422. `operational_administration` is entered manually here and is independent of the Operational Fund module's own `operational_expense` (they no longer mirror each other). Response is the full rebuilt month payload.\n\n**Enums / allowed values:**\nEditable: individual_contributions, asset_administration, operational_administration, notes\nForbidden: project_administration, cash_fund_contributions, debt_recovery, total_income, total_expenses, net, administrative_net",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"individual_contributions\": 25,\n  \"asset_administration\": 10,\n  \"notes\": \"optional note\"\n}",
+                  "raw": "{\n  \"individual_contributions\": 25,\n  \"asset_administration\": 10,\n  \"operational_administration\": 15,\n  \"notes\": \"optional note\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -14915,7 +14915,7 @@
                     ],
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"individual_contributions\": 25,\n  \"asset_administration\": 10,\n  \"notes\": \"optional note\"\n}",
+                      "raw": "{\n  \"individual_contributions\": 25,\n  \"asset_administration\": 10,\n  \"operational_administration\": 15,\n  \"notes\": \"optional note\"\n}",
                       "options": {
                         "raw": {
                           "language": "json"
@@ -14942,7 +14942,7 @@
                       "value": "application/json"
                     }
                   ],
-                  "body": "{\n  \"success\": true,\n  \"message\": \"Administrative fund day updated successfully.\",\n  \"data\": {\n    \"month\": 8,\n    \"year\": 2026,\n    \"summary\": {\n      \"project_administration\": \"100.00\",\n      \"cash_fund_contributions\": \"0.00\",\n      \"individual_contributions\": \"25.00\",\n      \"debt_recovery\": \"0.00\",\n      \"total_income\": \"125.00\",\n      \"operational_administration\": \"0.00\",\n      \"asset_administration\": \"10.00\",\n      \"total_expenses\": \"10.00\",\n      \"administrative_net\": \"115.00\"\n    },\n    \"days\": [\n      {\n        \"date\": \"2026-08-01\",\n        \"day\": \"Saturday\",\n        \"project_administration\": \"100.00\",\n        \"cash_fund_contributions\": \"0.00\",\n        \"individual_contributions\": \"25.00\",\n        \"debt_recovery\": \"0.00\",\n        \"total_income\": \"125.00\",\n        \"operational_administration\": \"0.00\",\n        \"asset_administration\": \"10.00\",\n        \"total_expenses\": \"10.00\",\n        \"net\": \"115.00\",\n        \"notes\": null\n      }\n    ],\n    \"totals\": {\n      \"project_administration\": \"100.00\",\n      \"cash_fund_contributions\": \"0.00\",\n      \"individual_contributions\": \"25.00\",\n      \"debt_recovery\": \"0.00\",\n      \"total_income\": \"125.00\",\n      \"operational_administration\": \"0.00\",\n      \"asset_administration\": \"10.00\",\n      \"total_expenses\": \"10.00\",\n      \"net\": \"115.00\"\n    }\n  }\n}",
+                  "body": "{\n  \"success\": true,\n  \"message\": \"Administrative fund day updated successfully.\",\n  \"data\": {\n    \"month\": 8,\n    \"year\": 2026,\n    \"summary\": {\n      \"project_administration\": \"100.00\",\n      \"cash_fund_contributions\": \"0.00\",\n      \"individual_contributions\": \"25.00\",\n      \"debt_recovery\": \"0.00\",\n      \"total_income\": \"125.00\",\n      \"operational_administration\": \"15.00\",\n      \"asset_administration\": \"10.00\",\n      \"total_expenses\": \"25.00\",\n      \"administrative_net\": \"100.00\"\n    },\n    \"days\": [\n      {\n        \"date\": \"2026-08-01\",\n        \"day\": \"Saturday\",\n        \"project_administration\": \"100.00\",\n        \"cash_fund_contributions\": \"0.00\",\n        \"individual_contributions\": \"25.00\",\n        \"debt_recovery\": \"0.00\",\n        \"total_income\": \"125.00\",\n        \"operational_administration\": \"15.00\",\n        \"asset_administration\": \"10.00\",\n        \"total_expenses\": \"25.00\",\n        \"net\": \"100.00\",\n        \"notes\": \"optional note\"\n      }\n    ],\n    \"totals\": {\n      \"project_administration\": \"100.00\",\n      \"cash_fund_contributions\": \"0.00\",\n      \"individual_contributions\": \"25.00\",\n      \"debt_recovery\": \"0.00\",\n      \"total_income\": \"125.00\",\n      \"operational_administration\": \"15.00\",\n      \"asset_administration\": \"10.00\",\n      \"total_expenses\": \"25.00\",\n      \"net\": \"100.00\"\n    }\n  }\n}",
                   "id": "ae90252a-7f24-4feb-8506-4c456d907a89"
                 },
                 {
@@ -14968,7 +14968,7 @@
                     ],
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"individual_contributions\": 25,\n  \"asset_administration\": 10,\n  \"notes\": \"optional note\"\n}",
+                      "raw": "{\n  \"individual_contributions\": 25,\n  \"asset_administration\": 10,\n  \"operational_administration\": 15,\n  \"notes\": \"optional note\"\n}",
                       "options": {
                         "raw": {
                           "language": "json"
@@ -15021,7 +15021,7 @@
                     ],
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"individual_contributions\": 25,\n  \"asset_administration\": 10,\n  \"notes\": \"optional note\"\n}",
+                      "raw": "{\n  \"individual_contributions\": 25,\n  \"asset_administration\": 10,\n  \"operational_administration\": 15,\n  \"notes\": \"optional note\"\n}",
                       "options": {
                         "raw": {
                           "language": "json"
@@ -15074,7 +15074,7 @@
                     ],
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"individual_contributions\": 25,\n  \"asset_administration\": 10,\n  \"notes\": \"optional note\"\n}",
+                      "raw": "{\n  \"individual_contributions\": 25,\n  \"asset_administration\": 10,\n  \"operational_administration\": 15,\n  \"notes\": \"optional note\"\n}",
                       "options": {
                         "raw": {
                           "language": "json"
@@ -15591,7 +15591,7 @@
                     "{{operational_fund_date}}"
                   ]
                 },
-                "description": "**Roles:** `super-admin, finance`\n\nUpsert `operational_expense` for one day (`Y-m-d`). Null clears to 0. Only this field is allowed. Returns full rebuilt month (coverage recalculated). Also refreshes Administrative Fund Operational Administration for that month.\n\n**Enums / allowed values:**\nEditable: operational_expense only",
+                "description": "**Roles:** `super-admin, finance`\n\nUpsert `operational_expense` for one day (`Y-m-d`). Null clears to 0. Only this field is allowed. Returns full rebuilt month (coverage recalculated). Independent from Administrative Fund's `operational_administration` (that field is now entered manually there and no longer sourced from this module).\n\n**Enums / allowed values:**\nEditable: operational_expense only",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"operational_expense\": 200\n}",
@@ -19065,6 +19065,158 @@
               ]
             },
             {
+              "name": "Delete Inventory Item",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/items/{{inventory_item_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "inventory",
+                    "items",
+                    "{{inventory_item_id}}"
+                  ]
+                },
+                "description": "**Roles:** `super-admin, inventory`\n\nPermanently delete an inventory item entered by mistake. Only allowed when the item has zero related inventory movements and zero recorded batches (including an opening-quantity batch) — otherwise returns 422. Historical data is never cascade-deleted."
+              },
+              "response": [
+                {
+                  "name": "200 OK",
+                  "originalRequest": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Accept",
+                        "value": "application/json",
+                        "type": "text"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/inventory/items/{{inventory_item_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "inventory",
+                        "items",
+                        "{{inventory_item_id}}"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": true,\n  \"message\": \"Inventory item deleted successfully.\"\n}",
+                  "id": "b1a1a111-1111-4111-8111-111111111101"
+                },
+                {
+                  "name": "422 Has Movements",
+                  "originalRequest": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Accept",
+                        "value": "application/json",
+                        "type": "text"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/inventory/items/{{inventory_item_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "inventory",
+                        "items",
+                        "{{inventory_item_id}}"
+                      ]
+                    }
+                  },
+                  "status": "Unprocessable Entity",
+                  "code": 422,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": false,\n  \"message\": \"Cannot delete inventory item because it has recorded inventory movements.\"\n}",
+                  "id": "b1a1a111-1111-4111-8111-111111111102"
+                },
+                {
+                  "name": "404 Not Found",
+                  "originalRequest": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Accept",
+                        "value": "application/json",
+                        "type": "text"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/inventory/items/{{inventory_item_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "inventory",
+                        "items",
+                        "{{inventory_item_id}}"
+                      ]
+                    }
+                  },
+                  "status": "Not Found",
+                  "code": 404,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": false,\n  \"message\": \"Inventory item not found.\"\n}",
+                  "id": "b1a1a111-1111-4111-8111-111111111103"
+                }
+              ]
+            },
+            {
               "name": "List Inventory Movements",
               "request": {
                 "method": "GET",
@@ -20188,6 +20340,158 @@
                   ],
                   "body": "{\n  \"message\": \"The given data was invalid.\",\n  \"errors\": {\n    \"field\": [\n      \"The field field is required.\"\n    ]\n  }\n}",
                   "id": "7a57f951-2e26-46cc-8ba5-17c76e4ef5bd"
+                }
+              ]
+            },
+            {
+              "name": "Delete Inventory Movement",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/movements/{{inventory_movement_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "inventory",
+                    "movements",
+                    "{{inventory_movement_id}}"
+                  ]
+                },
+                "description": "**Roles:** `super-admin, inventory`\n\nCancel/delete an incorrectly recorded incoming or outgoing movement. Reverses its effect on the item's balance (recomputed from the remaining valid movements). Deleting an incoming movement is blocked if its stock has already been partly consumed by a later outgoing movement. Deleting an `administrative`-typed outgoing movement automatically re-triggers Daily Journal recalculation for that movement's date. Returns the item's recalculated state."
+              },
+              "response": [
+                {
+                  "name": "200 OK",
+                  "originalRequest": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Accept",
+                        "value": "application/json",
+                        "type": "text"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/inventory/movements/{{inventory_movement_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "inventory",
+                        "movements",
+                        "{{inventory_movement_id}}"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": true,\n  \"message\": \"Inventory movement deleted successfully.\",\n  \"data\": {\n    \"id\": 1,\n    \"code\": \"INV-0001\",\n    \"name\": \"قفازات طبية\",\n    \"category_id\": 1,\n    \"unit\": \"علبة\",\n    \"project_id\": 1,\n    \"latest_incoming_price\": \"25.50\",\n    \"opening_quantity\": \"100.00\",\n    \"total_incoming_quantity\": \"0.00\",\n    \"total_outgoing_quantity\": \"20.00\",\n    \"current_balance\": \"80.00\",\n    \"minimum_stock_level\": \"10.00\",\n    \"notes\": \"مخزون افتتاحي\",\n    \"created_at\": \"2026-07-29T10:00:00.000000Z\",\n    \"updated_at\": \"2026-08-11T12:00:00.000000Z\"\n  }\n}",
+                  "id": "b2a2a222-2222-4222-8222-222222222201"
+                },
+                {
+                  "name": "422 Already Consumed",
+                  "originalRequest": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Accept",
+                        "value": "application/json",
+                        "type": "text"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/inventory/movements/{{inventory_movement_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "inventory",
+                        "movements",
+                        "{{inventory_movement_id}}"
+                      ]
+                    }
+                  },
+                  "status": "Unprocessable Entity",
+                  "code": 422,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": false,\n  \"message\": \"Cannot delete this movement because part of its stock has already been consumed by a later movement.\"\n}",
+                  "id": "b2a2a222-2222-4222-8222-222222222202"
+                },
+                {
+                  "name": "404 Not Found",
+                  "originalRequest": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Accept",
+                        "value": "application/json",
+                        "type": "text"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/inventory/movements/{{inventory_movement_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "inventory",
+                        "movements",
+                        "{{inventory_movement_id}}"
+                      ]
+                    }
+                  },
+                  "status": "Not Found",
+                  "code": 404,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": false,\n  \"message\": \"Inventory movement not found.\"\n}",
+                  "id": "b2a2a222-2222-4222-8222-222222222203"
                 }
               ]
             }
@@ -27621,10 +27925,10 @@
                     "{{administrative_fund_date}}"
                   ]
                 },
-                "description": "**Roles:** `super-admin, finance`\n\nUpsert manual fields for one day (`Y-m-d`). Only `individual_contributions`, `asset_administration`, `notes` are allowed. Sending any auto/calculated field returns 422. Response is the full rebuilt month payload.\n\n**Enums / allowed values:**\nEditable: individual_contributions, asset_administration, notes\nForbidden: project_administration, cash_fund_contributions, debt_recovery, operational_administration, total_income, total_expenses, net, administrative_net",
+                "description": "**Roles:** `super-admin, finance`\n\nUpsert manual fields for one day (`Y-m-d`). Only `individual_contributions`, `asset_administration`, `operational_administration`, `notes` are allowed. Sending any auto/calculated field returns 422. `operational_administration` is entered manually here and is independent of the Operational Fund module's own `operational_expense` (they no longer mirror each other). Response is the full rebuilt month payload.\n\n**Enums / allowed values:**\nEditable: individual_contributions, asset_administration, operational_administration, notes\nForbidden: project_administration, cash_fund_contributions, debt_recovery, total_income, total_expenses, net, administrative_net",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"individual_contributions\": 25,\n  \"asset_administration\": 10,\n  \"notes\": \"optional note\"\n}",
+                  "raw": "{\n  \"individual_contributions\": 25,\n  \"asset_administration\": 10,\n  \"operational_administration\": 15,\n  \"notes\": \"optional note\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -27656,7 +27960,7 @@
                     ],
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"individual_contributions\": 25,\n  \"asset_administration\": 10,\n  \"notes\": \"optional note\"\n}",
+                      "raw": "{\n  \"individual_contributions\": 25,\n  \"asset_administration\": 10,\n  \"operational_administration\": 15,\n  \"notes\": \"optional note\"\n}",
                       "options": {
                         "raw": {
                           "language": "json"
@@ -27683,7 +27987,7 @@
                       "value": "application/json"
                     }
                   ],
-                  "body": "{\n  \"success\": true,\n  \"message\": \"Administrative fund day updated successfully.\",\n  \"data\": {\n    \"month\": 8,\n    \"year\": 2026,\n    \"summary\": {\n      \"project_administration\": \"100.00\",\n      \"cash_fund_contributions\": \"0.00\",\n      \"individual_contributions\": \"25.00\",\n      \"debt_recovery\": \"0.00\",\n      \"total_income\": \"125.00\",\n      \"operational_administration\": \"0.00\",\n      \"asset_administration\": \"10.00\",\n      \"total_expenses\": \"10.00\",\n      \"administrative_net\": \"115.00\"\n    },\n    \"days\": [\n      {\n        \"date\": \"2026-08-01\",\n        \"day\": \"Saturday\",\n        \"project_administration\": \"100.00\",\n        \"cash_fund_contributions\": \"0.00\",\n        \"individual_contributions\": \"25.00\",\n        \"debt_recovery\": \"0.00\",\n        \"total_income\": \"125.00\",\n        \"operational_administration\": \"0.00\",\n        \"asset_administration\": \"10.00\",\n        \"total_expenses\": \"10.00\",\n        \"net\": \"115.00\",\n        \"notes\": null\n      }\n    ],\n    \"totals\": {\n      \"project_administration\": \"100.00\",\n      \"cash_fund_contributions\": \"0.00\",\n      \"individual_contributions\": \"25.00\",\n      \"debt_recovery\": \"0.00\",\n      \"total_income\": \"125.00\",\n      \"operational_administration\": \"0.00\",\n      \"asset_administration\": \"10.00\",\n      \"total_expenses\": \"10.00\",\n      \"net\": \"115.00\"\n    }\n  }\n}",
+                  "body": "{\n  \"success\": true,\n  \"message\": \"Administrative fund day updated successfully.\",\n  \"data\": {\n    \"month\": 8,\n    \"year\": 2026,\n    \"summary\": {\n      \"project_administration\": \"100.00\",\n      \"cash_fund_contributions\": \"0.00\",\n      \"individual_contributions\": \"25.00\",\n      \"debt_recovery\": \"0.00\",\n      \"total_income\": \"125.00\",\n      \"operational_administration\": \"15.00\",\n      \"asset_administration\": \"10.00\",\n      \"total_expenses\": \"25.00\",\n      \"administrative_net\": \"100.00\"\n    },\n    \"days\": [\n      {\n        \"date\": \"2026-08-01\",\n        \"day\": \"Saturday\",\n        \"project_administration\": \"100.00\",\n        \"cash_fund_contributions\": \"0.00\",\n        \"individual_contributions\": \"25.00\",\n        \"debt_recovery\": \"0.00\",\n        \"total_income\": \"125.00\",\n        \"operational_administration\": \"15.00\",\n        \"asset_administration\": \"10.00\",\n        \"total_expenses\": \"25.00\",\n        \"net\": \"100.00\",\n        \"notes\": \"optional note\"\n      }\n    ],\n    \"totals\": {\n      \"project_administration\": \"100.00\",\n      \"cash_fund_contributions\": \"0.00\",\n      \"individual_contributions\": \"25.00\",\n      \"debt_recovery\": \"0.00\",\n      \"total_income\": \"125.00\",\n      \"operational_administration\": \"15.00\",\n      \"asset_administration\": \"10.00\",\n      \"total_expenses\": \"25.00\",\n      \"net\": \"100.00\"\n    }\n  }\n}",
                   "id": "c893118c-b2e1-4672-a61d-1fc6ec4b64a0"
                 },
                 {
@@ -27709,7 +28013,7 @@
                     ],
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"individual_contributions\": 25,\n  \"asset_administration\": 10,\n  \"notes\": \"optional note\"\n}",
+                      "raw": "{\n  \"individual_contributions\": 25,\n  \"asset_administration\": 10,\n  \"operational_administration\": 15,\n  \"notes\": \"optional note\"\n}",
                       "options": {
                         "raw": {
                           "language": "json"
@@ -27762,7 +28066,7 @@
                     ],
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"individual_contributions\": 25,\n  \"asset_administration\": 10,\n  \"notes\": \"optional note\"\n}",
+                      "raw": "{\n  \"individual_contributions\": 25,\n  \"asset_administration\": 10,\n  \"operational_administration\": 15,\n  \"notes\": \"optional note\"\n}",
                       "options": {
                         "raw": {
                           "language": "json"
@@ -27815,7 +28119,7 @@
                     ],
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"individual_contributions\": 25,\n  \"asset_administration\": 10,\n  \"notes\": \"optional note\"\n}",
+                      "raw": "{\n  \"individual_contributions\": 25,\n  \"asset_administration\": 10,\n  \"operational_administration\": 15,\n  \"notes\": \"optional note\"\n}",
                       "options": {
                         "raw": {
                           "language": "json"
@@ -28332,7 +28636,7 @@
                     "{{operational_fund_date}}"
                   ]
                 },
-                "description": "**Roles:** `super-admin, finance`\n\nUpsert `operational_expense` for one day (`Y-m-d`). Null clears to 0. Only this field is allowed. Returns full rebuilt month (coverage recalculated). Also refreshes Administrative Fund Operational Administration for that month.\n\n**Enums / allowed values:**\nEditable: operational_expense only",
+                "description": "**Roles:** `super-admin, finance`\n\nUpsert `operational_expense` for one day (`Y-m-d`). Null clears to 0. Only this field is allowed. Returns full rebuilt month (coverage recalculated). Independent from Administrative Fund's `operational_administration` (that field is now entered manually there and no longer sourced from this module).\n\n**Enums / allowed values:**\nEditable: operational_expense only",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"operational_expense\": 200\n}",
@@ -33854,6 +34158,158 @@
               ]
             },
             {
+              "name": "Delete Inventory Item",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/items/{{inventory_item_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "inventory",
+                    "items",
+                    "{{inventory_item_id}}"
+                  ]
+                },
+                "description": "**Roles:** `super-admin, inventory`\n\nPermanently delete an inventory item entered by mistake. Only allowed when the item has zero related inventory movements and zero recorded batches (including an opening-quantity batch) — otherwise returns 422. Historical data is never cascade-deleted."
+              },
+              "response": [
+                {
+                  "name": "200 OK",
+                  "originalRequest": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Accept",
+                        "value": "application/json",
+                        "type": "text"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/inventory/items/{{inventory_item_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "inventory",
+                        "items",
+                        "{{inventory_item_id}}"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": true,\n  \"message\": \"Inventory item deleted successfully.\"\n}",
+                  "id": "c1a1a111-1111-4111-8111-111111111101"
+                },
+                {
+                  "name": "422 Has Movements",
+                  "originalRequest": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Accept",
+                        "value": "application/json",
+                        "type": "text"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/inventory/items/{{inventory_item_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "inventory",
+                        "items",
+                        "{{inventory_item_id}}"
+                      ]
+                    }
+                  },
+                  "status": "Unprocessable Entity",
+                  "code": 422,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": false,\n  \"message\": \"Cannot delete inventory item because it has recorded inventory movements.\"\n}",
+                  "id": "c1a1a111-1111-4111-8111-111111111102"
+                },
+                {
+                  "name": "404 Not Found",
+                  "originalRequest": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Accept",
+                        "value": "application/json",
+                        "type": "text"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/inventory/items/{{inventory_item_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "inventory",
+                        "items",
+                        "{{inventory_item_id}}"
+                      ]
+                    }
+                  },
+                  "status": "Not Found",
+                  "code": 404,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": false,\n  \"message\": \"Inventory item not found.\"\n}",
+                  "id": "c1a1a111-1111-4111-8111-111111111103"
+                }
+              ]
+            },
+            {
               "name": "List Inventory Movements",
               "request": {
                 "method": "GET",
@@ -34977,6 +35433,158 @@
                   ],
                   "body": "{\n  \"message\": \"The given data was invalid.\",\n  \"errors\": {\n    \"field\": [\n      \"The field field is required.\"\n    ]\n  }\n}",
                   "id": "fa788040-33ad-4927-a0e2-ae42fc28b677"
+                }
+              ]
+            },
+            {
+              "name": "Delete Inventory Movement",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/movements/{{inventory_movement_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "inventory",
+                    "movements",
+                    "{{inventory_movement_id}}"
+                  ]
+                },
+                "description": "**Roles:** `super-admin, inventory`\n\nCancel/delete an incorrectly recorded incoming or outgoing movement. Reverses its effect on the item's balance (recomputed from the remaining valid movements). Deleting an incoming movement is blocked if its stock has already been partly consumed by a later outgoing movement. Deleting an `administrative`-typed outgoing movement automatically re-triggers Daily Journal recalculation for that movement's date. Returns the item's recalculated state."
+              },
+              "response": [
+                {
+                  "name": "200 OK",
+                  "originalRequest": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Accept",
+                        "value": "application/json",
+                        "type": "text"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/inventory/movements/{{inventory_movement_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "inventory",
+                        "movements",
+                        "{{inventory_movement_id}}"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": true,\n  \"message\": \"Inventory movement deleted successfully.\",\n  \"data\": {\n    \"id\": 1,\n    \"code\": \"INV-0001\",\n    \"name\": \"قفازات طبية\",\n    \"category_id\": 1,\n    \"unit\": \"علبة\",\n    \"project_id\": 1,\n    \"latest_incoming_price\": \"25.50\",\n    \"opening_quantity\": \"100.00\",\n    \"total_incoming_quantity\": \"0.00\",\n    \"total_outgoing_quantity\": \"20.00\",\n    \"current_balance\": \"80.00\",\n    \"minimum_stock_level\": \"10.00\",\n    \"notes\": \"مخزون افتتاحي\",\n    \"created_at\": \"2026-07-29T10:00:00.000000Z\",\n    \"updated_at\": \"2026-08-11T12:00:00.000000Z\"\n  }\n}",
+                  "id": "c2a2a222-2222-4222-8222-222222222201"
+                },
+                {
+                  "name": "422 Already Consumed",
+                  "originalRequest": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Accept",
+                        "value": "application/json",
+                        "type": "text"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/inventory/movements/{{inventory_movement_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "inventory",
+                        "movements",
+                        "{{inventory_movement_id}}"
+                      ]
+                    }
+                  },
+                  "status": "Unprocessable Entity",
+                  "code": 422,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": false,\n  \"message\": \"Cannot delete this movement because part of its stock has already been consumed by a later movement.\"\n}",
+                  "id": "c2a2a222-2222-4222-8222-222222222202"
+                },
+                {
+                  "name": "404 Not Found",
+                  "originalRequest": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Accept",
+                        "value": "application/json",
+                        "type": "text"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/inventory/movements/{{inventory_movement_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "inventory",
+                        "movements",
+                        "{{inventory_movement_id}}"
+                      ]
+                    }
+                  },
+                  "status": "Not Found",
+                  "code": 404,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": false,\n  \"message\": \"Inventory movement not found.\"\n}",
+                  "id": "c2a2a222-2222-4222-8222-222222222203"
                 }
               ]
             }
@@ -50869,6 +51477,158 @@
               ]
             },
             {
+              "name": "Delete Inventory Item",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/items/{{inventory_item_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "inventory",
+                    "items",
+                    "{{inventory_item_id}}"
+                  ]
+                },
+                "description": "**Roles:** `super-admin, inventory`\n\nPermanently delete an inventory item entered by mistake. Only allowed when the item has zero related inventory movements and zero recorded batches (including an opening-quantity batch) — otherwise returns 422. Historical data is never cascade-deleted."
+              },
+              "response": [
+                {
+                  "name": "200 OK",
+                  "originalRequest": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Accept",
+                        "value": "application/json",
+                        "type": "text"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/inventory/items/{{inventory_item_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "inventory",
+                        "items",
+                        "{{inventory_item_id}}"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": true,\n  \"message\": \"Inventory item deleted successfully.\"\n}",
+                  "id": "d1a1a111-1111-4111-8111-111111111101"
+                },
+                {
+                  "name": "422 Has Movements",
+                  "originalRequest": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Accept",
+                        "value": "application/json",
+                        "type": "text"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/inventory/items/{{inventory_item_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "inventory",
+                        "items",
+                        "{{inventory_item_id}}"
+                      ]
+                    }
+                  },
+                  "status": "Unprocessable Entity",
+                  "code": 422,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": false,\n  \"message\": \"Cannot delete inventory item because it has recorded inventory movements.\"\n}",
+                  "id": "d1a1a111-1111-4111-8111-111111111102"
+                },
+                {
+                  "name": "404 Not Found",
+                  "originalRequest": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Accept",
+                        "value": "application/json",
+                        "type": "text"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/inventory/items/{{inventory_item_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "inventory",
+                        "items",
+                        "{{inventory_item_id}}"
+                      ]
+                    }
+                  },
+                  "status": "Not Found",
+                  "code": 404,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": false,\n  \"message\": \"Inventory item not found.\"\n}",
+                  "id": "d1a1a111-1111-4111-8111-111111111103"
+                }
+              ]
+            },
+            {
               "name": "List Inventory Movements",
               "request": {
                 "method": "GET",
@@ -51992,6 +52752,158 @@
                   ],
                   "body": "{\n  \"message\": \"The given data was invalid.\",\n  \"errors\": {\n    \"field\": [\n      \"The field field is required.\"\n    ]\n  }\n}",
                   "id": "e939e4c2-d588-4994-ad41-2c591b8ef98b"
+                }
+              ]
+            },
+            {
+              "name": "Delete Inventory Movement",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/movements/{{inventory_movement_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "inventory",
+                    "movements",
+                    "{{inventory_movement_id}}"
+                  ]
+                },
+                "description": "**Roles:** `super-admin, inventory`\n\nCancel/delete an incorrectly recorded incoming or outgoing movement. Reverses its effect on the item's balance (recomputed from the remaining valid movements). Deleting an incoming movement is blocked if its stock has already been partly consumed by a later outgoing movement. Deleting an `administrative`-typed outgoing movement automatically re-triggers Daily Journal recalculation for that movement's date. Returns the item's recalculated state."
+              },
+              "response": [
+                {
+                  "name": "200 OK",
+                  "originalRequest": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Accept",
+                        "value": "application/json",
+                        "type": "text"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/inventory/movements/{{inventory_movement_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "inventory",
+                        "movements",
+                        "{{inventory_movement_id}}"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": true,\n  \"message\": \"Inventory movement deleted successfully.\",\n  \"data\": {\n    \"id\": 1,\n    \"code\": \"INV-0001\",\n    \"name\": \"قفازات طبية\",\n    \"category_id\": 1,\n    \"unit\": \"علبة\",\n    \"project_id\": 1,\n    \"latest_incoming_price\": \"25.50\",\n    \"opening_quantity\": \"100.00\",\n    \"total_incoming_quantity\": \"0.00\",\n    \"total_outgoing_quantity\": \"20.00\",\n    \"current_balance\": \"80.00\",\n    \"minimum_stock_level\": \"10.00\",\n    \"notes\": \"مخزون افتتاحي\",\n    \"created_at\": \"2026-07-29T10:00:00.000000Z\",\n    \"updated_at\": \"2026-08-11T12:00:00.000000Z\"\n  }\n}",
+                  "id": "d2a2a222-2222-4222-8222-222222222201"
+                },
+                {
+                  "name": "422 Already Consumed",
+                  "originalRequest": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Accept",
+                        "value": "application/json",
+                        "type": "text"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/inventory/movements/{{inventory_movement_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "inventory",
+                        "movements",
+                        "{{inventory_movement_id}}"
+                      ]
+                    }
+                  },
+                  "status": "Unprocessable Entity",
+                  "code": 422,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": false,\n  \"message\": \"Cannot delete this movement because part of its stock has already been consumed by a later movement.\"\n}",
+                  "id": "d2a2a222-2222-4222-8222-222222222202"
+                },
+                {
+                  "name": "404 Not Found",
+                  "originalRequest": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Accept",
+                        "value": "application/json",
+                        "type": "text"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/inventory/movements/{{inventory_movement_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "inventory",
+                        "movements",
+                        "{{inventory_movement_id}}"
+                      ]
+                    }
+                  },
+                  "status": "Not Found",
+                  "code": 404,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": false,\n  \"message\": \"Inventory movement not found.\"\n}",
+                  "id": "d2a2a222-2222-4222-8222-222222222203"
                 }
               ]
             }

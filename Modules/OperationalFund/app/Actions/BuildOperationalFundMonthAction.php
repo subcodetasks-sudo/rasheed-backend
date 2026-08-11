@@ -2,6 +2,7 @@
 
 namespace Modules\OperationalFund\Actions;
 
+use App\Support\Money\FormatMoneyDecimal;
 use Carbon\Carbon;
 use Modules\OperationalFund\Enums\DayStatus;
 use Modules\OperationalFund\Enums\DeficitCoverageStatus;
@@ -38,9 +39,9 @@ class BuildOperationalFundMonthAction
 
             $days[] = [
                 'date' => $dateString,
-                'operational_income' => $this->decimal($income),
+                'operational_income' => FormatMoneyDecimal::formatRounded($income),
                 'operational_expense' => $this->decimal($expense),
-                'daily_net' => $this->decimal($net),
+                'daily_net' => FormatMoneyDecimal::formatRounded($net),
                 'day_status' => $status->value,
                 'deficit_coverage_status' => $coverage?->value,
             ];
@@ -58,9 +59,9 @@ class BuildOperationalFundMonthAction
             'month' => $month,
             'year' => $year,
             'summary' => [
-                'total_monthly_operational_income' => $this->decimal($totalIncome),
-                'total_monthly_operational_expense' => $this->decimal($totalExpense),
-                'monthly_operational_net' => $this->decimal($monthlyNet),
+                'total_monthly_operational_income' => FormatMoneyDecimal::formatRounded($totalIncome),
+                'total_monthly_operational_expense' => FormatMoneyDecimal::formatRounded($totalExpense),
+                'monthly_operational_net' => FormatMoneyDecimal::formatRounded($monthlyNet),
             ],
             'days' => $days,
         ];

@@ -2,6 +2,7 @@
 
 namespace Modules\ReportsCenter\Actions;
 
+use App\Support\Money\FormatMoneyDecimal;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Modules\CashStation\Actions\BuildCashStationAction;
@@ -66,20 +67,20 @@ class BuildReportsCenterAction
                 'project_id' => $projectId,
                 'project_name' => (string) $project->name,
                 'fund_type' => $fundType,
-                'income' => $this->decimal($income),
-                'expense' => $this->decimal($expense),
-                'administrative' => $this->decimal($administrative),
-                'operational' => $this->decimal($operational),
-                'net' => $this->decimal($net),
-                'debt' => $this->decimal($debt),
+                'income' => FormatMoneyDecimal::formatRounded($income),
+                'expense' => FormatMoneyDecimal::formatRounded($expense),
+                'administrative' => FormatMoneyDecimal::formatRounded($administrative),
+                'operational' => FormatMoneyDecimal::formatRounded($operational),
+                'net' => FormatMoneyDecimal::formatRounded($net),
+                'debt' => FormatMoneyDecimal::formatRounded($debt),
             ];
 
             $comparison[] = [
                 'project_id' => $projectId,
                 'project_name' => (string) $project->name,
-                'income' => $this->decimal($income),
-                'expense' => $this->decimal($expense),
-                'net' => $this->decimal($net),
+                'income' => FormatMoneyDecimal::formatRounded($income),
+                'expense' => FormatMoneyDecimal::formatRounded($expense),
+                'net' => FormatMoneyDecimal::formatRounded($net),
             ];
 
             $totalIncome += $income;
@@ -109,28 +110,28 @@ class BuildReportsCenterAction
         return [
             'period' => $periodPayload,
             'summary' => [
-                'total_income' => $this->decimal($totalIncome),
-                'total_expense' => $this->decimal($totalExpense),
-                'administrative_percentage' => $this->decimal($totalAdministrative),
-                'operational_deduction' => $this->decimal($totalOperational),
-                'net_cash_funds' => $this->decimal($totalNet),
+                'total_income' => FormatMoneyDecimal::formatRounded($totalIncome),
+                'total_expense' => FormatMoneyDecimal::formatRounded($totalExpense),
+                'administrative_percentage' => FormatMoneyDecimal::formatRounded($totalAdministrative),
+                'operational_deduction' => FormatMoneyDecimal::formatRounded($totalOperational),
+                'net_cash_funds' => FormatMoneyDecimal::formatRounded($totalNet),
             ],
             'charts' => [
                 'income_expense_movement' => $this->incomeExpenseMovement($startDate, $endDate, $endBound, $projectIds),
                 'expense_distribution' => [
-                    'direct_expenses' => $this->decimal($totalExpense),
-                    'administrative_percentage' => $this->decimal($totalAdministrative),
-                    'operational_deduction' => $this->decimal($totalOperational),
+                    'direct_expenses' => FormatMoneyDecimal::formatRounded($totalExpense),
+                    'administrative_percentage' => FormatMoneyDecimal::formatRounded($totalAdministrative),
+                    'operational_deduction' => FormatMoneyDecimal::formatRounded($totalOperational),
                 ],
                 'project_comparison' => $comparison,
             ],
             'projects' => $projectRows,
             'totals' => [
-                'total_income' => $this->decimal($totalIncome),
-                'total_expense' => $this->decimal($totalExpense),
-                'total_administrative' => $this->decimal($totalAdministrative),
-                'total_operational' => $this->decimal($totalOperational),
-                'total_net' => $this->decimal($totalNet),
+                'total_income' => FormatMoneyDecimal::formatRounded($totalIncome),
+                'total_expense' => FormatMoneyDecimal::formatRounded($totalExpense),
+                'total_administrative' => FormatMoneyDecimal::formatRounded($totalAdministrative),
+                'total_operational' => FormatMoneyDecimal::formatRounded($totalOperational),
+                'total_net' => FormatMoneyDecimal::formatRounded($totalNet),
             ],
         ];
     }
@@ -185,19 +186,14 @@ class BuildReportsCenterAction
 
             $records[] = [
                 'date' => $dateString,
-                'daily_income' => $this->decimal($income),
-                'daily_expense' => $this->decimal($expense),
-                'daily_net_movement' => $this->decimal($net),
+                'daily_income' => FormatMoneyDecimal::formatRounded($income),
+                'daily_expense' => FormatMoneyDecimal::formatRounded($expense),
+                'daily_net_movement' => FormatMoneyDecimal::formatRounded($net),
             ];
 
             $cursor->addDay();
         }
 
         return $records;
-    }
-
-    private function decimal(mixed $value): string
-    {
-        return number_format((float) $value, 2, '.', '');
     }
 }

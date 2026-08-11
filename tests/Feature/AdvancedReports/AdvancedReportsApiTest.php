@@ -115,8 +115,8 @@ class AdvancedReportsApiTest extends TestCase
                 ->assertJsonCount($period, 'data.months')
                 ->assertJsonCount($period, 'data.comparison_table')
                 ->assertJsonCount($period, 'data.charts.revenue_expense_trend')
-                ->assertJsonPath('data.summary.total_revenue', '0.00')
-                ->assertJsonPath('data.summary.net_period', '0.00');
+                ->assertJsonPath('data.summary.total_revenue', '0')
+                ->assertJsonPath('data.summary.net_period', '0');
         }
 
         $three = $this->getJson(self::ENDPOINT.'?report_type=month_comparison&period=3');
@@ -158,27 +158,27 @@ class AdvancedReportsApiTest extends TestCase
 
         $response = $this->getJson(self::ENDPOINT.'?report_type=month_comparison&period=3');
         $response->assertOk()
-            ->assertJsonPath('data.summary.total_revenue', '1700.00')
-            ->assertJsonPath('data.summary.total_expenses', '600.00')
-            ->assertJsonPath('data.summary.net_period', '1100.00');
+            ->assertJsonPath('data.summary.total_revenue', '1700')
+            ->assertJsonPath('data.summary.total_expenses', '600')
+            ->assertJsonPath('data.summary.net_period', '1100');
 
         $june = collect($response->json('data.comparison_table'))->firstWhere('month', 6);
-        $this->assertSame('1000.00', $june['total_revenue']);
-        $this->assertSame('100.00', $june['expenses']);
-        $this->assertSame('110.00', $june['administrative_deduction']);
-        $this->assertSame('50.00', $june['operational_deduction']);
-        $this->assertSame('900.00', $june['net']);
+        $this->assertSame('1000', $june['total_revenue']);
+        $this->assertSame('100', $june['expenses']);
+        $this->assertSame('110', $june['administrative_deduction']);
+        $this->assertSame('50', $june['operational_deduction']);
+        $this->assertSame('900', $june['net']);
         $this->assertNull($june['growth_rate_percent']);
 
         $july = collect($response->json('data.comparison_table'))->firstWhere('month', 7);
-        $this->assertSame('0.00', $july['net']);
+        $this->assertSame('0', $july['net']);
         // growth vs June 900: ((0-900)/900)*100 = -100
         $this->assertEqualsWithDelta(-100.0, (float) $july['growth_rate_percent'], 0.001);
 
         $august = collect($response->json('data.comparison_table'))->firstWhere('month', 8);
-        $this->assertSame('200.00', $august['net']);
-        $this->assertSame('24.00', $august['administrative_deduction']);
-        $this->assertSame('10.00', $august['operational_deduction']);
+        $this->assertSame('200', $august['net']);
+        $this->assertSame('24', $august['administrative_deduction']);
+        $this->assertSame('10', $august['operational_deduction']);
         $this->assertNull($august['growth_rate_percent']);
     }
 
@@ -190,7 +190,7 @@ class AdvancedReportsApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.summary.total_items', 0)
             ->assertJsonPath('data.summary.low_stock_items', 0)
-            ->assertJsonPath('data.summary.inventory_value', '0.00')
+            ->assertJsonPath('data.summary.inventory_value', '0')
             ->assertJsonPath('data.summary.most_consumed_item', null)
             ->assertJsonCount(0, 'data.items');
     }
@@ -280,17 +280,17 @@ class AdvancedReportsApiTest extends TestCase
             ->assertJsonPath('data.summary.total_items', 3)
             ->assertJsonPath('data.summary.low_stock_items', 1)
             // 40*2.5 + 20*3 = 100 + 60 = 160
-            ->assertJsonPath('data.summary.inventory_value', '160.00')
+            ->assertJsonPath('data.summary.inventory_value', '160')
             ->assertJsonPath('data.summary.most_consumed_item.id', $good->id)
-            ->assertJsonPath('data.summary.most_consumed_item.quantity_consumed', '30.00');
+            ->assertJsonPath('data.summary.most_consumed_item.quantity_consumed', '30');
 
         $byName = collect($response->json('data.items'))->keyBy('item_name');
         $this->assertSame('good', $byName['Good Item']['status']);
-        $this->assertSame('100.00', $byName['Good Item']['total_incoming']);
+        $this->assertSame('100', $byName['Good Item']['total_incoming']);
         $this->assertSame('low', $byName['Low Item']['status']);
         $this->assertSame('out_of_stock', $byName['Out Item']['status']);
-        $this->assertSame('10.00', $byName['Out Item']['total_incoming']);
-        $this->assertSame('10.00', $byName['Out Item']['total_outgoing']);
-        $this->assertSame('0.00', $byName['Out Item']['balance']);
+        $this->assertSame('10', $byName['Out Item']['total_incoming']);
+        $this->assertSame('10', $byName['Out Item']['total_outgoing']);
+        $this->assertSame('0', $byName['Out Item']['balance']);
     }
 }

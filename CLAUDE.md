@@ -10,7 +10,8 @@ thin cross-cutting concerns (base controller, media handling, exception handler,
 
 Active modules (see `modules_statuses.json`): `User`, `Authorization`, `Settings`, `Project`, `DailyJournal`,
 `AdministrationRates`, `Inventory`, `Dashboard`, `CashStation`, `CashFundExpenses`, `Notifications`,
-`AdministrativeDebtSettlement`, `MonthlySummary`.
+`AdministrativeDebtSettlement`, `AdministrativeFund`, `OperationalFund`, `OperationalRate`, `ReportsCenter`,
+`AdvancedReports`, `MonthlySummary`.
 
 ## Common commands
 
@@ -309,21 +310,97 @@ contributed amount (mirrored in reverse by `ReverseContributionAdministrativeDeb
 `CancelMonthlySummaryContributionController` deletes a contribution). Every write re-dispatches both
 `CashStationUpdated` and `MonthlySummaryUpdated` since a contribution changes both views.
 
+A contribution can be recorded before the beneficiary has a journal entry to anchor it to: in that case
+`ApplyContributionAdministrativeDebtAction`/`ApplyContributionFundBalanceAction` leave the settlement pending
+(`CashStationSettlement.journal_anchor_date` stays `null`) instead of applying it, and `Notifications`' listeners
+retry it the next time `DailyJournalUpdated` fires for that beneficiary project (see the Notifications section).
+
+### OperationalRate, OperationalFund, AdministrativeFund: derived operational/administrative ledgers
+
+Three more read-mostly modules layer on top of `DailyJournal`/`Project`, all gated `role:super-admin|finance`:
+
+- **`OperationalRate`** (`GET /v1/operational-rate` → `BuildOperationalRateAction`) is purely a read model: for a
+  month it aggregates `daily_journal_entries` (joined to `projects` for `operational_deduction_type`) into a
+  zero-filled daily calendar plus relative/fixed/total operational-deduction and admin-percentage summaries. No
+  persistence of its own.
+- **`OperationalFund`** persists one row per day in `operational_fund_days` (`operational_expense`, written via
+  `UpdateOperationalFundDayController → UpsertOperationalFundDayAction`, `lockForUpdate()`d). Reads combine that
+  manual expense with `expected_operational_income` — `ResolveExpectedOperationalIncomeAction` sums `Project`'s
+  effective-dated operational-deduction pool (`ResolveEffectiveOperationalDeductionAction`, see above) plus the sum
+  of all `fixed`-type projects' deductions (`SumFixedOperationalDeductionsAction`) — to produce a daily net
+  (`BuildOperationalFundDayAction`) or a full month view with a running deficit-coverage accumulator that carries
+  a day's uncovered deficit forward and marks later days `covered`/`not_covered` against it
+  (`BuildOperationalFundMonthAction`, `DeficitCoverageStatus` enum).
+- **`AdministrativeFund`** persists one row per day in `administrative_fund_days` (`individual_contributions`,
+  `asset_administration`, `notes`, via `UpdateAdministrativeFundDayController → UpsertAdministrativeFundDayAction`).
+  `BuildAdministrativeFundAction` combines that manual input with three other reads to build a day-by-day
+  income/expense view for a month: project admin-fee net of debt plus contributions (from `daily_journal_entries`),
+  admin-debt recovery (from `administrative_debt_settlements`, keyed by `created_at` date — **not** the settlement's
+  `month`/`year` fields), and `OperationalFund`'s persisted `operational_expense` (via
+  `LoadOperationalExpensesByDateAction`, an explicit cross-module dependency on `OperationalFund`). No persistence
+  of its own beyond the two manual daily fields.
+
+### ReportsCenter, AdvancedReports: period-based financial/inventory reporting
+
+Two more read-only reporting modules, both `role:super-admin|finance` (`AdvancedReports` also allows `inventory`):
+
+- **`ReportsCenter`** (`GET /v1/reports-center` → `BuildReportsCenterAction`) takes an arbitrary
+  `{period_type, start_date, end_date}` (also accepting a `month`/`year` shorthand) and, for every active project,
+  reuses `CashStation\BuildCashStationAction::monthlyAggregatesByProject()` (despite the "monthly" name, it accepts
+  any date range) plus `DailyJournal\ReadAccumulatedAdministrativeDebtTipAction` to build income/expense/admin/
+  operational/net/debt rows per project, a daily income-expense-movement chart, and an expense-distribution
+  breakdown. No persistence of its own.
+- **`AdvancedReports`** (`GET /v1/advanced-reports?report_type=...` → `ShowAdvancedReportsWorkflow`, dispatching on
+  `report_type`) supports two report types over a rolling `period` (number of months, via
+  `ResolveAdvancedReportPeriodAction`): `month_comparison` (`BuildMonthComparisonReportAction`, reusing
+  `BuildCashStationAction::monthlyAggregatesByProject()` per month to build a revenue/expense trend, an
+  administrative-vs-operational-deduction chart, and month-over-month growth-rate percentages) and `inventory`
+  (`BuildInventoryReportAction`, reading `InventoryItem` balances directly plus `ComputeInventoryFifoValueAction`
+  for total FIFO inventory value and a most-consumed-item lookup over `inventory_movements`). Unknown `report_type`
+  values throw `BusinessException`.
+
+### Dashboard: home-screen aggregate
+
+`GET /v1/dashboard` (role `super-admin|finance`) → `BuildDashboardSummaryAction` builds a single payload for a given
+date: today's total income/expense/operational-deduction straight off `daily_journal_entries`, the current
+admin-fee percentage (via `AdministrationRates\BuildAdministrationRatesAction`), low-stock `InventoryItem`s
+(`current_balance <= minimum_stock_level`), a 7-day cash-movement window and month-to-date totals, and — only when
+the month has any journal activity at all — the full `CashStation` project list and a derived surplus/deficit/
+debt-count status summary. It has no persistence of its own; it is purely a fan-in read model over
+`DailyJournal`/`AdministrationRates`/`Inventory`/`CashStation`.
+
 ### Notifications: activity feed + cross-module reactions
 
 `Notifications` is a passive subscriber module: its `EventServiceProvider` (registered explicitly from
-`NotificationsServiceProvider::boot()`, not via Laravel's auto-discovery — `$shouldDiscoverEvents = false`) listens
-for domain events from `Project`, `DailyJournal`, `Inventory`, and `CashStation` and reacts two ways:
+`NotificationsServiceProvider::boot()`, not via Laravel's auto-discovery — `$shouldDiscoverEvents = false`) is a
+single hardcoded `$listen` map (not container-tagged — see the `NotificationRule` registry below for the one
+extension point that *is* open-ended) covering events from `Project`, `DailyJournal`, `Inventory`, `CashStation`,
+`AdministrativeDebtSettlement`, `OperationalFund`, and `Settings`, reacting three ways:
 1. **User-facing activity records** — `NotifyProjectActivity`, `NotifyDailyJournalActivity`,
-   `NotifyInventoryActivity`, `NotifyCashStationActivity` each translate one module's events into a persisted
-   `Notification` row via `NotificationService` (`notifyActivity`/`notifySuccess`/`notifyWarning`/`notifyDanger`/
-   `notifyInfo`), which also dispatches `NotificationCreated` for real-time delivery.
-2. **Cross-module cache/view refresh** — `RefreshCashStationOnDailyJournalUpdate`,
-   `RefreshAdministrativeDebtSettlementOnDailyJournalUpdate`, and `RefreshCashFundExpensesOnDailyJournalUpdate`
-   rebuild and re-broadcast those other modules' derived views whenever `DailyJournal` changes, so
-   `CashStation`/`AdministrativeDebtSettlement`/`CashFundExpenses` don't need direct knowledge of `DailyJournal`'s
-   write path. `MonthlySummary` doesn't need a listener here since it only changes via its own contribution
-   endpoints, which dispatch `MonthlySummaryUpdated` directly.
+   `NotifyInventoryActivity`, `NotifyCashStationActivity`, `NotifyAdministrativeDebtSettlementActivity`,
+   `NotifyCategoryActivity`, `NotifyUserActivity`, `NotifySettingsActivity` each translate one module's events into
+   a persisted `Notification` row via `NotificationService` (`notifyActivity`/`notifySuccess`/`notifyWarning`/
+   `notifyDanger`/`notifyInfo`), which also dispatches `NotificationCreated` for real-time delivery.
+2. **Cross-module cache/view refresh** — most derived-view modules (`CashStation`, `AdministrativeDebtSettlement`,
+   `CashFundExpenses`, `MonthlySummary`, `AdministrativeFund`, `OperationalRate`, `ReportsCenter`,
+   `AdvancedReports`, `Dashboard`) have a `Refresh<Module>On<Trigger>` listener that rebuilds and re-broadcasts that
+   module's `*Updated` event whenever an upstream module changes, so none of them need direct knowledge of each
+   other's write paths — this is the same push-refresh pattern `CashStation` pioneered, just fanned out much wider
+   now. `RefreshModulesOnSettingsUpdate` is the broadest of these: both `Settings` events (`SystemGeneralSettingsUpdated`,
+   `MonthlyEmployeeSettingsUpdated`) rebuild and rebroadcast `Dashboard`, `OperationalRate`, `ReportsCenter`, and
+   `AdvancedReports` in one go. `RefreshDailyJournalOnInventoryAdministrativeMovement` is the one listener that
+   goes the other direction — an `administrative`-typed `InventoryStockMoved` triggers a full
+   `RecalculateDailyJournalAction` for that movement's date and re-dispatches `DailyJournalUpdated`, which then
+   cascades through all the listeners above.
+3. **Pending-write follow-through** — `ApplyPendingContributionAdministrativeDebtOnDailyJournalUpdate` and
+   `ApplyPendingContributionFundBalanceOnDailyJournalUpdate` retry `MonthlySummary` contributions that were left
+   pending (`CashStationSettlement.journal_anchor_date` still `null`) because no qualifying journal entry existed
+   yet at settlement-creation time, applying them (and re-broadcasting `CashStation`/`MonthlySummary`/
+   `AdministrativeDebtSettlement`) as soon as a matching `DailyJournalUpdated` fires for the beneficiary project.
+   `SyncAdministrativeDebtAlertOnFinancialChange` similarly keeps a per-project low/no-debt `Notification` (of type
+   `Warning`, tagged `meta.action = 'administrative_debt_alert'`) in sync with `accumulated_administrative_debt`
+   across several trigger events, upserting or deleting that one alert row via `SyncAdministrativeDebtAlertAction`
+   rather than spawning a new notification each time.
 
 Separately, `Modules\Notifications\Contracts\NotificationRule` + `NotificationRuleRegistry` is a second, unrelated
 extension point: a rule declares which `context` string it `handles()` and is `evaluate()`-d against a subject
@@ -333,9 +410,11 @@ extension point: a rule declares which `context` string it `handles()` and is `e
 
 ### Realtime updates: Socket.IO broadcasting
 
-Live updates ride Laravel's native broadcasting (`ShouldBroadcastNow` events — `DailyJournalUpdated`,
-`CashStationUpdated`, `AdministrativeDebtSettlementUpdated`, `InventoryItemCreated`, `InventoryStockMoved`,
-`NotificationCreated`) over a **custom `socketio` broadcast driver**, not Pusher/Reverb/Ably. The driver
+Live updates ride Laravel's native broadcasting (`ShouldBroadcastNow` events — one `<Module>Updated` event per
+derived-view module, e.g. `DailyJournalUpdated`, `CashStationUpdated`, `AdministrativeDebtSettlementUpdated`,
+`MonthlySummaryUpdated`, `AdministrativeFundUpdated`, `OperationalFundUpdated`, `OperationalRateUpdated`,
+`ReportsCenterUpdated`, `AdvancedReportsUpdated`, `DashboardUpdated`, plus `InventoryItemCreated`,
+`InventoryStockMoved`, `NotificationCreated`) over a **custom `socketio` broadcast driver**, not Pusher/Reverb/Ably. The driver
 (`App\Broadcasting\SocketIoBroadcaster`, registered via `Broadcast::extend('socketio', ...)` in
 `AppServiceProvider::boot()`) doesn't hold a persistent connection to clients itself — on each `broadcast()` call it
 opens a short-lived Socket.IO client connection (via `elephantio/elephant.io`, configured in `config/broadcasting.php`)

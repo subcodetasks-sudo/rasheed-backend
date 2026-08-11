@@ -69,10 +69,10 @@ class BuildDashboardSummaryAction
         }
 
         return [
-            'total_daily_income' => FormatMoneyDecimal::format($allProjects->total_daily_income ?? 0),
-            'total_daily_expenses' => FormatMoneyDecimal::format($allProjects->total_daily_expenses ?? 0),
+            'total_daily_income' => FormatMoneyDecimal::formatRounded($allProjects->total_daily_income ?? 0),
+            'total_daily_expenses' => FormatMoneyDecimal::formatRounded($allProjects->total_daily_expenses ?? 0),
             'total_administrative_percentage' => $administrativePercentage,
-            'total_operational_deduction' => FormatMoneyDecimal::format($allProjects->total_operational_deduction ?? 0),
+            'total_operational_deduction' => FormatMoneyDecimal::formatRounded($allProjects->total_operational_deduction ?? 0),
             'low_stock_items' => $lowStockItems,
             'cash_movement' => [
                 'days' => $this->lastNDays($dailyMovement, 7, includeNet: false),
@@ -119,9 +119,9 @@ class BuildDashboardSummaryAction
         $expense = round($expense, 2);
 
         return [
-            'total_monthly_income' => FormatMoneyDecimal::format($income),
-            'total_monthly_expenses' => FormatMoneyDecimal::format($expense),
-            'monthly_net' => FormatMoneyDecimal::format(round($income - $expense, 2)),
+            'total_monthly_income' => FormatMoneyDecimal::formatRounded($income),
+            'total_monthly_expenses' => FormatMoneyDecimal::formatRounded($expense),
+            'monthly_net' => FormatMoneyDecimal::formatRounded(round($income - $expense, 2)),
         ];
     }
 
@@ -142,9 +142,9 @@ class BuildDashboardSummaryAction
             if ($includeNet) {
                 $records[] = [
                     'date' => $date,
-                    'total_income' => FormatMoneyDecimal::format($income),
-                    'total_expenses' => FormatMoneyDecimal::format($expense),
-                    'net_result' => FormatMoneyDecimal::format(round($income - $expense, 2)),
+                    'total_income' => FormatMoneyDecimal::formatRounded($income),
+                    'total_expenses' => FormatMoneyDecimal::formatRounded($expense),
+                    'net_result' => FormatMoneyDecimal::formatRounded(round($income - $expense, 2)),
                 ];
 
                 continue;
@@ -152,8 +152,8 @@ class BuildDashboardSummaryAction
 
             $records[] = [
                 'date' => $date,
-                'total_income' => FormatMoneyDecimal::format($income),
-                'total_expense' => FormatMoneyDecimal::format($expense),
+                'total_income' => FormatMoneyDecimal::formatRounded($income),
+                'total_expense' => FormatMoneyDecimal::formatRounded($expense),
             ];
         }
 

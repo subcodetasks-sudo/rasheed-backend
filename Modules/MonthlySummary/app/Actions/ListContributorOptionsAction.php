@@ -2,6 +2,7 @@
 
 namespace Modules\MonthlySummary\Actions;
 
+use App\Support\Money\FormatMoneyDecimal;
 use Modules\CashStation\Actions\BuildCashStationAction;
 use Modules\Project\Models\Project;
 
@@ -31,7 +32,7 @@ class ListContributorOptionsAction
             $options[] = [
                 'project_id' => $project->id,
                 'project_name' => $project->name,
-                'available_surplus' => number_format($surplus, 2, '.', ''),
+                'available_surplus' => FormatMoneyDecimal::formatRounded($surplus),
             ];
         }
 

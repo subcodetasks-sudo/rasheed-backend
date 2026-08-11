@@ -2,17 +2,13 @@
 
 namespace Modules\AdministrativeFund\Actions;
 
+use App\Support\Money\FormatMoneyDecimal;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Modules\AdministrativeFund\Models\AdministrativeFundDay;
-use Modules\OperationalFund\Actions\LoadOperationalExpensesByDateAction;
 
 class BuildAdministrativeFundAction
 {
-    public function __construct(
-        private readonly LoadOperationalExpensesByDateAction $loadOperationalExpensesByDateAction,
-    ) {}
-
     public function execute(int $month, int $year): array
     {
         $startOfMonth = Carbon::create($year, $month, 1)->startOfDay();
@@ -23,7 +19,6 @@ class BuildAdministrativeFundAction
         $projectAdminByDate = $this->projectAdministrationByDate($start, $end);
         $debtRecoveryByDate = $this->debtRecoveryByDate($year, $month);
         $manualByDate = $this->manualByDate($start, $end);
-        $operationalExpensesByDate = $this->loadOperationalExpensesByDateAction->execute($start, $end);
 
         $days = [];
         $sums = $this->emptyMoneyBag();
@@ -37,7 +32,7 @@ class BuildAdministrativeFundAction
             $cashFundContributions = 0.0;
             $individualContributions = round((float) ($manual['individual_contributions'] ?? 0), 2);
             $debtRecovery = round((float) ($debtRecoveryByDate[$dateString] ?? 0), 2);
-            $operationalAdministration = round((float) ($operationalExpensesByDate[$dateString] ?? 0), 2);
+            $operationalAdministration = round((float) ($manual['operational_administration'] ?? 0), 2);
             $assetAdministration = round((float) ($manual['asset_administration'] ?? 0), 2);
 
             $totalIncome = round(
@@ -50,15 +45,15 @@ class BuildAdministrativeFundAction
             $row = [
                 'date' => $dateString,
                 'day' => $cursor->format('l'),
-                'project_administration' => $this->decimal($projectAdministration),
-                'cash_fund_contributions' => $this->decimal($cashFundContributions),
+                'project_administration' => FormatMoneyDecimal::formatRounded($projectAdministration),
+                'cash_fund_contributions' => FormatMoneyDecimal::formatRounded($cashFundContributions),
                 'individual_contributions' => $this->decimal($individualContributions),
-                'debt_recovery' => $this->decimal($debtRecovery),
-                'total_income' => $this->decimal($totalIncome),
+                'debt_recovery' => FormatMoneyDecimal::formatRounded($debtRecovery),
+                'total_income' => FormatMoneyDecimal::formatRounded($totalIncome),
                 'operational_administration' => $this->decimal($operationalAdministration),
                 'asset_administration' => $this->decimal($assetAdministration),
-                'total_expenses' => $this->decimal($totalExpenses),
-                'net' => $this->decimal($net),
+                'total_expenses' => FormatMoneyDecimal::formatRounded($totalExpenses),
+                'net' => FormatMoneyDecimal::formatRounded($net),
                 'notes' => $manual['notes'] ?? null,
             ];
 
@@ -78,15 +73,15 @@ class BuildAdministrativeFundAction
         }
 
         $summary = [
-            'project_administration' => $this->decimal($sums['project_administration']),
-            'cash_fund_contributions' => $this->decimal($sums['cash_fund_contributions']),
-            'individual_contributions' => $this->decimal($sums['individual_contributions']),
-            'debt_recovery' => $this->decimal($sums['debt_recovery']),
-            'total_income' => $this->decimal($sums['total_income']),
-            'operational_administration' => $this->decimal($sums['operational_administration']),
-            'asset_administration' => $this->decimal($sums['asset_administration']),
-            'total_expenses' => $this->decimal($sums['total_expenses']),
-            'administrative_net' => $this->decimal($sums['administrative_net']),
+            'project_administration' => FormatMoneyDecimal::formatRounded($sums['project_administration']),
+            'cash_fund_contributions' => FormatMoneyDecimal::formatRounded($sums['cash_fund_contributions']),
+            'individual_contributions' => FormatMoneyDecimal::formatRounded($sums['individual_contributions']),
+            'debt_recovery' => FormatMoneyDecimal::formatRounded($sums['debt_recovery']),
+            'total_income' => FormatMoneyDecimal::formatRounded($sums['total_income']),
+            'operational_administration' => FormatMoneyDecimal::formatRounded($sums['operational_administration']),
+            'asset_administration' => FormatMoneyDecimal::formatRounded($sums['asset_administration']),
+            'total_expenses' => FormatMoneyDecimal::formatRounded($sums['total_expenses']),
+            'administrative_net' => FormatMoneyDecimal::formatRounded($sums['administrative_net']),
         ];
 
         return [
@@ -162,14 +157,14 @@ class BuildAdministrativeFundAction
     }
 
     /**
-     * @return array<string, array{individual_contributions: float, asset_administration: float, notes: ?string}>
+     * @return array<string, array{individual_contributions: float, asset_administration: float, operational_administration: float, notes: ?string}>
      */
     private function manualByDate(string $start, string $end): array
     {
         $rows = AdministrativeFundDay::query()
             ->whereDate('date', '>=', $start)
             ->whereDate('date', '<=', $end)
-            ->get(['date', 'individual_contributions', 'asset_administration', 'notes']);
+            ->get(['date', 'individual_contributions', 'asset_administration', 'operational_administration', 'notes']);
 
         $keyed = [];
         foreach ($rows as $row) {
@@ -177,6 +172,7 @@ class BuildAdministrativeFundAction
             $keyed[$dateKey] = [
                 'individual_contributions' => (float) $row->individual_contributions,
                 'asset_administration' => (float) $row->asset_administration,
+                'operational_administration' => (float) $row->operational_administration,
                 'notes' => $row->notes,
             ];
         }

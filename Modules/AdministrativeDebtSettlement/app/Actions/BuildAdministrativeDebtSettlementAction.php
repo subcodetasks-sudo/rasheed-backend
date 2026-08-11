@@ -2,6 +2,7 @@
 
 namespace Modules\AdministrativeDebtSettlement\Actions;
 
+use App\Support\Money\FormatMoneyDecimal;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -62,10 +63,10 @@ class BuildAdministrativeDebtSettlementAction
             $rows[] = [
                 'project_id' => $projectId,
                 'project_name' => $project['project_name'],
-                'net_cash_balance' => $this->decimal($snapshot['net_cash_balance']),
-                'administrative_debt' => $this->decimal($snapshot['administrative_debt']),
-                'recoverable_amount' => $this->decimal($snapshot['recoverable_amount']),
-                'remaining_debt' => $this->decimal($snapshot['remaining_debt']),
+                'net_cash_balance' => FormatMoneyDecimal::formatRounded($snapshot['net_cash_balance']),
+                'administrative_debt' => FormatMoneyDecimal::formatRounded($snapshot['administrative_debt']),
+                'recoverable_amount' => FormatMoneyDecimal::formatRounded($snapshot['recoverable_amount']),
+                'remaining_debt' => FormatMoneyDecimal::formatRounded($snapshot['remaining_debt']),
                 'settlement_status' => $snapshot['settlement_status']->value,
                 'can_settle' => $snapshot['can_settle'],
             ];
@@ -275,10 +276,5 @@ class BuildAdministrativeDebtSettlementAction
     private function periodLessOrEqual(int $year, int $month, int $refYear, int $refMonth): bool
     {
         return ($year * 12 + $month) <= ($refYear * 12 + $refMonth);
-    }
-
-    private function decimal(float $value): string
-    {
-        return number_format(round($value, 2), 2, '.', '');
     }
 }

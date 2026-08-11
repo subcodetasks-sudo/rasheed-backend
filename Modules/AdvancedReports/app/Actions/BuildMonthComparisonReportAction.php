@@ -2,6 +2,7 @@
 
 namespace Modules\AdvancedReports\Actions;
 
+use App\Support\Money\FormatMoneyDecimal;
 use Modules\CashStation\Actions\BuildCashStationAction;
 use Modules\Project\Models\Project;
 
@@ -63,28 +64,28 @@ class BuildMonthComparisonReportAction
             $trend[] = [
                 'year' => $monthMeta['year'],
                 'month' => $monthMeta['month'],
-                'revenue' => $this->decimal($revenue),
-                'expenses' => $this->decimal($expenses),
-                'net' => $this->decimal($net),
+                'revenue' => FormatMoneyDecimal::formatRounded($revenue),
+                'expenses' => FormatMoneyDecimal::formatRounded($expenses),
+                'net' => FormatMoneyDecimal::formatRounded($net),
             ];
 
             $adminVsOp[] = [
                 'year' => $monthMeta['year'],
                 'month' => $monthMeta['month'],
-                'administrative_deduction' => $this->decimal($administrative),
-                'operational_deduction' => $this->decimal($operational),
+                'administrative_deduction' => FormatMoneyDecimal::formatRounded($administrative),
+                'operational_deduction' => FormatMoneyDecimal::formatRounded($operational),
             ];
 
             $table[] = [
                 'year' => $monthMeta['year'],
                 'month' => $monthMeta['month'],
                 'label' => $monthMeta['label'],
-                'total_revenue' => $this->decimal($revenue),
-                'expenses' => $this->decimal($expenses),
-                'administrative_deduction' => $this->decimal($administrative),
-                'operational_deduction' => $this->decimal($operational),
-                'net' => $this->decimal($net),
-                'growth_rate_percent' => $growthRate,
+                'total_revenue' => FormatMoneyDecimal::formatRounded($revenue),
+                'expenses' => FormatMoneyDecimal::formatRounded($expenses),
+                'administrative_deduction' => FormatMoneyDecimal::formatRounded($administrative),
+                'operational_deduction' => FormatMoneyDecimal::formatRounded($operational),
+                'net' => FormatMoneyDecimal::formatRounded($net),
+                'growth_rate_percent' => $growthRate !== null ? (int) round($growthRate) : null,
             ];
 
             $totalRevenue += $revenue;
@@ -105,9 +106,9 @@ class BuildMonthComparisonReportAction
                 'label' => $m['label'],
             ], $months),
             'summary' => [
-                'total_revenue' => $this->decimal($totalRevenue),
-                'total_expenses' => $this->decimal($totalExpenses),
-                'net_period' => $this->decimal($netPeriod),
+                'total_revenue' => FormatMoneyDecimal::formatRounded($totalRevenue),
+                'total_expenses' => FormatMoneyDecimal::formatRounded($totalExpenses),
+                'net_period' => FormatMoneyDecimal::formatRounded($netPeriod),
             ],
             'charts' => [
                 'revenue_expense_trend' => $trend,
@@ -115,10 +116,5 @@ class BuildMonthComparisonReportAction
             ],
             'comparison_table' => $table,
         ];
-    }
-
-    private function decimal(mixed $value): string
-    {
-        return number_format((float) $value, 2, '.', '');
     }
 }

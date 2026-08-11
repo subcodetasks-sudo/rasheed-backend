@@ -64,11 +64,11 @@ class BuildMonthlySummaryAction
                 'project_status' => $project->administrative_exempt
                     ? 'exempt'
                     : 'subject',
-                'project_net_result' => FormatMoneyDecimal::format($monthlyTotal),
+                'project_net_result' => FormatMoneyDecimal::formatRounded($monthlyTotal),
                 'net_result_state' => $this->netResultState($monthlyTotal),
-                'administrative_debt' => FormatMoneyDecimal::format($debt),
-                'total_received_contributions' => FormatMoneyDecimal::format($added),
-                'total_deducted_contributions' => FormatMoneyDecimal::format($deducted),
+                'administrative_debt' => FormatMoneyDecimal::formatRounded($debt),
+                'total_received_contributions' => FormatMoneyDecimal::formatRounded($added),
+                'total_deducted_contributions' => FormatMoneyDecimal::formatRounded($deducted),
             ];
         }
 

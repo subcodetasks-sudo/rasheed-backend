@@ -2,6 +2,7 @@
 
 namespace Modules\AdministrationRates\Actions;
 
+use App\Support\Money\FormatMoneyDecimal;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Query\Builder;
@@ -42,7 +43,7 @@ class BuildAdministrationRatesAction
             ->selectRaw('COALESCE(SUM(COALESCE(daily_journal_entries.administrative_fee, 0) - COALESCE(daily_journal_entries.administrative_debt, 0) + COALESCE(daily_journal_entries.contribution, 0)), 0) as administrative_percentage')
             ->first();
 
-        return $this->decimal($row->administrative_percentage ?? 0);
+        return FormatMoneyDecimal::formatRounded($row->administrative_percentage ?? 0);
     }
 
     private function eligibleBaseQuery(): Builder
@@ -61,9 +62,9 @@ class BuildAdministrationRatesAction
             ->first();
 
         return [
-            'total_institution_income' => $this->decimal($row->total_institution_income),
-            'total_administrative_percentage' => $this->decimal($row->total_administrative_percentage),
-            'total_administrative_debt' => $this->decimal($row->total_administrative_debt),
+            'total_institution_income' => FormatMoneyDecimal::formatRounded($row->total_institution_income),
+            'total_administrative_percentage' => FormatMoneyDecimal::formatRounded($row->total_administrative_percentage),
+            'total_administrative_debt' => FormatMoneyDecimal::formatRounded($row->total_administrative_debt),
         ];
     }
 
@@ -102,9 +103,9 @@ class BuildAdministrationRatesAction
 
             $records[] = [
                 'date' => $dateString,
-                'total_income' => $this->decimal($row->total_income ?? 0),
-                'administrative_percentage' => $this->decimal($row->administrative_percentage ?? 0),
-                'administrative_debt' => $this->decimal($row->administrative_debt ?? 0),
+                'total_income' => FormatMoneyDecimal::formatRounded($row->total_income ?? 0),
+                'administrative_percentage' => FormatMoneyDecimal::formatRounded($row->administrative_percentage ?? 0),
+                'administrative_debt' => FormatMoneyDecimal::formatRounded($row->administrative_debt ?? 0),
             ];
 
             $cursor->addDay();
@@ -126,14 +127,9 @@ class BuildAdministrationRatesAction
         }
 
         return [
-            'month_total_income' => $this->decimal($totalIncome),
-            'month_total_administrative_percentage' => $this->decimal($totalFee),
-            'month_total_administrative_debt' => $this->decimal($totalDebt),
+            'month_total_income' => FormatMoneyDecimal::formatRounded($totalIncome),
+            'month_total_administrative_percentage' => FormatMoneyDecimal::formatRounded($totalFee),
+            'month_total_administrative_debt' => FormatMoneyDecimal::formatRounded($totalDebt),
         ];
-    }
-
-    private function decimal(mixed $value): string
-    {
-        return number_format((float) $value, 2, '.', '');
     }
 }

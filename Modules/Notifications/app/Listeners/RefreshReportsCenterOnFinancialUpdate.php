@@ -9,6 +9,7 @@ use Modules\CashStation\Events\CashStationSettlementCreated;
 use Modules\CashStation\Events\CashStationSettlementDeleted;
 use Modules\DailyJournal\Events\AdministrativeDebtRepaid;
 use Modules\DailyJournal\Events\DailyJournalUpdated;
+use Modules\Inventory\Events\InventoryMovementDeleted;
 use Modules\Inventory\Events\InventoryStockMoved;
 use Modules\Project\Events\ProjectUpdated;
 use Modules\ReportsCenter\Events\ReportsCenterUpdated;
@@ -19,6 +20,7 @@ class RefreshReportsCenterOnFinancialUpdate
         DailyJournalUpdated|
         AdministrativeDebtRepaid|
         InventoryStockMoved|
+        InventoryMovementDeleted|
         CashStationSettlementCreated|
         CashStationSettlementDeleted|
         CashStationCarriedForward|
@@ -40,6 +42,10 @@ class RefreshReportsCenterOnFinancialUpdate
 
         if ($event instanceof InventoryStockMoved) {
             return Carbon::parse($event->movement->movement_date)->toDateString();
+        }
+
+        if ($event instanceof InventoryMovementDeleted) {
+            return $event->movementDate->toDateString();
         }
 
         if ($event instanceof CashStationSettlementCreated) {

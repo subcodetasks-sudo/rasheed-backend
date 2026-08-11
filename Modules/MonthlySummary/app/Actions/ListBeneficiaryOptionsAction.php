@@ -2,6 +2,7 @@
 
 namespace Modules\MonthlySummary\Actions;
 
+use App\Support\Money\FormatMoneyDecimal;
 use Modules\CashStation\Actions\BuildCashStationAction;
 use Modules\MonthlySummary\Enums\ContributionType;
 use Modules\Project\Exceptions\BusinessException;
@@ -44,7 +45,7 @@ class ListBeneficiaryOptionsAction
             $options[] = [
                 'project_id' => $project->id,
                 'project_name' => $project->name,
-                'remaining_need' => number_format($need, 2, '.', ''),
+                'remaining_need' => FormatMoneyDecimal::formatRounded($need),
             ];
         }
 

@@ -14,6 +14,7 @@ class AdministrativeFundDay extends Model
         'date',
         'individual_contributions',
         'asset_administration',
+        'operational_administration',
         'notes',
         'updated_by',
     ];
@@ -24,6 +25,7 @@ class AdministrativeFundDay extends Model
             'date' => 'date',
             'individual_contributions' => 'decimal:2',
             'asset_administration' => 'decimal:2',
+            'operational_administration' => 'decimal:2',
         ];
     }
 

@@ -8,4 +8,9 @@ final class FormatMoneyDecimal
     {
         return number_format((float) $value, 2, '.', '');
     }
+
+    public static function formatRounded(mixed $value): string
+    {
+        return number_format((float) $value, 0, '.', '');
+    }
 }

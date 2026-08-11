@@ -177,9 +177,9 @@ class InventoryApiTest extends InventoryFeatureTestCase
         $journal->assertOk();
         $entry = collect($journal->json('data.entries'))->firstWhere('project.id', $project->id);
 
-        $this->assertSame('0.00', $entry['administrative_expense']);
-        $this->assertSame('100.00', $entry['administrative_fee']);
-        $this->assertSame('0.00', $entry['administrative_debt']);
+        $this->assertSame('0', $entry['administrative_expense']);
+        $this->assertSame('100', $entry['administrative_fee']);
+        $this->assertSame('0', $entry['administrative_debt']);
     }
 
     public function test_outgoing_fifo_consumes_oldest_batches_first(): void
@@ -296,7 +296,7 @@ class InventoryApiTest extends InventoryFeatureTestCase
 
         $journal->assertOk();
         $entry = collect($journal->json('data.entries'))->firstWhere('project.id', $beneficiary->id);
-        $this->assertSame('200.00', $entry['administrative_expense']);
+        $this->assertSame('200', $entry['administrative_expense']);
     }
 
     public function test_administrative_outgoing_auto_refreshes_daily_journal_expense(): void
@@ -390,11 +390,11 @@ class InventoryApiTest extends InventoryFeatureTestCase
         $journal->assertOk();
         $entry = collect($journal->json('data.entries'))->firstWhere('project.id', $beneficiary->id);
 
-        $this->assertSame('80.00', $entry['administrative_expense']);
-        $this->assertSame('50.00', $entry['administrative_fee']);
-        $this->assertSame('370.00', $entry['fund_balance']);
-        $this->assertSame('50.00', $entry['administrative_debt']);
-        $this->assertSame('50.00', $entry['accumulated_administrative_debt']);
+        $this->assertSame('80', $entry['administrative_expense']);
+        $this->assertSame('50', $entry['administrative_fee']);
+        $this->assertSame('370', $entry['fund_balance']);
+        $this->assertSame('50', $entry['administrative_debt']);
+        $this->assertSame('50', $entry['accumulated_administrative_debt']);
     }
 
     public function test_operational_outgoing_does_not_feed_administrative_expense(): void
@@ -434,7 +434,7 @@ class InventoryApiTest extends InventoryFeatureTestCase
         ]);
 
         $entry = collect($journal->json('data.entries'))->firstWhere('project.id', $beneficiary->id);
-        $this->assertSame('0.00', $entry['administrative_expense']);
+        $this->assertSame('0', $entry['administrative_expense']);
     }
 
     public function test_search_and_filter_on_list_only(): void
@@ -489,7 +489,7 @@ class InventoryApiTest extends InventoryFeatureTestCase
         ])->assertForbidden();
     }
 
-    public function test_movements_have_no_update_or_delete_routes(): void
+    public function test_movements_have_no_update_routes(): void
     {
         $this->actAsInventoryUser();
         $owner = $this->createActiveProject();
@@ -509,9 +509,9 @@ class InventoryApiTest extends InventoryFeatureTestCase
             'unit_price' => 2,
         ])->json('data.id');
 
-        $this->putJson('/api/v1/inventory/movements/'.$movementId, ['quantity' => 9])->assertNotFound();
-        $this->patchJson('/api/v1/inventory/movements/'.$movementId, ['quantity' => 9])->assertNotFound();
-        $this->deleteJson('/api/v1/inventory/movements/'.$movementId)->assertNotFound();
+        // A DELETE route exists at this URI, so other methods correctly 405 rather than 404.
+        $this->putJson('/api/v1/inventory/movements/'.$movementId, ['quantity' => 9])->assertStatus(405);
+        $this->patchJson('/api/v1/inventory/movements/'.$movementId, ['quantity' => 9])->assertStatus(405);
     }
 
     public function test_list_movements_default_sort_and_summary(): void

@@ -2,6 +2,7 @@
 
 namespace Modules\OperationalRate\Actions;
 
+use App\Support\Money\FormatMoneyDecimal;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
@@ -93,9 +94,9 @@ class BuildOperationalRateAction
             $records[] = [
                 'date' => $dateString,
                 'day_name' => $cursor->format('l'),
-                'total_income' => $this->decimal($row->total_income ?? 0),
-                'operational_deduction' => $this->decimal($row->operational_deduction ?? 0),
-                'administrative_percentage' => $this->decimal($row->administrative_percentage ?? 0),
+                'total_income' => FormatMoneyDecimal::formatRounded($row->total_income ?? 0),
+                'operational_deduction' => FormatMoneyDecimal::formatRounded($row->operational_deduction ?? 0),
+                'administrative_percentage' => FormatMoneyDecimal::formatRounded($row->administrative_percentage ?? 0),
             ];
 
             $cursor->addDay();
@@ -122,9 +123,9 @@ class BuildOperationalRateAction
         $fixed = round($fixed, 2);
 
         return [
-            'relative_operational_deduction' => $this->decimal($relative),
-            'fixed_operational_deduction' => $this->decimal($fixed),
-            'total_operational_deduction' => $this->decimal(round($relative + $fixed, 2)),
+            'relative_operational_deduction' => FormatMoneyDecimal::formatRounded($relative),
+            'fixed_operational_deduction' => FormatMoneyDecimal::formatRounded($fixed),
+            'total_operational_deduction' => FormatMoneyDecimal::formatRounded(round($relative + $fixed, 2)),
         ];
     }
 
@@ -145,14 +146,9 @@ class BuildOperationalRateAction
         }
 
         return [
-            'total_income' => $this->decimal($totalIncome),
-            'total_operational_deduction' => $this->decimal($totalOd),
-            'total_administrative_percentage' => $this->decimal($totalAdmin),
+            'total_income' => FormatMoneyDecimal::formatRounded($totalIncome),
+            'total_operational_deduction' => FormatMoneyDecimal::formatRounded($totalOd),
+            'total_administrative_percentage' => FormatMoneyDecimal::formatRounded($totalAdmin),
         ];
-    }
-
-    private function decimal(mixed $value): string
-    {
-        return number_format((float) $value, 2, '.', '');
     }
 }
