@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class AdministrativeFeeRate extends Model
 {
     protected $fillable = [
+        'project_id',
         'percentage',
         'effective_from',
     ];

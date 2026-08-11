@@ -55,7 +55,7 @@ class DeductionServicesTest extends TestCase
         $this->assertArrayNotHasKey($exempt->id, $distributed);
     }
 
-    public function test_administrative_deduction_uses_effective_percentage_unless_exempt(): void
+    public function test_administrative_deduction_uses_each_projects_own_percentage_unless_exempt(): void
     {
         $service = app(AdministrativeDeductionService::class);
 
@@ -65,7 +65,6 @@ class DeductionServicesTest extends TestCase
         ]);
         $customStored = Project::factory()->create([
             'administrative_exempt' => false,
-            // Stored snapshot is ignored for calculation; effective global rate applies.
             'administrative_fee_percentage' => 15,
         ]);
         $exempt = Project::factory()->create([
@@ -74,25 +73,59 @@ class DeductionServicesTest extends TestCase
         ]);
 
         $this->assertEquals(120.0, $service->calculate($subject, 1000));
-        $this->assertEquals(120.0, $service->calculate($customStored, 1000));
+        $this->assertEquals(150.0, $service->calculate($customStored, 1000));
         $this->assertEquals(0.0, $service->calculate($exempt, 1000));
+    }
+
+    public function test_administrative_deduction_zero_percent_does_not_fall_back_to_default(): void
+    {
+        $service = app(AdministrativeDeductionService::class);
+
+        $project = Project::factory()->create([
+            'administrative_exempt' => false,
+            'administrative_fee_percentage' => 0,
+        ]);
+
+        $this->assertEquals(0.0, $service->calculate($project, 1000));
     }
 
     public function test_administrative_deduction_uses_effective_percentage_for_date(): void
     {
-        AdministrativeFeeRate::query()->updateOrCreate(
-            ['effective_from' => '2000-01-01'],
-            ['percentage' => 20]
-        );
-
-        $service = app(AdministrativeDeductionService::class);
-
         $project = Project::factory()->create([
             'administrative_exempt' => false,
             'administrative_fee_percentage' => 12,
         ]);
 
+        AdministrativeFeeRate::query()->updateOrCreate(
+            ['project_id' => $project->id, 'effective_from' => '2000-01-01'],
+            ['percentage' => 20]
+        );
+
+        $service = app(AdministrativeDeductionService::class);
+
         $this->assertEquals(200.0, $service->calculate($project, 1000, '2026-07-30'));
+    }
+
+    public function test_administrative_deduction_rate_history_does_not_leak_between_projects(): void
+    {
+        $projectA = Project::factory()->create([
+            'administrative_exempt' => false,
+            'administrative_fee_percentage' => 12,
+        ]);
+        $projectB = Project::factory()->create([
+            'administrative_exempt' => false,
+            'administrative_fee_percentage' => 12,
+        ]);
+
+        AdministrativeFeeRate::query()->updateOrCreate(
+            ['project_id' => $projectA->id, 'effective_from' => '2000-01-01'],
+            ['percentage' => 20]
+        );
+
+        $service = app(AdministrativeDeductionService::class);
+
+        $this->assertEquals(200.0, $service->calculate($projectA, 1000, '2026-07-30'));
+        $this->assertEquals(120.0, $service->calculate($projectB, 1000, '2026-07-30'));
     }
 
     public function test_relative_operational_deduction_uses_effective_pool_for_date(): void

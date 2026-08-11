@@ -7,6 +7,7 @@ use Illuminate\Validation\Rule;
 use Modules\Project\Enums\FundType;
 use Modules\Project\Enums\OperationalDeductionType;
 use Modules\Project\Enums\ProjectStatus;
+use Modules\Project\Rules\AdministrativeFeePercentageRule;
 use Modules\Project\Rules\OperationalFixedAmountRule;
 
 class UpdateProjectRequest extends FormRequest
@@ -35,6 +36,7 @@ class UpdateProjectRequest extends FormRequest
                 new OperationalFixedAmountRule($this->input('operational_deduction_type')),
             ],
             'administrative_exempt' => ['sometimes', 'boolean'],
+            'administrative_fee_percentage' => ['sometimes', 'nullable', new AdministrativeFeePercentageRule],
         ];
     }
 

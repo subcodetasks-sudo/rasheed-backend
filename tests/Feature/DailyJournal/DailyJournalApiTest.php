@@ -727,10 +727,6 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
     {
         $this->actAsSuperAdmin();
         $this->seedAdminPercentageBalance();
-        \Modules\Project\Models\AdministrativeFeeRate::query()->create([
-            'percentage' => 10,
-            'effective_from' => now()->subYear()->toDateString(),
-        ]);
         $project = $this->createActiveProject([
             'operational_deduction_type' => OperationalDeductionType::Exempt,
             'administrative_exempt' => false,

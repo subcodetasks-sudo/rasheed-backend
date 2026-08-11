@@ -73,12 +73,9 @@ class SystemGeneralSettingsApiTest extends TestCase
                 'admin_fee_percentage' => 15,
             ]);
 
-            $this->assertTrue(
-                AdministrativeFeeRate::query()
-                    ->whereDate('effective_from', '2026-07-31')
-                    ->where('percentage', 15)
-                    ->exists()
-            );
+            // The global percentage is only the default offered to new projects - it must
+            // never write into any project's own administrative-fee rate history.
+            $this->assertSame(0, AdministrativeFeeRate::query()->whereNotNull('project_id')->count());
         } finally {
             Carbon::setTestNow();
         }
@@ -115,7 +112,7 @@ class SystemGeneralSettingsApiTest extends TestCase
         ])->assertStatus(422)->assertJsonValidationErrors(['admin_fee_percentage']);
     }
 
-    public function test_identical_admin_fee_does_not_reschedule_rates(): void
+    public function test_changing_global_percentage_never_writes_any_project_rate_history(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-07-30 10:00:00'));
 
@@ -123,11 +120,11 @@ class SystemGeneralSettingsApiTest extends TestCase
             $this->actAs('super-admin');
 
             $this->putJson(self::ENDPOINT, ['admin_fee_percentage' => 15])->assertOk();
-            $countAfterFirst = AdministrativeFeeRate::query()->count();
+            $this->putJson(self::ENDPOINT, ['admin_fee_percentage' => 18])->assertOk();
 
-            $this->putJson(self::ENDPOINT, ['admin_fee_percentage' => 15])->assertOk();
-
-            $this->assertSame($countAfterFirst, AdministrativeFeeRate::query()->count());
+            // Only the pre-seeded legacy (project_id = null) row from the schema migration
+            // exists - the global setting change must never write a project-scoped row.
+            $this->assertSame(0, AdministrativeFeeRate::query()->whereNotNull('project_id')->count());
         } finally {
             Carbon::setTestNow();
         }

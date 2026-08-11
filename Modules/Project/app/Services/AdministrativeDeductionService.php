@@ -18,7 +18,7 @@ class AdministrativeDeductionService
             return 0.0;
         }
 
-        $percentage = $this->resolveEffectiveAdminFeePercentageAction->execute($asOfDate ?? now());
+        $percentage = $this->resolveEffectiveAdminFeePercentageAction->execute($project, $asOfDate ?? now());
 
         return round($income * ($percentage / 100), 2);
     }

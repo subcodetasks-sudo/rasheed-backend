@@ -4,6 +4,7 @@ namespace Modules\Project\Workflows\Project;
 
 use Illuminate\Support\Facades\DB;
 use Modules\Project\Actions\Project\CalculateOperationalSettingsAction;
+use Modules\Project\Actions\Project\ScheduleAdminFeePercentageChangeAction;
 use Modules\Project\Actions\Project\UpdateProjectAction;
 use Modules\Project\DTOs\ProjectData;
 use Modules\Project\Enums\ProjectStatus;
@@ -15,6 +16,7 @@ class UpdateProjectWorkflow
     public function __construct(
         private readonly CalculateOperationalSettingsAction $calculateOperationalSettingsAction,
         private readonly UpdateProjectAction $updateProjectAction,
+        private readonly ScheduleAdminFeePercentageChangeAction $scheduleAdminFeePercentageChangeAction,
     ) {}
 
     public function handle(Project $project, ProjectData $data): Project
@@ -28,7 +30,19 @@ class UpdateProjectWorkflow
                 'updated_by' => auth()->user()?->uuid,
             ];
 
-            unset($attributes['administrative_fee_percentage']);
+            if ($data->administrativeFeePercentage !== null) {
+                $newPercentage = round($data->administrativeFeePercentage, 2);
+                $currentPercentage = round((float) $project->administrative_fee_percentage, 2);
+
+                if ($newPercentage !== $currentPercentage) {
+                    $this->scheduleAdminFeePercentageChangeAction->execute($project, $newPercentage);
+                    $attributes['administrative_fee_percentage'] = $newPercentage;
+                } else {
+                    unset($attributes['administrative_fee_percentage']);
+                }
+            } else {
+                unset($attributes['administrative_fee_percentage']);
+            }
 
             if ($data->status === ProjectStatus::Archived) {
                 $attributes['archived_at'] = $project->archived_at ?? now();

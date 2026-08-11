@@ -16,6 +16,7 @@ readonly class ProjectData
         public OperationalDeductionType $operationalDeductionType,
         public ?float $operationalFixedAmount,
         public bool $administrativeExempt,
+        public ?float $administrativeFeePercentage,
     ) {}
 
     public static function fromArray(array $data): self
@@ -32,6 +33,9 @@ readonly class ProjectData
                 ? (isset($data['operational_fixed_amount']) ? (float) $data['operational_fixed_amount'] : null)
                 : null,
             administrativeExempt: (bool) ($data['administrative_exempt'] ?? false),
+            administrativeFeePercentage: isset($data['administrative_fee_percentage']) && $data['administrative_fee_percentage'] !== ''
+                ? (float) $data['administrative_fee_percentage']
+                : null,
         );
     }
 
@@ -45,6 +49,7 @@ readonly class ProjectData
             'operational_deduction_type' => $this->operationalDeductionType,
             'operational_fixed_amount' => $this->operationalFixedAmount,
             'administrative_exempt' => $this->administrativeExempt,
+            'administrative_fee_percentage' => $this->administrativeFeePercentage,
         ];
     }
 }

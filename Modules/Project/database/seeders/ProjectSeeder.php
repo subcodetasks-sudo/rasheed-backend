@@ -3,6 +3,7 @@
 namespace Modules\Project\Database\Seeders;
 
 use Illuminate\Database\Seeder;
+use Modules\Project\Actions\Project\SeedAdministrativeFeeRateAction;
 use Modules\Project\Enums\FundType;
 use Modules\Project\Enums\OperationalDeductionType;
 use Modules\Project\Enums\ProjectStatus;
@@ -90,13 +91,15 @@ class ProjectSeeder extends Seeder
         ];
 
         foreach ($projects as $project) {
-            Project::updateOrCreate(
+            $model = Project::updateOrCreate(
                 ['name' => $project['name']],
                 [
                     ...$project,
                     'administrative_fee_percentage' => $adminFee,
                 ]
             );
+
+            app(SeedAdministrativeFeeRateAction::class)->execute($model, $adminFee, $model->created_at);
         }
     }
 }

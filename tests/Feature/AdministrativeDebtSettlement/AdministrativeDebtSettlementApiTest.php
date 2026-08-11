@@ -6,6 +6,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Laravel\Sanctum\Sanctum;
 use Modules\AdministrativeDebtSettlement\Events\AdministrativeDebtSettlementUpdated;
+use Modules\AdministrativeDebtSettlement\Models\AdministrativeDebtSettlement;
 use Modules\CashStation\Events\CashStationUpdated;
 use Modules\CashStation\Models\CashStationMonthCarry;
 use Modules\DailyJournal\Models\AdminPercentageBalanceCredit;
@@ -15,6 +16,7 @@ use Modules\MonthlySummary\Events\MonthlySummaryUpdated;
 use Modules\Project\Enums\OperationalDeductionType;
 use Modules\Project\Enums\ProjectStatus;
 use Modules\Project\Models\Project;
+use Modules\Settings\Models\SystemGeneralSetting;
 use Modules\User\app\Models\User;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -507,5 +509,72 @@ class AdministrativeDebtSettlementApiTest extends TestCase
                 && $event->month === 7
                 && isset($event->payload['projects']);
         });
+    }
+
+    public function test_settlement_uses_project_specific_accrued_debt_not_global_percentage(): void
+    {
+        $this->actAs('finance');
+
+        // Global default is 12% → 120 on 1000 income. Projects below use 20% / 5%.
+        SystemGeneralSetting::singleton()->update(['admin_fee_percentage' => 12]);
+
+        $high = $this->createProject([
+            'name' => 'High rate project',
+            'administrative_fee_percentage' => 20,
+        ]);
+        $low = $this->createProject([
+            'name' => 'Low rate project',
+            'administrative_fee_percentage' => 5,
+        ]);
+
+        // Persist fees/debt as produced by each project's own percentage on 1000 income
+        // (200 and 50). Settlement must expose and recover those amounts — never 120.
+        $this->seedEntry($high->id, '2026-07-15', [
+            'daily_income' => 1000,
+            'administrative_fee' => 200,
+            'administrative_debt' => 200,
+            'accumulated_administrative_debt' => 200,
+        ]);
+        $this->seedEntry($low->id, '2026-07-15', [
+            'daily_income' => 1000,
+            'administrative_fee' => 50,
+            'administrative_debt' => 50,
+            'accumulated_administrative_debt' => 50,
+        ]);
+
+        $listed = collect($this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data.projects'))
+            ->keyBy('project_id');
+
+        $this->assertEqualsWithDelta(200.0, (float) $listed[$high->id]['administrative_debt'], 0.001);
+        $this->assertEqualsWithDelta(200.0, (float) $listed[$high->id]['recoverable_amount'], 0.001);
+        $this->assertEqualsWithDelta(50.0, (float) $listed[$low->id]['administrative_debt'], 0.001);
+        $this->assertEqualsWithDelta(50.0, (float) $listed[$low->id]['recoverable_amount'], 0.001);
+
+        // Explicitly not the global 12% of 1000 income.
+        $this->assertNotEqualsWithDelta(120.0, (float) $listed[$high->id]['administrative_debt'], 0.001);
+        $this->assertNotEqualsWithDelta(120.0, (float) $listed[$low->id]['administrative_debt'], 0.001);
+
+        $this->postJson(self::ENDPOINT, [
+            'year' => 2026,
+            'month' => 7,
+            'project_id' => $high->id,
+        ])->assertCreated();
+
+        $settlement = AdministrativeDebtSettlement::query()
+            ->where('project_id', $high->id)
+            ->where('year', 2026)
+            ->where('month', 7)
+            ->first();
+
+        $this->assertNotNull($settlement);
+        $this->assertEqualsWithDelta(200.0, (float) $settlement->recoverable_amount, 0.001);
+        $this->assertSame('paid', $settlement->status->value);
+        $this->assertNotEqualsWithDelta(120.0, (float) $settlement->recoverable_amount, 0.001);
+
+        $remaining = collect($this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data.projects'))
+            ->keyBy('project_id');
+
+        $this->assertArrayNotHasKey($high->id, $remaining->all());
+        $this->assertEqualsWithDelta(50.0, (float) $remaining[$low->id]['administrative_debt'], 0.001);
     }
 }

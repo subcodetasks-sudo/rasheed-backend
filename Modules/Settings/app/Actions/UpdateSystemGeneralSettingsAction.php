@@ -3,7 +3,6 @@
 namespace Modules\Settings\Actions;
 
 use Illuminate\Support\Facades\DB;
-use Modules\Project\Actions\Project\ScheduleAdminFeePercentageChangeAction;
 use Modules\Settings\Events\SystemGeneralSettingsUpdated;
 use Modules\Settings\Models\SystemGeneralSetting;
 
@@ -11,7 +10,6 @@ class UpdateSystemGeneralSettingsAction
 {
     public function __construct(
         private readonly GetSystemGeneralSettingsAction $getSystemGeneralSettingsAction,
-        private readonly ScheduleAdminFeePercentageChangeAction $scheduleAdminFeePercentageChangeAction,
     ) {}
 
     /**
@@ -29,26 +27,18 @@ class UpdateSystemGeneralSettingsAction
                 $updates['organization_name'] = (string) $data['organization_name'];
             }
 
-            $adminFeeChanged = false;
-            $newAdminFee = null;
-
             if (array_key_exists('admin_fee_percentage', $data)) {
                 $newAdminFee = round((float) $data['admin_fee_percentage'], 2);
                 $currentAdminFee = round((float) $row->admin_fee_percentage, 2);
 
                 if ($newAdminFee !== $currentAdminFee) {
                     $updates['admin_fee_percentage'] = $newAdminFee;
-                    $adminFeeChanged = true;
                 }
             }
 
             if ($updates !== []) {
                 $row->fill($updates);
                 $row->save();
-            }
-
-            if ($adminFeeChanged && $newAdminFee !== null) {
-                $this->scheduleAdminFeePercentageChangeAction->execute($newAdminFee);
             }
 
             return $this->getSystemGeneralSettingsAction->execute();

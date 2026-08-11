@@ -11,6 +11,7 @@ use Modules\DailyJournal\Workflows\SaveDailyJournalWorkflow;
 use Modules\Project\Enums\OperationalDeductionType;
 use Modules\Project\Enums\ProjectStatus;
 use Modules\Project\Models\Project;
+use Modules\Settings\Models\SystemGeneralSetting;
 use Modules\Settings\Services\SettingService;
 use RuntimeException;
 use Tests\TestCase;
@@ -160,6 +161,47 @@ class DailyJournalCalculationTest extends TestCase
         $entries = $this->service->applyAdministrativeFees(collect([$entry]));
 
         $this->assertEquals(150.0, (float) $entries->first()->administrative_fee);
+    }
+
+    public function test_administrative_debt_derives_from_each_projects_own_fee_percentage(): void
+    {
+        // If calculations silently used the global setting (50%), both projects would
+        // produce fee/debt 500 — prove each project's own percentage drives debt instead.
+        SystemGeneralSetting::singleton()->update(['admin_fee_percentage' => 50]);
+
+        $atTen = Project::factory()->create([
+            'status' => ProjectStatus::Active,
+            'administrative_exempt' => false,
+            'administrative_fee_percentage' => 10,
+            'operational_deduction_type' => OperationalDeductionType::Exempt,
+        ]);
+        $atTwenty = Project::factory()->create([
+            'status' => ProjectStatus::Active,
+            'administrative_exempt' => false,
+            'administrative_fee_percentage' => 20,
+            'operational_deduction_type' => OperationalDeductionType::Exempt,
+        ]);
+
+        $entries = collect([
+            tap(new DailyJournalEntry(['project_id' => $atTen->id, 'daily_income' => 1000]), fn ($e) => $e->setRelation('project', $atTen)),
+            tap(new DailyJournalEntry(['project_id' => $atTwenty->id, 'daily_income' => 1000]), fn ($e) => $e->setRelation('project', $atTwenty)),
+        ]);
+
+        $withFees = $this->service->applyAdministrativeFees($entries)->keyBy('project_id');
+
+        $this->assertEquals(100.0, (float) $withFees[$atTen->id]->administrative_fee);
+        $this->assertEquals(200.0, (float) $withFees[$atTwenty->id]->administrative_fee);
+
+        foreach ($withFees as $entry) {
+            $entry->contribution = 0;
+            $entry->administrative_expense = 0;
+            $entry->fund_balance = -1000;
+        }
+
+        $withDebt = $this->service->applyAdministrativeDebt($withFees->values())->keyBy('project_id');
+
+        $this->assertEquals(100.0, (float) $withDebt[$atTen->id]->administrative_debt);
+        $this->assertEquals(200.0, (float) $withDebt[$atTwenty->id]->administrative_debt);
     }
 
     public function test_operational_deduction_relative_fixed_exempt(): void
