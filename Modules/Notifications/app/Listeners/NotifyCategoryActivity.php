@@ -2,6 +2,7 @@
 
 namespace Modules\Notifications\Listeners;
 
+use App\Support\ArabicLocale;
 use Modules\Notifications\Services\NotificationService;
 use Modules\Project\Events\CategoryCreated;
 use Modules\Project\Events\CategoryDeleted;
@@ -17,8 +18,8 @@ class NotifyCategoryActivity
     {
         if ($event instanceof CategoryDeleted) {
             $this->notificationService->notifyActivity(
-                __('messages.notification_category_deleted_title'),
-                __('messages.notification_category_deleted_message', ['name' => $event->categoryName]),
+                ArabicLocale::trans('messages.notification_category_deleted_title'),
+                ArabicLocale::trans('messages.notification_category_deleted_message', ['name' => $event->categoryName]),
                 [
                     'action' => 'deleted',
                     'category_id' => $event->categoryId,
@@ -34,8 +35,8 @@ class NotifyCategoryActivity
             : ['notification_category_updated_title', 'notification_category_updated_message', 'updated'];
 
         $this->notificationService->notifyActivity(
-            __('messages.'.$titleKey),
-            __('messages.'.$messageKey, ['name' => $category->name]),
+            ArabicLocale::trans('messages.'.$titleKey),
+            ArabicLocale::trans('messages.'.$messageKey, ['name' => $category->name]),
             [
                 'action' => $action,
                 'category_id' => $category->id,

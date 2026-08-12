@@ -2,6 +2,7 @@
 
 namespace Modules\AuditLog\Listeners;
 
+use App\Support\ArabicLocale;
 use Modules\AuditLog\Enums\AuditAction;
 use Modules\AuditLog\Support\RecordsAuditSafely;
 use Modules\DailyJournal\Events\AdministrativeDebtRepaid;
@@ -22,7 +23,7 @@ class RecordDailyJournalAuditLog
 
             $this->record(
                 AuditAction::Saved,
-                __('messages.audit_daily_journal_saved', ['date' => $date]),
+                ArabicLocale::trans('messages.audit_daily_journal_saved', ['date' => $date]),
                 properties: [
                     'journal_date' => $date,
                     'entries_count' => $event->entries->count(),
@@ -36,7 +37,7 @@ class RecordDailyJournalAuditLog
 
         $this->record(
             AuditAction::Repaid,
-            __('messages.audit_admin_debt_repaid', [
+            ArabicLocale::trans('messages.audit_admin_debt_repaid', [
                 'project_id' => $event->entry->project_id,
                 'date' => $date,
             ]),

@@ -159,7 +159,7 @@ class AuditLogRecordingTest extends TestCase
         $row = $this->auditRows(AuditAction::Viewed->value)->first();
         $this->assertNotNull($row);
         $this->assertSame('api', $row->getExtraProperty('source'));
-        $this->assertStringContainsString('dashboard', $row->description);
+        $this->assertStringContainsString('لوحة التحكم', $row->description);
     }
 
     public function test_saving_daily_journal_records_saved_and_does_not_change_calculations(): void

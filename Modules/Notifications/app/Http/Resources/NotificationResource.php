@@ -2,6 +2,7 @@
 
 namespace Modules\Notifications\Http\Resources;
 
+use App\Support\ArabicLocale;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Modules\Notifications\Support\NotificationPageTypeMapper;
@@ -70,13 +71,13 @@ class NotificationResource extends JsonResource
             && is_string($action)
             && in_array($action, $projectActions, true)
         ) {
-            $message = __('messages.notification_project_'.$action.'_message', [
+            $message = ArabicLocale::trans('messages.notification_project_'.$action.'_message', [
                 'name' => $this->project->name,
             ]);
 
             $actorName = trim((string) ($meta['actor_name'] ?? ''));
             if ($actorName !== '') {
-                $suffix = __('messages.notification_by_actor', ['name' => $actorName]);
+                $suffix = ArabicLocale::trans('messages.notification_by_actor', ['name' => $actorName]);
                 $trimmed = rtrim($message);
                 $message = str_ends_with($trimmed, '.')
                     ? substr($trimmed, 0, -1).' '.$suffix.'.'

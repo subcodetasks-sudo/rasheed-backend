@@ -2,6 +2,7 @@
 
 namespace Modules\AuditLog\Listeners;
 
+use App\Support\ArabicLocale;
 use Modules\AuditLog\Enums\AuditAction;
 use Modules\AuditLog\Support\RecordsAuditSafely;
 use Modules\Project\Events\ProjectArchived;
@@ -19,7 +20,7 @@ class RecordProjectAuditLog
         if ($event instanceof ProjectDeleted) {
             $this->record(
                 AuditAction::Deleted,
-                __('messages.audit_project_deleted', ['name' => $event->projectName]),
+                ArabicLocale::trans('messages.audit_project_deleted', ['name' => $event->projectName]),
                 properties: ['project_id' => $event->projectId],
             );
 
@@ -35,7 +36,7 @@ class RecordProjectAuditLog
 
         $this->record(
             $action,
-            __("messages.{$key}", ['name' => $event->project->name]),
+            ArabicLocale::trans("messages.{$key}", ['name' => $event->project->name]),
             subject: $event->project,
             properties: ['project_id' => $event->project->id],
         );

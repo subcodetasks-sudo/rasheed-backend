@@ -2,6 +2,7 @@
 
 namespace Modules\User\Services;
 
+use App\Support\ArabicLocale;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Modules\AuditLog\Actions\RecordAuditLogAction;
@@ -33,7 +34,7 @@ class AuthService
 
         $this->auditLog->execute(
             action: AuditAction::Login,
-            description: __('messages.audit_user_logged_in', ['name' => $user->full_name]),
+            description: ArabicLocale::trans('messages.audit_user_logged_in', ['name' => $user->full_name]),
             source: AuditSource::User,
             causer: $user,
             subject: $user,
@@ -46,7 +47,7 @@ class AuthService
     {
         $this->auditLog->execute(
             action: AuditAction::Logout,
-            description: __('messages.audit_user_logged_out', ['name' => $user->full_name]),
+            description: ArabicLocale::trans('messages.audit_user_logged_out', ['name' => $user->full_name]),
             source: AuditSource::User,
             causer: $user,
             subject: $user,

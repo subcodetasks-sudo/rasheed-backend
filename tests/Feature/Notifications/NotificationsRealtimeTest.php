@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Notifications;
 
+use App\Support\ArabicLocale;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Laravel\Sanctum\Sanctum;
@@ -72,7 +73,7 @@ class NotificationsRealtimeTest extends TestCase
 
         $this->assertDatabaseHas('activity_notifications', [
             'type' => NotificationType::Activity->value,
-            'title' => __('messages.notification_project_created_title'),
+            'title' => ArabicLocale::trans('messages.notification_project_created_title'),
         ]);
 
         Event::assertDispatched(NotificationCreated::class);
@@ -139,7 +140,7 @@ class NotificationsRealtimeTest extends TestCase
 
         $this->assertDatabaseHas('activity_notifications', [
             'type' => NotificationType::Warning->value,
-            'title' => __('messages.notification_low_stock_title'),
+            'title' => ArabicLocale::trans('messages.notification_low_stock_title'),
         ]);
     }
 
@@ -170,7 +171,7 @@ class NotificationsRealtimeTest extends TestCase
 
         $this->assertDatabaseHas('activity_notifications', [
             'type' => NotificationType::Danger->value,
-            'title' => __('messages.notification_out_of_stock_title'),
+            'title' => ArabicLocale::trans('messages.notification_out_of_stock_title'),
         ]);
     }
 

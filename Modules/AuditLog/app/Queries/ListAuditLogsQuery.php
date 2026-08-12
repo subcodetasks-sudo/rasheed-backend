@@ -10,9 +10,9 @@ use Spatie\Activitylog\Models\Activity;
 
 class ListAuditLogsQuery
 {
-    public function paginate(Request $request): LengthAwarePaginator
+    public function paginate(Request $request, ?string $forcedCauserId = null): LengthAwarePaginator
     {
-        $query = $this->filteredQuery($request);
+        $query = $this->filteredQuery($request, $forcedCauserId);
         $perPage = (int) $request->input('per_page', 15);
 
         $this->applyDefaultSort($query, $request);
@@ -20,13 +20,13 @@ class ListAuditLogsQuery
         return $query->paginate($perPage);
     }
 
-    public function filteredQuery(Request $request): Builder
+    public function filteredQuery(Request $request, ?string $forcedCauserId = null): Builder
     {
         $query = Activity::query()
             ->where('log_name', config('auditlog.log_name', 'audit'))
             ->with('causer');
 
-        $this->applyMappedFilters($query, $request);
+        $this->applyMappedFilters($query, $request, $forcedCauserId);
         $this->applyDateRangeFilters($query, $request);
 
         (new BaseQueryService($query, $request))
@@ -38,11 +38,15 @@ class ListAuditLogsQuery
         return $query;
     }
 
-    private function applyMappedFilters(Builder $query, Request $request): void
+    private function applyMappedFilters(Builder $query, Request $request, ?string $forcedCauserId = null): void
     {
-        $userId = $request->input('filter.user_id');
-        if (is_string($userId) && $userId !== '') {
-            $query->where('causer_id', $userId);
+        if ($forcedCauserId !== null) {
+            $query->where('causer_id', $forcedCauserId);
+        } else {
+            $userId = $request->input('filter.user_id');
+            if (is_string($userId) && $userId !== '') {
+                $query->where('causer_id', $userId);
+            }
         }
 
         $action = $request->input('filter.action');

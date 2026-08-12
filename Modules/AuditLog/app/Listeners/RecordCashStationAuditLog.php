@@ -2,6 +2,7 @@
 
 namespace Modules\AuditLog\Listeners;
 
+use App\Support\ArabicLocale;
 use Modules\AuditLog\Enums\AuditAction;
 use Modules\AuditLog\Support\RecordsAuditSafely;
 use Modules\CashStation\Events\CashStationCarriedForward;
@@ -23,7 +24,7 @@ class RecordCashStationAuditLog
 
             $this->record(
                 $action,
-                __("messages.{$key}", [
+                ArabicLocale::trans("messages.{$key}", [
                     'amount' => $settlement->amount,
                     'month' => $settlement->month,
                     'year' => $settlement->year,
@@ -47,7 +48,7 @@ class RecordCashStationAuditLog
 
             $this->record(
                 $action,
-                __("messages.{$key}", [
+                ArabicLocale::trans("messages.{$key}", [
                     'month' => $event->month,
                     'year' => $event->year,
                 ]),
@@ -66,7 +67,7 @@ class RecordCashStationAuditLog
 
         $this->record(
             AuditAction::CarriedForward,
-            __('messages.audit_cash_station_carried_forward', [
+            ArabicLocale::trans('messages.audit_cash_station_carried_forward', [
                 'month' => $carry->from_month,
                 'year' => $carry->from_year,
             ]),

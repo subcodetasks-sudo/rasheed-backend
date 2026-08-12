@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Notifications;
 
+use App\Support\ArabicLocale;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Modules\Notifications\Enums\NotificationType;
@@ -67,10 +68,10 @@ class DomainCrudNotificationsTest extends TestCase
 
         $this->assertDatabaseHas('activity_notifications', [
             'type' => NotificationType::Activity->value,
-            'title' => __('messages.notification_user_created_title'),
+            'title' => ArabicLocale::trans('messages.notification_user_created_title'),
         ]);
 
-        $message = Notification::query()->where('title', __('messages.notification_user_created_title'))->value('message');
+        $message = Notification::query()->where('title', ArabicLocale::trans('messages.notification_user_created_title'))->value('message');
         $this->assertStringContainsString('New Finance', (string) $message);
         $this->assertStringContainsString('Creator Admin', (string) $message);
         $this->assertStringNotContainsString('"New Finance"', (string) $message);
@@ -87,7 +88,7 @@ class DomainCrudNotificationsTest extends TestCase
 
         $this->assertDatabaseHas('activity_notifications', [
             'type' => NotificationType::Activity->value,
-            'title' => __('messages.notification_general_settings_updated_title'),
+            'title' => ArabicLocale::trans('messages.notification_general_settings_updated_title'),
         ]);
     }
 
@@ -103,7 +104,7 @@ class DomainCrudNotificationsTest extends TestCase
         ])->assertCreated();
 
         $notification = Notification::query()
-            ->where('title', __('messages.notification_inventory_category_created_title'))
+            ->where('title', ArabicLocale::trans('messages.notification_inventory_category_created_title'))
             ->first();
 
         $this->assertNotNull($notification);
@@ -150,7 +151,7 @@ class DomainCrudNotificationsTest extends TestCase
 
         $this->assertSame('Actor Name', $notification->meta['actor_name']);
         $this->assertSame(
-            'Project Demo was created '.__('messages.notification_by_actor', ['name' => 'Actor Name']).'.',
+            'Project Demo was created '.ArabicLocale::trans('messages.notification_by_actor', ['name' => 'Actor Name']).'.',
             $notification->message
         );
         $this->assertStringNotContainsString('"', $notification->message);

@@ -2,6 +2,7 @@
 
 namespace Modules\AuditLog\Listeners;
 
+use App\Support\ArabicLocale;
 use Modules\AdministrativeDebtSettlement\Events\AdministrativeDebtSettlementCreated;
 use Modules\AuditLog\Enums\AuditAction;
 use Modules\AuditLog\Support\RecordsAuditSafely;
@@ -17,7 +18,7 @@ class RecordAdministrativeDebtSettlementAuditLog
 
         $this->record(
             AuditAction::Saved,
-            __('messages.audit_admin_debt_settlement_created', [
+            ArabicLocale::trans('messages.audit_admin_debt_settlement_created', [
                 'name' => $projectName,
                 'amount' => $settlement->recoverable_amount,
             ]),

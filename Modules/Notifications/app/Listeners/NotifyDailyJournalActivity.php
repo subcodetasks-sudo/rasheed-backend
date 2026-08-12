@@ -2,6 +2,7 @@
 
 namespace Modules\Notifications\Listeners;
 
+use App\Support\ArabicLocale;
 use Modules\DailyJournal\Events\AdministrativeDebtRepaid;
 use Modules\DailyJournal\Events\DailyJournalUpdated;
 use Modules\Notifications\Services\NotificationService;
@@ -18,8 +19,8 @@ class NotifyDailyJournalActivity
             $date = $event->journalDate->toDateString();
 
             $this->notificationService->notifyActivity(
-                __('messages.notification_daily_journal_updated_title'),
-                __('messages.notification_daily_journal_updated_message', ['date' => $date]),
+                ArabicLocale::trans('messages.notification_daily_journal_updated_title'),
+                ArabicLocale::trans('messages.notification_daily_journal_updated_message', ['date' => $date]),
                 [
                     'action' => 'updated',
                     'journal_date' => $date,
@@ -33,8 +34,8 @@ class NotifyDailyJournalActivity
         $date = $event->entry->journal_date?->toDateString() ?? (string) $event->entry->journal_date;
 
         $this->notificationService->notifySuccess(
-            __('messages.notification_admin_debt_repaid_title'),
-            __('messages.notification_admin_debt_repaid_message', [
+            ArabicLocale::trans('messages.notification_admin_debt_repaid_title'),
+            ArabicLocale::trans('messages.notification_admin_debt_repaid_message', [
                 'project_id' => $event->entry->project_id,
                 'date' => $date,
             ]),

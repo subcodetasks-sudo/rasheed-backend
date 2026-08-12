@@ -2,6 +2,7 @@
 
 namespace Modules\Notifications\Actions;
 
+use App\Support\ArabicLocale;
 use Illuminate\Support\Facades\DB;
 use Modules\DailyJournal\Actions\ReadAccumulatedAdministrativeDebtTipAction;
 use Modules\Notifications\Enums\NotificationType;
@@ -42,8 +43,8 @@ class SyncAdministrativeDebtAlertAction
             return;
         }
 
-        $title = __('messages.notification_administrative_debt_alert_title');
-        $message = __('messages.notification_administrative_debt_alert_message', [
+        $title = ArabicLocale::trans('messages.notification_administrative_debt_alert_title');
+        $message = ArabicLocale::trans('messages.notification_administrative_debt_alert_message', [
             'name' => $project->name,
             'amount' => number_format($remaining, 2, '.', ','),
         ]);

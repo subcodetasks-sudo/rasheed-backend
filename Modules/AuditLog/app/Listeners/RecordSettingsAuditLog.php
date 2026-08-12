@@ -2,6 +2,7 @@
 
 namespace Modules\AuditLog\Listeners;
 
+use App\Support\ArabicLocale;
 use Modules\AuditLog\Enums\AuditAction;
 use Modules\AuditLog\Support\RecordsAuditSafely;
 use Modules\Settings\Events\MonthlyEmployeeSettingsUpdated;
@@ -16,7 +17,7 @@ class RecordSettingsAuditLog
         if ($event instanceof SystemGeneralSettingsUpdated) {
             $this->record(
                 AuditAction::Updated,
-                __('messages.audit_general_settings_updated'),
+                ArabicLocale::trans('messages.audit_general_settings_updated'),
             );
 
             return;
@@ -24,7 +25,7 @@ class RecordSettingsAuditLog
 
         $this->record(
             AuditAction::Updated,
-            __('messages.audit_monthly_employee_settings_updated', [
+            ArabicLocale::trans('messages.audit_monthly_employee_settings_updated', [
                 'month' => $event->month,
                 'year' => $event->year,
             ]),

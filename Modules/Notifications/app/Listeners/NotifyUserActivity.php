@@ -2,6 +2,7 @@
 
 namespace Modules\Notifications\Listeners;
 
+use App\Support\ArabicLocale;
 use Modules\Notifications\Services\NotificationService;
 use Modules\User\app\Events\UserCreated;
 use Modules\User\app\Events\UserDeleted;
@@ -18,8 +19,8 @@ class NotifyUserActivity
     {
         if ($event instanceof UserDeleted) {
             $this->notificationService->notifyActivity(
-                __('messages.notification_user_deleted_title'),
-                __('messages.notification_user_deleted_message', ['name' => $event->userFullName]),
+                ArabicLocale::trans('messages.notification_user_deleted_title'),
+                ArabicLocale::trans('messages.notification_user_deleted_message', ['name' => $event->userFullName]),
                 [
                     'action' => 'deleted',
                     'user_uuid' => $event->userUuid,
@@ -33,10 +34,10 @@ class NotifyUserActivity
 
         if ($event instanceof UserStatusUpdated) {
             $this->notificationService->notifyActivity(
-                __('messages.notification_user_status_updated_title'),
-                __('messages.notification_user_status_updated_message', [
+                ArabicLocale::trans('messages.notification_user_status_updated_title'),
+                ArabicLocale::trans('messages.notification_user_status_updated_message', [
                     'name' => $user->full_name,
-                    'status' => $user->status,
+                    'status' => ArabicLocale::label((string) $user->status),
                 ]),
                 [
                     'action' => 'status_updated',
@@ -54,8 +55,8 @@ class NotifyUserActivity
             : ['notification_user_updated_title', 'notification_user_updated_message', 'updated'];
 
         $this->notificationService->notifyActivity(
-            __('messages.'.$titleKey),
-            __('messages.'.$messageKey, ['name' => $user->full_name]),
+            ArabicLocale::trans('messages.'.$titleKey),
+            ArabicLocale::trans('messages.'.$messageKey, ['name' => $user->full_name]),
             [
                 'action' => $action,
                 'user_uuid' => $user->uuid,

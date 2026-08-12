@@ -2,6 +2,7 @@
 
 namespace Modules\Notifications\Services;
 
+use App\Support\ArabicLocale;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -119,7 +120,7 @@ class NotificationService
             return $message;
         }
 
-        $suffix = __('messages.notification_by_actor', ['name' => $actorName]);
+        $suffix = ArabicLocale::trans('messages.notification_by_actor', ['name' => $actorName]);
         $trimmed = rtrim($message);
 
         if (str_ends_with($trimmed, '.')) {

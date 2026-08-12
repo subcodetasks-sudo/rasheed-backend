@@ -16,7 +16,7 @@ Route::prefix('v1')->middleware([
     'role:super-admin|finance|inventory',
 ])->group(function () {
     Route::get('notifications/statistics', ShowNotificationStatisticsController::class);
-    Route::get('notifications/stream', StreamNotificationsController::class);
+    // Route::get('notifications/stream', StreamNotificationsController::class);
     Route::post('notifications/read-all', MarkAllNotificationsReadController::class);
     Route::post('notifications/{notification}/read', MarkNotificationReadController::class);
     Route::get('notifications/{notification}', ShowNotificationController::class);

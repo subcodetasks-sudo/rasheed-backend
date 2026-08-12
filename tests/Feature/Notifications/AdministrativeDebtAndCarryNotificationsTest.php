@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Notifications;
 
+use App\Support\ArabicLocale;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Modules\AdministrativeDebtSettlement\Enums\AdministrativeDebtSettlementStatus;
@@ -55,7 +56,7 @@ class AdministrativeDebtAndCarryNotificationsTest extends TestCase
 
         $this->assertCount(1, $alerts);
         $alert = $alerts->first();
-        $this->assertSame(__('messages.notification_administrative_debt_alert_title'), $alert->title);
+        $this->assertSame(ArabicLocale::trans('messages.notification_administrative_debt_alert_title'), $alert->title);
         $this->assertSame(10000.0, (float) $alert->meta['remaining_debt']);
         $this->assertStringContainsString('مشروع الدين', $alert->message);
 
@@ -119,7 +120,7 @@ class AdministrativeDebtAndCarryNotificationsTest extends TestCase
 
         $this->assertCount(1, $notifications);
         $notification = $notifications->first();
-        $this->assertSame(__('messages.notification_cash_station_carried_forward_title'), $notification->title);
+        $this->assertSame(ArabicLocale::trans('messages.notification_cash_station_carried_forward_title'), $notification->title);
         $this->assertSame($carry->id, $notification->meta['carry_id']);
         $this->assertStringContainsString('7/2026', $notification->message);
         $this->assertArrayHasKey('executed_at', $notification->meta);
@@ -159,7 +160,7 @@ class AdministrativeDebtAndCarryNotificationsTest extends TestCase
 
         $this->assertCount(1, $notifications);
         $notification = $notifications->first();
-        $this->assertSame(__('messages.notification_admin_debt_settlement_created_title'), $notification->title);
+        $this->assertSame(ArabicLocale::trans('messages.notification_admin_debt_settlement_created_title'), $notification->title);
         $this->assertSame($settlement->id, $notification->meta['settlement_id']);
         $this->assertSame(3000.0, (float) $notification->meta['paid_amount']);
         $this->assertSame(2000.0, (float) $notification->meta['remaining_debt']);

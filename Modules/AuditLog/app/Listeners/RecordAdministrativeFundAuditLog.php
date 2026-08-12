@@ -2,6 +2,7 @@
 
 namespace Modules\AuditLog\Listeners;
 
+use App\Support\ArabicLocale;
 use Modules\AdministrativeFund\Events\AdministrativeFundUpdated;
 use Modules\AuditLog\Enums\AuditAction;
 use Modules\AuditLog\Support\RecordsAuditSafely;
@@ -18,7 +19,7 @@ class RecordAdministrativeFundAuditLog
 
         $this->record(
             AuditAction::Saved,
-            __('messages.audit_administrative_fund_saved', [
+            ArabicLocale::trans('messages.audit_administrative_fund_saved', [
                 'month' => $event->month,
                 'year' => $event->year,
             ]),

@@ -2,6 +2,7 @@
 
 namespace Modules\AuditLog\Listeners;
 
+use App\Support\ArabicLocale;
 use Modules\AuditLog\Enums\AuditAction;
 use Modules\AuditLog\Support\RecordsAuditSafely;
 use Modules\User\app\Events\UserCreated;
@@ -18,7 +19,7 @@ class RecordUserAuditLog
         if ($event instanceof UserDeleted) {
             $this->record(
                 AuditAction::Deleted,
-                __('messages.audit_user_deleted', ['name' => $event->userFullName]),
+                ArabicLocale::trans('messages.audit_user_deleted', ['name' => $event->userFullName]),
                 properties: ['user_uuid' => $event->userUuid],
             );
 
@@ -28,9 +29,9 @@ class RecordUserAuditLog
         if ($event instanceof UserStatusUpdated) {
             $this->record(
                 AuditAction::StatusUpdated,
-                __('messages.audit_user_status_updated', [
+                ArabicLocale::trans('messages.audit_user_status_updated', [
                     'name' => $event->user->full_name,
-                    'status' => $event->user->status,
+                    'status' => ArabicLocale::label((string) $event->user->status),
                 ]),
                 subject: $event->user,
                 properties: [
@@ -47,7 +48,7 @@ class RecordUserAuditLog
 
         $this->record(
             $action,
-            __("messages.{$key}", ['name' => $event->user->full_name]),
+            ArabicLocale::trans("messages.{$key}", ['name' => $event->user->full_name]),
             subject: $event->user,
             properties: ['user_uuid' => $event->user->uuid],
         );

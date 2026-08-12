@@ -2,6 +2,7 @@
 
 namespace Modules\Notifications\Listeners;
 
+use App\Support\ArabicLocale;
 use Modules\Notifications\Services\NotificationService;
 use Modules\Project\Events\ProjectArchived;
 use Modules\Project\Events\ProjectCreated;
@@ -19,8 +20,8 @@ class NotifyProjectActivity
     {
         if ($event instanceof ProjectDeleted) {
             $this->notificationService->notifyActivity(
-                __('messages.notification_project_deleted_title'),
-                __('messages.notification_project_deleted_message', ['name' => $event->projectName]),
+                ArabicLocale::trans('messages.notification_project_deleted_title'),
+                ArabicLocale::trans('messages.notification_project_deleted_message', ['name' => $event->projectName]),
                 [
                     'action' => 'deleted',
                     'project_id' => $event->projectId,
@@ -55,8 +56,8 @@ class NotifyProjectActivity
         };
 
         $this->notificationService->notifyActivity(
-            __('messages.'.$titleKey),
-            __('messages.'.$messageKey, ['name' => $project->name]),
+            ArabicLocale::trans('messages.'.$titleKey),
+            ArabicLocale::trans('messages.'.$messageKey, ['name' => $project->name]),
             [
                 'action' => $action,
                 'project_id' => $project->id,

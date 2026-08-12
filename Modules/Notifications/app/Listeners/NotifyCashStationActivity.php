@@ -2,6 +2,7 @@
 
 namespace Modules\Notifications\Listeners;
 
+use App\Support\ArabicLocale;
 use Modules\CashStation\Events\CashStationCarriedForward;
 use Modules\CashStation\Events\CashStationSettlementCreated;
 use Modules\CashStation\Events\CashStationSettlementDeleted;
@@ -23,12 +24,12 @@ class NotifyCashStationActivity
             $isContribution = $settlement->contribution_type !== null;
 
             $this->notificationService->notifyActivity(
-                __(
+                ArabicLocale::trans(
                     $isContribution
                         ? 'messages.notification_contribution_created_title'
                         : 'messages.notification_cash_station_settlement_created_title'
                 ),
-                __(
+                ArabicLocale::trans(
                     $isContribution
                         ? 'messages.notification_contribution_created_message'
                         : 'messages.notification_cash_station_settlement_created_message',
@@ -56,12 +57,12 @@ class NotifyCashStationActivity
             $isContribution = $event->contributionType !== null;
 
             $this->notificationService->notifyActivity(
-                __(
+                ArabicLocale::trans(
                     $isContribution
                         ? 'messages.notification_contribution_deleted_title'
                         : 'messages.notification_cash_station_settlement_deleted_title'
                 ),
-                __(
+                ArabicLocale::trans(
                     $isContribution
                         ? 'messages.notification_contribution_deleted_message'
                         : 'messages.notification_cash_station_settlement_deleted_message',
@@ -92,8 +93,8 @@ class NotifyCashStationActivity
         $executedAt = $carry->updated_at ?? $carry->created_at ?? now();
 
         $this->notificationService->notifyInfo(
-            __('messages.notification_cash_station_carried_forward_title'),
-            __('messages.notification_cash_station_carried_forward_message', [
+            ArabicLocale::trans('messages.notification_cash_station_carried_forward_title'),
+            ArabicLocale::trans('messages.notification_cash_station_carried_forward_message', [
                 'month' => $carry->from_month,
                 'year' => $carry->from_year,
                 'executed_at' => $executedAt->timezone(config('app.timezone'))->format('Y-m-d H:i:s'),

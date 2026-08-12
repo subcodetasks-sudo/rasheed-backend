@@ -2,6 +2,7 @@
 
 namespace Modules\Notifications\Listeners;
 
+use App\Support\ArabicLocale;
 use Modules\Notifications\Services\NotificationService;
 use Modules\Settings\Events\MonthlyEmployeeSettingsUpdated;
 use Modules\Settings\Events\SystemGeneralSettingsUpdated;
@@ -16,8 +17,8 @@ class NotifySettingsActivity
     {
         if ($event instanceof SystemGeneralSettingsUpdated) {
             $this->notificationService->notifyActivity(
-                __('messages.notification_general_settings_updated_title'),
-                __('messages.notification_general_settings_updated_message'),
+                ArabicLocale::trans('messages.notification_general_settings_updated_title'),
+                ArabicLocale::trans('messages.notification_general_settings_updated_message'),
                 ['action' => 'general_settings_updated'],
             );
 
@@ -25,8 +26,8 @@ class NotifySettingsActivity
         }
 
         $this->notificationService->notifyActivity(
-            __('messages.notification_monthly_employee_settings_updated_title'),
-            __('messages.notification_monthly_employee_settings_updated_message', [
+            ArabicLocale::trans('messages.notification_monthly_employee_settings_updated_title'),
+            ArabicLocale::trans('messages.notification_monthly_employee_settings_updated_message', [
                 'month' => $event->month,
                 'year' => $event->year,
             ]),

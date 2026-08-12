@@ -2,6 +2,7 @@
 
 namespace Modules\Notifications\Rules;
 
+use App\Support\ArabicLocale;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Notifications\Contracts\NotificationRule;
 use Modules\Notifications\Services\NotificationService;
@@ -36,8 +37,8 @@ class InventoryStockNotificationRule implements NotificationRule
 
         if ($isOut && ! $wasOut) {
             $this->notificationService->notifyDanger(
-                __('messages.notification_out_of_stock_title'),
-                __('messages.notification_out_of_stock_message', ['name' => $subject->name, 'code' => $subject->code]),
+                ArabicLocale::trans('messages.notification_out_of_stock_title'),
+                ArabicLocale::trans('messages.notification_out_of_stock_message', ['name' => $subject->name, 'code' => $subject->code]),
                 [
                     'inventory_item_id' => $subject->id,
                     'code' => $subject->code,
@@ -52,8 +53,8 @@ class InventoryStockNotificationRule implements NotificationRule
 
         if ($isLow && ! $wasLow && ! $wasOut) {
             $this->notificationService->notifyWarning(
-                __('messages.notification_low_stock_title'),
-                __('messages.notification_low_stock_message', [
+                ArabicLocale::trans('messages.notification_low_stock_title'),
+                ArabicLocale::trans('messages.notification_low_stock_message', [
                     'name' => $subject->name,
                     'code' => $subject->code,
                     'balance' => $balance,

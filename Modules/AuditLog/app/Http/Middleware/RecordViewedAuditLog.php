@@ -2,6 +2,7 @@
 
 namespace Modules\AuditLog\Http\Middleware;
 
+use App\Support\ArabicLocale;
 use Closure;
 use Illuminate\Http\Request;
 use Modules\AuditLog\Actions\RecordAuditLogAction;
@@ -42,6 +43,7 @@ class RecordViewedAuditLog
      */
     private const EXCLUDED_PREFIXES = [
         'audit-logs',
+        'my-activity-logs',
         'notifications',
         'media',
         'realtime',
@@ -126,6 +128,8 @@ class RecordViewedAuditLog
             $resource = 'users';
         }
 
-        return __('messages.audit_viewed', ['resource' => $resource]);
+        return ArabicLocale::trans('messages.audit_viewed', [
+            'resource' => ArabicLocale::resource($resource),
+        ]);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace Modules\Notifications\Listeners;
 
+use App\Support\ArabicLocale;
 use Modules\Inventory\Events\InventoryCategoryCreated;
 use Modules\Inventory\Events\InventoryCategoryDeleted;
 use Modules\Inventory\Events\InventoryCategoryUpdated;
@@ -22,8 +23,8 @@ class NotifyInventoryActivity
     ): void {
         if ($event instanceof InventoryItemDeleted) {
             $this->notificationService->notifyActivity(
-                __('messages.notification_inventory_item_deleted_title'),
-                __('messages.notification_inventory_item_deleted_message', [
+                ArabicLocale::trans('messages.notification_inventory_item_deleted_title'),
+                ArabicLocale::trans('messages.notification_inventory_item_deleted_message', [
                     'name' => $event->itemName,
                     'code' => $event->itemCode,
                 ]),
@@ -38,9 +39,9 @@ class NotifyInventoryActivity
 
         if ($event instanceof InventoryMovementDeleted) {
             $this->notificationService->notifyActivity(
-                __('messages.notification_inventory_movement_deleted_title'),
-                __('messages.notification_inventory_movement_deleted_message', [
-                    'type' => $event->type->value,
+                ArabicLocale::trans('messages.notification_inventory_movement_deleted_title'),
+                ArabicLocale::trans('messages.notification_inventory_movement_deleted_message', [
+                    'type' => ArabicLocale::label($event->type->value),
                     'quantity' => $event->quantity,
                     'name' => $event->itemName,
                 ]),
@@ -57,8 +58,8 @@ class NotifyInventoryActivity
 
         if ($event instanceof InventoryCategoryDeleted) {
             $this->notificationService->notifyActivity(
-                __('messages.notification_inventory_category_deleted_title'),
-                __('messages.notification_inventory_category_deleted_message', ['name' => $event->categoryName]),
+                ArabicLocale::trans('messages.notification_inventory_category_deleted_title'),
+                ArabicLocale::trans('messages.notification_inventory_category_deleted_message', ['name' => $event->categoryName]),
                 [
                     'action' => 'category_deleted',
                     'inventory_category_id' => $event->categoryId,
@@ -75,8 +76,8 @@ class NotifyInventoryActivity
                 : ['notification_inventory_category_updated_title', 'notification_inventory_category_updated_message', 'category_updated'];
 
             $this->notificationService->notifyActivity(
-                __('messages.'.$titleKey),
-                __('messages.'.$messageKey, ['name' => $category->name]),
+                ArabicLocale::trans('messages.'.$titleKey),
+                ArabicLocale::trans('messages.'.$messageKey, ['name' => $category->name]),
                 [
                     'action' => $action,
                     'inventory_category_id' => $category->id,
@@ -91,8 +92,8 @@ class NotifyInventoryActivity
             $item = $event->item;
 
             $this->notificationService->notifyActivity(
-                __('messages.notification_inventory_item_created_title'),
-                __('messages.notification_inventory_item_created_message', [
+                ArabicLocale::trans('messages.notification_inventory_item_created_title'),
+                ArabicLocale::trans('messages.notification_inventory_item_created_message', [
                     'name' => $item->name,
                     'code' => $item->code,
                 ]),
@@ -110,9 +111,9 @@ class NotifyInventoryActivity
         $item = $movement->relationLoaded('item') ? $movement->item : $movement->item()->first();
 
         $this->notificationService->notifyActivity(
-            __('messages.notification_inventory_stock_moved_title'),
-            __('messages.notification_inventory_stock_moved_message', [
-                'type' => $movement->type?->value ?? 'movement',
+            ArabicLocale::trans('messages.notification_inventory_stock_moved_title'),
+            ArabicLocale::trans('messages.notification_inventory_stock_moved_message', [
+                'type' => ArabicLocale::label($movement->type?->value ?? 'movement'),
                 'quantity' => $movement->quantity,
                 'name' => $item?->name ?? '#'.$movement->inventory_item_id,
             ]),

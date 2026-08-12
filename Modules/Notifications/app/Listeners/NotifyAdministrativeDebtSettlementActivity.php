@@ -2,6 +2,7 @@
 
 namespace Modules\Notifications\Listeners;
 
+use App\Support\ArabicLocale;
 use Carbon\Carbon;
 use Modules\AdministrativeDebtSettlement\Events\AdministrativeDebtSettlementCreated;
 use Modules\DailyJournal\Actions\ReadAccumulatedAdministrativeDebtTipAction;
@@ -43,8 +44,8 @@ class NotifyAdministrativeDebtSettlementActivity
         $remainingDebt = round((float) ($debts[(int) $settlement->project_id] ?? 0), 2);
 
         $this->notificationService->notifyInfo(
-            __('messages.notification_admin_debt_settlement_created_title'),
-            __('messages.notification_admin_debt_settlement_created_message', [
+            ArabicLocale::trans('messages.notification_admin_debt_settlement_created_title'),
+            ArabicLocale::trans('messages.notification_admin_debt_settlement_created_message', [
                 'name' => $projectName,
                 'amount' => number_format($paidAmount, 2, '.', ','),
                 'remaining' => number_format($remainingDebt, 2, '.', ','),

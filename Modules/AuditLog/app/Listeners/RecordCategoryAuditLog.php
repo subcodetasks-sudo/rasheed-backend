@@ -2,6 +2,7 @@
 
 namespace Modules\AuditLog\Listeners;
 
+use App\Support\ArabicLocale;
 use Modules\AuditLog\Enums\AuditAction;
 use Modules\AuditLog\Support\RecordsAuditSafely;
 use Modules\Project\Events\CategoryCreated;
@@ -17,7 +18,7 @@ class RecordCategoryAuditLog
         if ($event instanceof CategoryDeleted) {
             $this->record(
                 AuditAction::Deleted,
-                __('messages.audit_category_deleted', ['name' => $event->categoryName]),
+                ArabicLocale::trans('messages.audit_category_deleted', ['name' => $event->categoryName]),
                 properties: ['category_id' => $event->categoryId],
             );
 
@@ -29,7 +30,7 @@ class RecordCategoryAuditLog
 
         $this->record(
             $action,
-            __("messages.{$key}", ['name' => $event->category->name]),
+            ArabicLocale::trans("messages.{$key}", ['name' => $event->category->name]),
             subject: $event->category,
             properties: ['category_id' => $event->category->id],
         );

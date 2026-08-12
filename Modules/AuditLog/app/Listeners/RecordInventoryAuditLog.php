@@ -2,6 +2,7 @@
 
 namespace Modules\AuditLog\Listeners;
 
+use App\Support\ArabicLocale;
 use Modules\AuditLog\Enums\AuditAction;
 use Modules\AuditLog\Support\RecordsAuditSafely;
 use Modules\Inventory\Enums\InventoryMovementType;
@@ -23,7 +24,7 @@ class RecordInventoryAuditLog
         if ($event instanceof InventoryItemDeleted) {
             $this->record(
                 AuditAction::Deleted,
-                __('messages.audit_inventory_item_deleted', [
+                ArabicLocale::trans('messages.audit_inventory_item_deleted', [
                     'name' => $event->itemName,
                     'code' => $event->itemCode,
                 ]),
@@ -36,8 +37,8 @@ class RecordInventoryAuditLog
         if ($event instanceof InventoryMovementDeleted) {
             $this->record(
                 AuditAction::Deleted,
-                __('messages.audit_inventory_movement_deleted', [
-                    'type' => $event->type->value,
+                ArabicLocale::trans('messages.audit_inventory_movement_deleted', [
+                    'type' => ArabicLocale::label($event->type->value),
                     'quantity' => $event->quantity,
                     'name' => $event->itemName,
                 ]),
@@ -54,7 +55,7 @@ class RecordInventoryAuditLog
         if ($event instanceof InventoryCategoryDeleted) {
             $this->record(
                 AuditAction::Deleted,
-                __('messages.audit_inventory_category_deleted', ['name' => $event->categoryName]),
+                ArabicLocale::trans('messages.audit_inventory_category_deleted', ['name' => $event->categoryName]),
                 properties: ['inventory_category_id' => $event->categoryId],
             );
 
@@ -69,7 +70,7 @@ class RecordInventoryAuditLog
 
             $this->record(
                 $action,
-                __("messages.{$key}", ['name' => $event->category->name]),
+                ArabicLocale::trans("messages.{$key}", ['name' => $event->category->name]),
                 subject: $event->category,
                 properties: ['inventory_category_id' => $event->category->id],
             );
@@ -82,7 +83,7 @@ class RecordInventoryAuditLog
 
             $this->record(
                 AuditAction::Created,
-                __('messages.audit_inventory_item_created', [
+                ArabicLocale::trans('messages.audit_inventory_item_created', [
                     'name' => $item->name,
                     'code' => $item->code,
                 ]),
@@ -101,7 +102,7 @@ class RecordInventoryAuditLog
 
         $this->record(
             $action,
-            __("messages.audit_inventory_{$action->value}", [
+            ArabicLocale::trans("messages.audit_inventory_{$action->value}", [
                 'quantity' => $movement->quantity,
                 'name' => $item?->name ?? '#'.$movement->inventory_item_id,
             ]),
