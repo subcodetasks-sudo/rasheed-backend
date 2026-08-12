@@ -23,6 +23,7 @@ class ProcessDailyJournalWriteAction
     public function __construct(
         private readonly UpsertDailyJournalEntriesAction $upsertDailyJournalEntriesAction,
         private readonly RecalculateDailyJournalAction $recalculateDailyJournalAction,
+        private readonly RecalculateDailyJournalForwardChainAction $recalculateDailyJournalForwardChainAction,
         private readonly ValidateDailyJournalContributionsAction $validateDailyJournalContributionsAction,
         private readonly AdministrativePercentageBalanceService $administrativePercentageBalanceService,
     ) {}
@@ -50,6 +51,7 @@ class ProcessDailyJournalWriteAction
 
         if (! $data->hasPositiveContribution()) {
             $this->reapplyOverlaysAfterRecalculation($pass1->entries, $data->journalDate);
+            $this->recalculateDailyJournalForwardChainAction->execute($data->journalDate);
 
             return $pass1->entries;
         }
@@ -69,6 +71,8 @@ class ProcessDailyJournalWriteAction
                 (float) ($entry->contribution ?? 0),
             );
         }
+
+        $this->recalculateDailyJournalForwardChainAction->execute($data->journalDate);
 
         return $entries;
     }

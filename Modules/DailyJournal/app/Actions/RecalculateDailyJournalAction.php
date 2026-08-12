@@ -40,7 +40,7 @@ class RecalculateDailyJournalAction
 
         $entries = $this->calculateDailyTotalsAction->execute($entries);
         $entries = $this->calculateFundBalancesAction->execute($entries, $date);
-        $entries = $this->calculateAdministrativeExpenseCoverageAction->execute($entries);
+        $entries = $this->calculateAdministrativeExpenseCoverageAction->execute($entries, $date);
 
         // Remaining Deficit = abs(negative signed fund balance) for contribution validation.
         $remainingDeficits = [];

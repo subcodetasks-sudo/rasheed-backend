@@ -216,18 +216,34 @@ class DailyJournalCalculationService
 
     /**
      * @param  Collection<int, DailyJournalEntry>  $entries
+     * @param  array<int, array{fund_balance: float, accumulated_administrative_debt: float, outstanding_project_administration: float}>  $previousBalances
      * @return Collection<int, DailyJournalEntry>
      */
-    public function applyAdministrativeExpenseCoverage(Collection $entries): Collection
+    public function applyAdministrativeExpenseCoverage(Collection $entries, array $previousBalances = []): Collection
     {
         foreach ($entries as $entry) {
+            $previousOutstanding = round(
+                (float) ($previousBalances[$entry->project_id]['outstanding_project_administration'] ?? 0),
+                2
+            );
+
             $coverage = $this->calculateAdministrativeExpenseCoverage(
                 (float) $entry->fund_balance,
                 (float) $entry->administrative_expense,
             );
 
-            $entry->fund_balance = $coverage['fund_balance'];
-            $entry->uncovered_administrative_expense = $coverage['uncovered'];
+            $fundBalance = $coverage['fund_balance'];
+            $uncovered = $coverage['uncovered'];
+
+            $remainingSurplus = max(0.0, $fundBalance);
+            $settled = round(min($remainingSurplus, $previousOutstanding), 2);
+            $fundBalance = round($fundBalance - $settled, 2);
+            $outstanding = round($previousOutstanding + $uncovered - $settled, 2);
+
+            $entry->fund_balance = $fundBalance;
+            $entry->uncovered_administrative_expense = $uncovered;
+            $entry->project_administration_settled = $settled;
+            $entry->outstanding_project_administration = $outstanding;
         }
 
         return $entries;
@@ -273,7 +289,7 @@ class DailyJournalCalculationService
 
     /**
      * @param  list<int>  $projectIds
-     * @return array<int, array{fund_balance: float, accumulated_administrative_debt: float}>
+     * @return array<int, array{fund_balance: float, accumulated_administrative_debt: float, outstanding_project_administration: float}>
      */
     public function previousBalances(array $projectIds, CarbonInterface $date): array
     {
@@ -294,6 +310,7 @@ class DailyJournalCalculationService
                 'daily_journal_entries.project_id',
                 'daily_journal_entries.fund_balance',
                 'daily_journal_entries.accumulated_administrative_debt',
+                'daily_journal_entries.outstanding_project_administration',
                 'daily_journal_entries.journal_date',
             ])
             ->joinSub($latestDates, 'latest', function ($join) {
@@ -310,6 +327,7 @@ class DailyJournalCalculationService
             $result[$projectId] = [
                 'fund_balance' => (float) ($row?->fund_balance ?? 0),
                 'accumulated_administrative_debt' => (float) ($row?->accumulated_administrative_debt ?? 0),
+                'outstanding_project_administration' => (float) ($row?->outstanding_project_administration ?? 0),
             ];
         }
 

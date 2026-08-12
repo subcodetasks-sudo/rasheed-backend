@@ -14,6 +14,7 @@ class RepayAdministrativeDebtAction
 {
     public function __construct(
         private readonly DailyJournalCalculationService $calculationService,
+        private readonly RecalculateDailyJournalForwardChainAction $recalculateDailyJournalForwardChainAction,
     ) {}
 
     public function execute(string $journalDate, int $projectId): DailyJournalEntry
@@ -60,9 +61,12 @@ class RepayAdministrativeDebtAction
 
         $entry = $entry->loadMissing(['project.category']);
 
+        $date = $entry->journal_date->copy()->startOfDay();
+        $this->recalculateDailyJournalForwardChainAction->execute($date);
+
         // Keep Daily Journal clients in sync by broadcasting the updated journal date.
         DailyJournalUpdated::dispatch(
-            $entry->journal_date->copy()->startOfDay(),
+            $date,
             collect([$entry]),
         );
 

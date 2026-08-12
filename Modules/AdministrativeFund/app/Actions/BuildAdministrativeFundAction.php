@@ -19,6 +19,7 @@ class BuildAdministrativeFundAction
         $journalTotalsByDate = $this->journalTotalsByDate($start, $end);
         $debtRecoveryByDate = $this->debtRecoveryByDate($year, $month);
         $manualByDate = $this->manualByDate($start, $end);
+        $monthEndTip = $this->projectAdministrationTipAsOf($end);
 
         $days = [];
         $sums = $this->emptyMoneyBag();
@@ -31,6 +32,7 @@ class BuildAdministrativeFundAction
             $journalTotals = $journalTotalsByDate[$dateString] ?? null;
 
             $projectAdministration = round((float) ($journalTotals['project_administration'] ?? 0), 2);
+            $projectAdministrationIncome = round((float) ($journalTotals['project_administration_income'] ?? 0), 2);
             $totalAdministrativePercentage = round((float) ($journalTotals['total_administrative_percentage'] ?? 0), 2);
             $cashFundContributions = 0.0;
             $individualContributions = round((float) ($manual['individual_contributions'] ?? 0), 2);
@@ -39,7 +41,7 @@ class BuildAdministrativeFundAction
             $assetAdministration = round((float) ($manual['asset_administration'] ?? 0), 2);
 
             $totalIncome = round(
-                $projectAdministration + $cashFundContributions + $individualContributions + $debtRecovery,
+                $projectAdministrationIncome + $cashFundContributions + $individualContributions + $debtRecovery,
                 2,
             );
             $totalExpenses = round($operationalAdministration + $assetAdministration, 2);
@@ -63,7 +65,6 @@ class BuildAdministrativeFundAction
 
             $days[] = $row;
 
-            $sums['project_administration'] += $projectAdministration;
             $sums['total_administrative_percentage'] += $totalAdministrativePercentage;
             $sums['cash_fund_contributions'] += $cashFundContributions;
             $sums['individual_contributions'] += $individualContributions;
@@ -78,7 +79,7 @@ class BuildAdministrativeFundAction
         }
 
         $summary = [
-            'project_administration' => FormatMoneyDecimal::formatRounded($sums['project_administration']),
+            'project_administration' => FormatMoneyDecimal::formatRounded($monthEndTip),
             'total_administrative_percentage' => FormatMoneyDecimal::formatRounded($sums['total_administrative_percentage']),
             'cash_fund_contributions' => FormatMoneyDecimal::formatRounded($sums['cash_fund_contributions']),
             'individual_contributions' => FormatMoneyDecimal::formatRounded($sums['individual_contributions']),
@@ -111,22 +112,27 @@ class BuildAdministrativeFundAction
     }
 
     /**
-     * Project administration and total administrative percentage are two independent
-     * values: the first is administrative expense left uncovered by fund surpluses,
-     * the second is the raw administrative percentage deducted from projects. They are
-     * never substituted for one another.
+     * Per day: outstanding tip (display) and new uncovered transfers (income).
+     * Administrative percentage remains an independent display-only column.
      *
-     * @return array<string, array{project_administration: float, total_administrative_percentage: float}>
+     * @return array<string, array{
+     *     project_administration: float,
+     *     project_administration_income: float,
+     *     total_administrative_percentage: float
+     * }>
      */
     private function journalTotalsByDate(string $start, string $end): array
     {
         $rows = DB::table('daily_journal_entries')
-            ->where('daily_journal_entries.journal_date', '>=', $start)
-            ->where('daily_journal_entries.journal_date', '<=', $end)
+            ->whereDate('daily_journal_entries.journal_date', '>=', $start)
+            ->whereDate('daily_journal_entries.journal_date', '<=', $end)
             ->groupBy('daily_journal_entries.journal_date')
             ->selectRaw('daily_journal_entries.journal_date as journal_date')
             ->selectRaw(
-                'COALESCE(SUM(COALESCE(daily_journal_entries.uncovered_administrative_expense, 0)), 0) as project_administration'
+                'COALESCE(SUM(COALESCE(daily_journal_entries.outstanding_project_administration, 0)), 0) as project_administration'
+            )
+            ->selectRaw(
+                'COALESCE(SUM(COALESCE(daily_journal_entries.uncovered_administrative_expense, 0)), 0) as project_administration_income'
             )
             ->selectRaw(
                 'COALESCE(SUM(COALESCE(daily_journal_entries.administrative_fee, 0)), 0) as total_administrative_percentage'
@@ -138,11 +144,36 @@ class BuildAdministrativeFundAction
             $dateKey = $this->dateKey((string) $row->journal_date);
             $keyed[$dateKey] = [
                 'project_administration' => round((float) $row->project_administration, 2),
+                'project_administration_income' => round((float) $row->project_administration_income, 2),
                 'total_administrative_percentage' => round((float) $row->total_administrative_percentage, 2),
             ];
         }
 
         return $keyed;
+    }
+
+    /**
+     * Org-wide outstanding tip as of `$asOfDate`: sum of each project's tip on its
+     * latest journal entry with journal_date <= asOfDate.
+     */
+    private function projectAdministrationTipAsOf(string $asOfDate): float
+    {
+        $latestDates = DB::table('daily_journal_entries')
+            ->selectRaw('project_id, MAX(journal_date) as journal_date')
+            ->whereDate('journal_date', '<=', $asOfDate)
+            ->groupBy('project_id');
+
+        $total = DB::table('daily_journal_entries')
+            ->joinSub($latestDates, 'latest', function ($join) {
+                $join->on('daily_journal_entries.project_id', '=', 'latest.project_id')
+                    ->on('daily_journal_entries.journal_date', '=', 'latest.journal_date');
+            })
+            ->selectRaw(
+                'COALESCE(SUM(COALESCE(daily_journal_entries.outstanding_project_administration, 0)), 0) as tip'
+            )
+            ->value('tip');
+
+        return round((float) $total, 2);
     }
 
     /**

@@ -43,7 +43,7 @@ class AdministrativeFundApiTest extends TestCase
 
     private function seedEntry(int $projectId, string $date, array $attrs = []): DailyJournalEntry
     {
-        return DailyJournalEntry::factory()->create(array_merge([
+        $defaults = [
             'project_id' => $projectId,
             'journal_date' => $date,
             'daily_income' => 0,
@@ -57,7 +57,17 @@ class AdministrativeFundApiTest extends TestCase
             'administrative_debt' => 0,
             'accumulated_administrative_debt' => 0,
             'uncovered_administrative_expense' => 0,
-        ], $attrs));
+            'project_administration_settled' => 0,
+            'outstanding_project_administration' => 0,
+        ];
+
+        $payload = array_merge($defaults, $attrs);
+
+        if (! array_key_exists('outstanding_project_administration', $attrs)) {
+            $payload['outstanding_project_administration'] = (float) ($payload['uncovered_administrative_expense'] ?? 0);
+        }
+
+        return DailyJournalEntry::factory()->create($payload);
     }
 
     private function findDay(array $payload, string $date): array
@@ -221,12 +231,13 @@ class AdministrativeFundApiTest extends TestCase
         $data = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data');
         $day = $this->findDay($data, '2026-08-18');
 
-        $expectedIncome = (float) $day['project_administration']
+        $expectedIncome = 30.0
             + (float) $day['cash_fund_contributions']
             + (float) $day['individual_contributions']
             + (float) $day['debt_recovery'];
 
         $this->assertMoneyEquals($expectedIncome, $day['total_income']);
+        $this->assertRoundedMoneyEquals(30.0, $day['project_administration']);
         $this->assertRoundedMoneyEquals(50.0, $day['total_income']);
         $this->assertRoundedMoneyEquals(5.0, $day['total_expenses']);
         $this->assertRoundedMoneyEquals(45.0, $day['net']);
@@ -251,13 +262,17 @@ class AdministrativeFundApiTest extends TestCase
         $this->assertRoundedMoneyEquals(15.0, $day['project_administration']);
         $this->assertRoundedMoneyEquals(40.0, $day['total_administrative_percentage']);
 
-        $entry->forceFill(['uncovered_administrative_expense' => 65])->save();
+        $entry->forceFill([
+            'uncovered_administrative_expense' => 65,
+            'outstanding_project_administration' => 65,
+        ])->save();
 
         $day = $this->findDay(
             $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data'),
             '2026-08-20',
         );
         $this->assertRoundedMoneyEquals(65.0, $day['project_administration']);
+        $this->assertRoundedMoneyEquals(65.0, $day['total_income']);
         $this->assertRoundedMoneyEquals(40.0, $day['total_administrative_percentage']);
 
         $entry->forceFill(['administrative_fee' => 90])->save();
@@ -268,6 +283,64 @@ class AdministrativeFundApiTest extends TestCase
         );
         $this->assertRoundedMoneyEquals(65.0, $day['project_administration']);
         $this->assertRoundedMoneyEquals(90.0, $day['total_administrative_percentage']);
+    }
+
+    public function test_project_administration_display_is_tip_while_income_uses_daily_uncovered(): void
+    {
+        $this->actAs('finance');
+        $project = $this->createProject();
+
+        $this->seedEntry($project->id, '2026-08-10', [
+            'uncovered_administrative_expense' => 100,
+            'outstanding_project_administration' => 100,
+            'project_administration_settled' => 0,
+        ]);
+        $this->seedEntry($project->id, '2026-08-11', [
+            'uncovered_administrative_expense' => 0,
+            'project_administration_settled' => 40,
+            'outstanding_project_administration' => 60,
+        ]);
+
+        $data = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data');
+        $day10 = $this->findDay($data, '2026-08-10');
+        $day11 = $this->findDay($data, '2026-08-11');
+
+        $this->assertRoundedMoneyEquals(100.0, $day10['project_administration']);
+        $this->assertRoundedMoneyEquals(100.0, $day10['total_income']);
+        $this->assertRoundedMoneyEquals(60.0, $day11['project_administration']);
+        $this->assertRoundedMoneyEquals(0.0, $day11['total_income']);
+        $this->assertRoundedMoneyEquals(60.0, $data['summary']['project_administration']);
+        $this->assertRoundedMoneyEquals(100.0, $data['summary']['total_income']);
+    }
+
+    public function test_month_summary_project_administration_is_month_end_tip_not_sum_of_daily_tips(): void
+    {
+        $this->actAs('finance');
+        $project = $this->createProject();
+
+        $this->seedEntry($project->id, '2026-08-01', [
+            'uncovered_administrative_expense' => 80,
+            'outstanding_project_administration' => 80,
+        ]);
+        $this->seedEntry($project->id, '2026-08-15', [
+            'uncovered_administrative_expense' => 20,
+            'project_administration_settled' => 30,
+            'outstanding_project_administration' => 70,
+        ]);
+        $this->seedEntry($project->id, '2026-08-31', [
+            'uncovered_administrative_expense' => 0,
+            'project_administration_settled' => 25,
+            'outstanding_project_administration' => 45,
+        ]);
+
+        $data = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data');
+
+        $this->assertRoundedMoneyEquals(80.0, $this->findDay($data, '2026-08-01')['project_administration']);
+        $this->assertRoundedMoneyEquals(70.0, $this->findDay($data, '2026-08-15')['project_administration']);
+        $this->assertRoundedMoneyEquals(45.0, $this->findDay($data, '2026-08-31')['project_administration']);
+        $this->assertRoundedMoneyEquals(45.0, $data['summary']['project_administration']);
+        $this->assertRoundedMoneyEquals(45.0, $data['totals']['project_administration']);
+        $this->assertRoundedMoneyEquals(100.0, $data['summary']['total_income']);
     }
 
     private function assertMoneyEquals(float $expected, string|float|null $actual): void

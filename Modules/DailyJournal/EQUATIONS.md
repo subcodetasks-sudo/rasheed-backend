@@ -14,6 +14,8 @@ You are implementing or reviewing the Daily Journal calculation engine for Rashi
 **System-calculated (reject if client sends them):**
 - `administrative_expense`
 - `uncovered_administrative_expense`
+- `project_administration_settled`
+- `outstanding_project_administration`
 - `administrative_fee`
 - `operational_deduction`
 - `daily_total`
@@ -93,9 +95,9 @@ Previous = latest entry with `journal_date < today` for that project, or `0`.
 
 The balance is **signed**: it may be positive, zero, or negative. A negative fund balance is carried forward as-is to the next journal date. It is **not** clamped to zero. A negative balance alone does **not** create Administrative Debt.
 
-### 5a. Administrative expense coverage (fund surplus only)
+### 5a. Administrative expense coverage (fund surplus only) + carry-forward settlement
 
-After `intermediate_fund_balance` is known, cover administrative expense from **same-day surplus only**. Administrative fee (percentage) does **not** participate.
+After `intermediate_fund_balance` is known, cover **today’s** administrative expense from same-day surplus first. Administrative fee (percentage) does **not** participate.
 
 ```
 surplus = max(0, intermediate_fund_balance)
@@ -110,7 +112,31 @@ uncovered_administrative_expense = round(administrative_expense − covered, 2)
 | 2 | 0 < surplus < expense | Use all surplus; `fund_balance = 0`; remainder → `uncovered` |
 | 3 | surplus = 0 | `covered = 0`; full expense → `uncovered` |
 
-Uncovered expense is **not** fund deficit and **not** administrative debt. Per day, `SUM(uncovered_administrative_expense)` across all projects feeds Administrative Fund **`project_administration`** (إداري المشروعات).
+Then, **per project**, settle prior carried-forward outstanding from any **remaining** surplus (never use admin fee):
+
+```
+previous_outstanding = outstanding tip from latest prior journal entry for that project (or 0)
+remaining_surplus = max(0, fund_balance)
+project_administration_settled = min(remaining_surplus, previous_outstanding)
+fund_balance = round(fund_balance − project_administration_settled, 2)
+outstanding_project_administration = round(
+  previous_outstanding + uncovered_administrative_expense − project_administration_settled
+, 2)
+```
+
+Rules:
+
+- `uncovered_administrative_expense` stays associated with the **original day** (new transfer that day); later settlement does not rewrite it.
+- Uncovered expense is **not** fund deficit and **not** administrative debt.
+- Order is fixed: cover current expense → then settle prior outstanding. Never reverse.
+- One project’s surplus never settles another project’s outstanding.
+- Recalculating date `D` must recalculate later journal dates in order so the tip chain stays consistent.
+
+Administrative Fund:
+
+- Daily **`project_administration`** (إداري المشروعات) = `SUM(outstanding_project_administration)` for entries on that date (outstanding tip).
+- Daily **income** from this source uses `SUM(uncovered_administrative_expense)` only (new transfers), so settlement does not double-count or reverse income.
+- Month **summary / totals `project_administration`** = org tip as of month-end (latest tip per project with `journal_date ≤` last day), not the sum of daily tips.
 
 Separately, per day `SUM(administrative_fee)` across all projects feeds Administrative Fund
 **`total_administrative_percentage`** (إجمالي النسبة الإدارية). That column is display-only: it is never
@@ -174,7 +200,7 @@ fund_balance = surplus
 4. Resolve administrative expense (inventory)
 5. Calculate daily totals
 6. Calculate intermediate fund balances (using previous day; signed carry-forward)
-7. Apply administrative expense coverage from surplus → final `fund_balance`, `uncovered_administrative_expense`
+7. Apply administrative expense coverage from surplus → settle prior project_administration tip → final `fund_balance`, `uncovered_administrative_expense`, `project_administration_settled`, `outstanding_project_administration`
 8. Capture `remainingDeficits = |fund_balance| if < 0 else 0` (for contribution validation)
 9. Calculate administrative debt (Case 1 fund consumption + contribution)
 10. Update accumulated administrative debt
@@ -293,9 +319,10 @@ Action rejections:
 | Positive balance | No Case 1 debt from balance |
 | Negative balance, fee available | Case 1 debt = min(\|balance\|, full same-day administrative_fee) |
 | Negative balance, fee 0 | Debt 0 (negative alone never creates debt) |
-| Admin expense uncovered | Transferred via `uncovered_administrative_expense`; never debt or extra deficit |
+| Admin expense uncovered | Transferred via `uncovered_administrative_expense` into outstanding tip; never debt or extra deficit |
 | Admin expense covered by surplus | Reduces `fund_balance` only; `uncovered = 0` |
-| Admin fee present with uncovered expense | Fee not used for expense; separate Case 1 only if fund deficit |
+| Later-day surplus after prior uncovered | After covering today’s expense, remaining surplus settles prior outstanding tip |
+| Admin fee present with uncovered expense | Fee not used for expense or tip settlement; separate Case 1 only if fund deficit |
 | Unused prior-day admin fee | Must not cover later deficit or expense |
 | Contribution | Requires Pass-1 deficit + available admin percentage balance; reduces fund deficit via daily_total; adds amount to debt; permanently debits org admin pool |
 | Contribution clear/lower | Super-admin only; does **not** refund admin percentage pool debits |
@@ -303,7 +330,7 @@ Action rejections:
 | Surplus day after prior debt | Surplus kept; accumulated unchanged until repay endpoint |
 | Pass-2 preserve | Fee / op / admin expense frozen from Pass 1 |
 | Non-active projects | Rejected on save |
-| Editing one date | Does not auto-recalculate later dates |
+| Editing one date | Recalculates that date then later journal dates in order (fund + tip chain) |
 | Project delete | Blocked if any journal entries exist |
 
 ---
@@ -328,4 +355,4 @@ repay(40, 0, 100) → (0, 0, 60)
 repay(30, 20, 50) → (0, 0, 20)  // today first, then accumulated
 ```
 
-When implementing, changing, or reviewing Daily Journal logic, preserve this exact order, these formulas, and these validations. Do not auto-repay debt on save. Do not use administrative fee to cover administrative expense. Uncovered administrative expense flows to Administrative Fund `project_administration` only, and the day's total administrative percentage flows to the display-only `total_administrative_percentage` column only — never merge the two or let either reach administrative income twice. Case 1 uses same-day full admin fee for deficit only; unused fee does not carry forward. Contribution requires a Pass-1 fund deficit; re-saves must not compound. Do not recalculate fee/op/admin expense on Pass 2.
+When implementing, changing, or reviewing Daily Journal logic, preserve this exact order, these formulas, and these validations. Do not auto-repay debt on save. Do not use administrative fee to cover administrative expense or to settle prior outstanding tip. Uncovered administrative expense becomes a per-project outstanding tip (`outstanding_project_administration`) that Administrative Fund shows as `project_administration`; new daily transfers (`uncovered_administrative_expense`) feed Admin Fund income only once. The day's total administrative percentage flows to the display-only `total_administrative_percentage` column only — never merge the two or let either reach administrative income twice. Cover today's expense before settling prior tip. Case 1 uses same-day full admin fee for deficit only; unused fee does not carry forward. Contribution requires a Pass-1 fund deficit; re-saves must not compound. Do not recalculate fee/op/admin expense on Pass 2. After recalculating a date, recalculate later journal dates in order.

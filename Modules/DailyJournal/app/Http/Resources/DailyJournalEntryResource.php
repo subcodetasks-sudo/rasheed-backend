@@ -27,6 +27,8 @@ class DailyJournalEntryResource extends JsonResource
             'contribution' => $this->nullableDecimal($this->contribution),
             'administrative_expense' => FormatMoneyDecimal::formatRounded($this->administrative_expense),
             'uncovered_administrative_expense' => FormatMoneyDecimal::formatRounded($this->uncovered_administrative_expense),
+            'project_administration_settled' => FormatMoneyDecimal::formatRounded($this->project_administration_settled),
+            'outstanding_project_administration' => FormatMoneyDecimal::formatRounded($this->outstanding_project_administration),
             'administrative_fee' => FormatMoneyDecimal::formatRounded($this->administrative_fee),
             'operational_deduction' => FormatMoneyDecimal::formatRounded($this->operational_deduction),
             'daily_total' => FormatMoneyDecimal::formatRounded($this->daily_total),
