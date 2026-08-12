@@ -16,6 +16,7 @@ class UpdateAdministrativeFundDayRequest extends FormRequest
 
     private const FORBIDDEN = [
         'project_administration',
+        'total_administrative_percentage',
         'cash_fund_contributions',
         'debt_recovery',
         'total_income',

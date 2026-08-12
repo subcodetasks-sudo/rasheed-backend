@@ -31,12 +31,11 @@ class DailyJournalCalculationTest extends TestCase
     public function test_daily_total_equation(): void
     {
         $this->assertEquals(
-            780.0,
+            800.0,
             $this->service->calculateDailyTotal(
                 income: 1000,
                 contribution: 50,
                 expense: 100,
-                administrativeExpense: 20,
                 administrativeFee: 120,
                 operationalDeduction: 30,
             )
@@ -49,55 +48,44 @@ class DailyJournalCalculationTest extends TestCase
         $this->assertEquals(-60.0, $this->service->calculateFundBalance(40, -100));
     }
 
-    public function test_administrative_debt_cases_and_expense_first_allocation(): void
+    public function test_administrative_expense_coverage_cases(): void
     {
-        // Case 1: deficit covered by fee (example: income 200 @ 12% → fee 24)
+        $full = $this->service->calculateAdministrativeExpenseCoverage(500, 100);
+        $this->assertSame(['covered' => 100.0, 'uncovered' => 0.0, 'fund_balance' => 400.0], $full);
+
+        $partial = $this->service->calculateAdministrativeExpenseCoverage(60, 100);
+        $this->assertSame(['covered' => 60.0, 'uncovered' => 40.0, 'fund_balance' => 0.0], $partial);
+
+        $none = $this->service->calculateAdministrativeExpenseCoverage(-12, 80);
+        $this->assertSame(['covered' => 0.0, 'uncovered' => 80.0, 'fund_balance' => -12.0], $none);
+    }
+
+    public function test_administrative_debt_case1_only(): void
+    {
+        // Case 1: deficit covered by full same-day fee
         $this->assertEquals(
             24.0,
             $this->service->calculateAdministrativeDebt(
                 fundBalance: -100,
                 administrativeFee: 24,
-                administrativeExpense: 0,
             )
         );
 
-        // Case 1 capped by remaining deficit magnitude
+        // Case 1 capped by deficit magnitude
         $this->assertEquals(
             10.0,
             $this->service->calculateAdministrativeDebt(
                 fundBalance: -10,
                 administrativeFee: 24,
-                administrativeExpense: 0,
             )
         );
 
-        // Case 2: expense exceeds fee → debt = fee consumed
+        // Surplus day → no debt
         $this->assertEquals(
-            50.0,
+            0.0,
             $this->service->calculateAdministrativeDebt(
-                fundBalance: 10,
+                fundBalance: 370,
                 administrativeFee: 50,
-                administrativeExpense: 80,
-            )
-        );
-
-        // Expense ≤ fee: no Case 2; remaining fee available for Case 1
-        $this->assertEquals(
-            20.0,
-            $this->service->calculateAdministrativeDebt(
-                fundBalance: -100,
-                administrativeFee: 50,
-                administrativeExpense: 30,
-            )
-        );
-
-        // Expense-first overlap cannot spend fee twice (expense 80 takes all fee)
-        $this->assertEquals(
-            50.0,
-            $this->service->calculateAdministrativeDebt(
-                fundBalance: -100,
-                administrativeFee: 50,
-                administrativeExpense: 80,
             )
         );
 
@@ -107,17 +95,15 @@ class DailyJournalCalculationTest extends TestCase
             $this->service->calculateAdministrativeDebt(
                 fundBalance: -60,
                 administrativeFee: 0,
-                administrativeExpense: 0,
             )
         );
 
-        // Positive balance, expense ≤ fee → no debt
+        // Positive balance → no debt
         $this->assertEquals(
             0.0,
             $this->service->calculateAdministrativeDebt(
                 fundBalance: 25,
                 administrativeFee: 50,
-                administrativeExpense: 30,
             )
         );
     }
@@ -257,6 +243,7 @@ class DailyJournalCalculationTest extends TestCase
         $entries = $this->service->applyFundBalances(collect([$entry]), $previous);
         $this->assertEquals(-60.0, (float) $entries->first()->fund_balance);
 
+        $entries = $this->service->applyAdministrativeExpenseCoverage($entries);
         $entries = $this->service->applyAdministrativeDebt($entries);
         $this->assertEquals(-60.0, (float) $entries->first()->fund_balance);
         $this->assertEquals(24.0, (float) $entries->first()->administrative_debt);

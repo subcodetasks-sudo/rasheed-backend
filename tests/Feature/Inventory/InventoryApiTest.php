@@ -334,7 +334,7 @@ class InventoryApiTest extends InventoryFeatureTestCase
         $this->assertSame('200.00', number_format((float) $entry->administrative_expense, 2, '.', ''));
     }
 
-    public function test_administrative_expense_exceeding_fee_creates_case2_debt(): void
+    public function test_administrative_expense_exceeding_fee_uses_surplus_not_debt(): void
     {
         $this->actAsSuperAdmin();
         Role::findOrCreate('inventory', 'web');
@@ -366,9 +366,7 @@ class InventoryApiTest extends InventoryFeatureTestCase
         ])->assertCreated()
             ->assertJsonPath('data.total_cost', '80.00');
 
-        // Income 500 → fee 50; admin expense 80; fund stays non-negative enough that Case 1 is 0
-        // daily_total = 500 - 0 - 80 - 50 - 0 = 370; fund = 370 > 0
-        // Case 2: expense 80 > fee 50 → debt = 50
+        // Income 500 → fee 50; admin expense 80; daily_total = 450; surplus covers 80 → fund 370
         $journal = $this->putJson('/api/v1/daily-journals', [
             'journal_date' => now()->toDateString(),
             'entries' => [
@@ -382,8 +380,9 @@ class InventoryApiTest extends InventoryFeatureTestCase
         $this->assertSame('80', $entry['administrative_expense']);
         $this->assertSame('50', $entry['administrative_fee']);
         $this->assertSame('370', $entry['fund_balance']);
-        $this->assertSame('50', $entry['administrative_debt']);
-        $this->assertSame('50', $entry['accumulated_administrative_debt']);
+        $this->assertSame('0', $entry['administrative_debt']);
+        $this->assertSame('0', $entry['uncovered_administrative_expense']);
+        $this->assertSame('0', $entry['accumulated_administrative_debt']);
     }
 
     public function test_operational_outgoing_does_not_feed_administrative_expense(): void

@@ -16,13 +16,14 @@ class DailyJournalCalculationService
     ) {}
 
     /**
-     * Daily Total = income + contribution - expense - admin expense - admin fee - operational deduction
+     * Daily Total = income + contribution - expense - admin fee - operational deduction
+     *
+     * Administrative expense is applied separately from fund surplus after this step.
      */
     public function calculateDailyTotal(
         float $income,
         float $contribution,
         float $expense,
-        float $administrativeExpense,
         float $administrativeFee,
         float $operationalDeduction,
     ): float {
@@ -30,7 +31,6 @@ class DailyJournalCalculationService
             $income
             + $contribution
             - $expense
-            - $administrativeExpense
             - $administrativeFee
             - $operationalDeduction,
             2
@@ -46,34 +46,47 @@ class DailyJournalCalculationService
     }
 
     /**
-     * Administrative Fund consumption debt (Cases 1 and 2 only).
+     * Cover administrative expense from same-day fund surplus only.
      *
-     * Expense-first allocation:
-     * - expense_consumed = min(expense, fee)
-     * - remaining_fee = fee - expense_consumed
-     * - Case 2 debt when expense > fee: expense_consumed
-     * - Case 1 debt when fund_balance < 0: min(|fund_balance|, remaining_fee)
+     * @return array{covered: float, uncovered: float, fund_balance: float}
+     */
+    public function calculateAdministrativeExpenseCoverage(
+        float $intermediateFundBalance,
+        float $administrativeExpense,
+    ): array {
+        $intermediate = round($intermediateFundBalance, 2);
+        $expense = round(max(0, $administrativeExpense), 2);
+        $surplus = max(0, $intermediate);
+        $covered = round(min($surplus, $expense), 2);
+        $uncovered = round($expense - $covered, 2);
+
+        return [
+            'covered' => $covered,
+            'uncovered' => $uncovered,
+            'fund_balance' => round($intermediate - $covered, 2),
+        ];
+    }
+
+    /**
+     * Administrative Fund consumption debt (Case 1 only).
      *
-     * Does not modify fund_balance. Contribution is added separately in applyAdministrativeDebt.
+     * Case 1 debt when fund_balance < 0: min(|fund_balance|, administrative_fee)
+     *
+     * Uses same-day administrative_fee only. Administrative expense is handled
+     * separately and never creates administrative debt.
      */
     public function calculateAdministrativeDebt(
         float $fundBalance,
         float $administrativeFee,
-        float $administrativeExpense,
     ): float {
         $fee = round(max(0, $administrativeFee), 2);
-        $expense = round(max(0, $administrativeExpense), 2);
         $balance = round($fundBalance, 2);
 
-        $expenseConsumed = min($expense, $fee);
-        $remainingFee = round($fee - $expenseConsumed, 2);
-
-        $expenseDebt = $expense > $fee ? $expenseConsumed : 0.0;
         $deficitDebt = $balance < 0
-            ? min(abs($balance), $remainingFee)
+            ? min(abs($balance), $fee)
             : 0.0;
 
-        return round($expenseDebt + $deficitDebt, 2);
+        return round($deficitDebt, 2);
     }
 
     /**
@@ -89,11 +102,6 @@ class DailyJournalCalculationService
     /**
      * Explicit user-initiated debt repayment using available fund surplus.
      *
-     * Priority (stop when surplus is exhausted):
-     * 1. Cover remaining fund balance deficit (if any).
-     * 2. Repay today's administrative debt.
-     * 3. Repay accumulated administrative debt.
-     *
      * @return array{fund_balance: float, administrative_debt: float, accumulated_administrative_debt: float}
      */
     public function repayAdministrativeDebtFromSurplus(
@@ -105,9 +113,6 @@ class DailyJournalCalculationService
         $administrativeDebt = round(max(0, $administrativeDebt), 2);
         $accumulatedAdministrativeDebt = round(max(0, $accumulatedAdministrativeDebt), 2);
 
-        // Priority 1: cover remaining fund balance deficit if any remains.
-        // With available surplus required by the caller, fund_balance is expected to be > 0,
-        // so this branch is typically a no-op.
         if ($fundBalance < 0) {
             return [
                 'fund_balance' => $fundBalance,
@@ -118,13 +123,11 @@ class DailyJournalCalculationService
 
         $surplus = $fundBalance;
 
-        // Priority 2: repay today's administrative debt.
         $repayToday = min($surplus, $administrativeDebt);
         $administrativeDebt = round($administrativeDebt - $repayToday, 2);
         $surplus = round($surplus - $repayToday, 2);
         $accumulatedAdministrativeDebt = round(max(0, $accumulatedAdministrativeDebt - $repayToday), 2);
 
-        // Priority 3: repay accumulated administrative debt.
         $repayAccumulated = min($surplus, $accumulatedAdministrativeDebt);
         $accumulatedAdministrativeDebt = round($accumulatedAdministrativeDebt - $repayAccumulated, 2);
         $surplus = round($surplus - $repayAccumulated, 2);
@@ -188,7 +191,6 @@ class DailyJournalCalculationService
                 $entry->incomeAmount(),
                 $entry->contributionAmount(),
                 $entry->expenseAmount(),
-                (float) $entry->administrative_expense,
                 (float) $entry->administrative_fee,
                 (float) $entry->operational_deduction,
             );
@@ -216,12 +218,22 @@ class DailyJournalCalculationService
      * @param  Collection<int, DailyJournalEntry>  $entries
      * @return Collection<int, DailyJournalEntry>
      */
+    public function applyAdministrativeExpenseCoverage(Collection $entries): Collection
+    {
+        foreach ($entries as $entry) {
+            $coverage = $this->calculateAdministrativeExpenseCoverage(
+                (float) $entry->fund_balance,
+                (float) $entry->administrative_expense,
+            );
+
+            $entry->fund_balance = $coverage['fund_balance'];
+            $entry->uncovered_administrative_expense = $coverage['uncovered'];
+        }
+
+        return $entries;
+    }
+
     /**
-     * Today's Administrative Debt = fund-consumption debt (Cases 1/2) + contribution.
-     *
-     * Fund-consumption base uses the pre-contribution fund balance so re-saving a
-     * different contribution recomputes from the same base (never compounds).
-     *
      * @param  Collection<int, DailyJournalEntry>  $entries
      * @return Collection<int, DailyJournalEntry>
      */
@@ -233,7 +245,6 @@ class DailyJournalCalculationService
             $fundConsumptionDebt = $this->calculateAdministrativeDebt(
                 round((float) $entry->fund_balance - $contribution, 2),
                 (float) $entry->administrative_fee,
-                (float) $entry->administrative_expense,
             );
 
             $entry->administrative_debt = round($fundConsumptionDebt + $contribution, 2);
@@ -261,12 +272,6 @@ class DailyJournalCalculationService
     }
 
     /**
-     * Latest cumulative values for each project before the given journal date.
-     *
-     * Fetches only one prior row per project via MAX(journal_date) subquery.
-     * Safe without secondary ordering because unique(project_id, journal_date)
-     * guarantees a single entry per project per day.
-     *
      * @param  list<int>  $projectIds
      * @return array<int, array{fund_balance: float, accumulated_administrative_debt: float}>
      */

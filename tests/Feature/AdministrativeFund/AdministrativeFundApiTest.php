@@ -56,6 +56,7 @@ class AdministrativeFundApiTest extends TestCase
             'fund_balance' => 0,
             'administrative_debt' => 0,
             'accumulated_administrative_debt' => 0,
+            'uncovered_administrative_expense' => 0,
         ], $attrs));
     }
 
@@ -95,38 +96,188 @@ class AdministrativeFundApiTest extends TestCase
         $this->assertCount(31, $data['days']);
         $this->assertSame('2026-08-01', $data['days'][0]['date']);
         $this->assertSame('Saturday', $data['days'][0]['day']);
-        $this->assertSame('0.00', $data['summary']['project_administration']);
-        $this->assertSame('0.00', $data['summary']['cash_fund_contributions']);
-        $this->assertSame('0.00', $data['summary']['operational_administration']);
-        $this->assertSame('0.00', $data['totals']['net']);
+        $this->assertRoundedMoneyEquals(0.0, $data['days'][0]['total_administrative_percentage']);
+        $this->assertRoundedMoneyEquals(0.0, $data['summary']['project_administration']);
+        $this->assertRoundedMoneyEquals(0.0, $data['summary']['total_administrative_percentage']);
+        $this->assertRoundedMoneyEquals(0.0, $data['summary']['cash_fund_contributions']);
+        $this->assertRoundedMoneyEquals(0.0, $data['summary']['operational_administration']);
+        $this->assertRoundedMoneyEquals(0.0, $data['totals']['net']);
     }
 
-    public function test_project_administration_from_daily_journal(): void
+    public function test_project_administration_from_uncovered_administrative_expense(): void
     {
         $this->actAs('finance');
         $project = $this->createProject();
 
-        // collected = fee − debt + contribution = 100 − 40 + 10 = 70
         $this->seedEntry($project->id, '2026-08-10', [
-            'administrative_fee' => 100,
-            'administrative_debt' => 40,
-            'contribution' => 10,
+            'uncovered_administrative_expense' => 70,
         ]);
 
-        $exempt = $this->createProject(['administrative_exempt' => true]);
-        $this->seedEntry($exempt->id, '2026-08-10', [
-            'administrative_fee' => 50,
-            'administrative_debt' => 0,
-            'contribution' => 0,
+        $other = $this->createProject(['name' => 'Other '.uniqid()]);
+        $this->seedEntry($other->id, '2026-08-10', [
+            'uncovered_administrative_expense' => 25,
         ]);
 
         $data = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data');
         $day = $this->findDay($data, '2026-08-10');
 
-        $this->assertSame('70.00', $day['project_administration']);
-        $this->assertSame('70.00', $day['total_income']);
-        $this->assertSame('70.00', $data['summary']['project_administration']);
-        $this->assertSame('70.00', $data['totals']['project_administration']);
+        $this->assertRoundedMoneyEquals(95.0, $day['project_administration']);
+        $this->assertRoundedMoneyEquals(95.0, $day['total_income']);
+        $this->assertRoundedMoneyEquals(95.0, $data['summary']['project_administration']);
+        $this->assertRoundedMoneyEquals(95.0, $data['totals']['project_administration']);
+
+        $this->assertRoundedMoneyEquals(0.0, $day['total_administrative_percentage']);
+        $this->assertRoundedMoneyEquals(0.0, $data['summary']['total_administrative_percentage']);
+    }
+
+    public function test_total_administrative_percentage_sums_fees_and_never_becomes_project_administration(): void
+    {
+        $this->actAs('finance');
+
+        foreach ([24, 12, 10] as $fee) {
+            $project = $this->createProject(['name' => 'Percentage '.uniqid()]);
+            $this->seedEntry($project->id, '2026-08-10', [
+                'administrative_fee' => $fee,
+                'uncovered_administrative_expense' => 0,
+            ]);
+        }
+
+        $data = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data');
+        $day = $this->findDay($data, '2026-08-10');
+
+        $this->assertRoundedMoneyEquals(46.0, $day['total_administrative_percentage']);
+        $this->assertRoundedMoneyEquals(0.0, $day['project_administration']);
+        $this->assertRoundedMoneyEquals(0.0, $day['total_income']);
+        $this->assertRoundedMoneyEquals(0.0, $day['net']);
+        $this->assertRoundedMoneyEquals(46.0, $data['summary']['total_administrative_percentage']);
+        $this->assertRoundedMoneyEquals(46.0, $data['totals']['total_administrative_percentage']);
+        $this->assertRoundedMoneyEquals(0.0, $data['totals']['project_administration']);
+        $this->assertRoundedMoneyEquals(0.0, $data['totals']['total_income']);
+    }
+
+    public function test_both_values_stay_in_their_own_column_on_the_same_day(): void
+    {
+        $this->actAs('finance');
+        $project = $this->createProject();
+
+        $this->seedEntry($project->id, '2026-08-14', [
+            'administrative_fee' => 46,
+            'administrative_expense' => 100,
+            'uncovered_administrative_expense' => 30,
+        ]);
+
+        $data = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data');
+        $day = $this->findDay($data, '2026-08-14');
+
+        $this->assertRoundedMoneyEquals(30.0, $day['project_administration']);
+        $this->assertRoundedMoneyEquals(46.0, $day['total_administrative_percentage']);
+        $this->assertRoundedMoneyEquals(30.0, $day['total_income']);
+        $this->assertRoundedMoneyEquals(30.0, $day['net']);
+    }
+
+    public function test_exempt_project_uncovered_expense_feeds_project_administration_only(): void
+    {
+        $this->actAs('finance');
+
+        $exempt = $this->createProject([
+            'name' => 'Exempt '.uniqid(),
+            'administrative_exempt' => true,
+            'administrative_fee_percentage' => 0,
+        ]);
+        $this->seedEntry($exempt->id, '2026-08-16', [
+            'administrative_fee' => 0,
+            'uncovered_administrative_expense' => 55,
+        ]);
+
+        $paying = $this->createProject(['name' => 'Paying '.uniqid()]);
+        $this->seedEntry($paying->id, '2026-08-16', [
+            'administrative_fee' => 24,
+            'uncovered_administrative_expense' => 0,
+        ]);
+
+        $data = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data');
+        $day = $this->findDay($data, '2026-08-16');
+
+        $this->assertRoundedMoneyEquals(55.0, $day['project_administration']);
+        $this->assertRoundedMoneyEquals(24.0, $day['total_administrative_percentage']);
+        $this->assertRoundedMoneyEquals(55.0, $day['total_income']);
+    }
+
+    public function test_administrative_percentage_never_enters_income_or_net(): void
+    {
+        $this->actAs('finance');
+        $project = $this->createProject();
+
+        $this->seedEntry($project->id, '2026-08-18', [
+            'administrative_fee' => 46,
+            'uncovered_administrative_expense' => 30,
+        ]);
+
+        $this->putJson(self::ENDPOINT.'/2026-08-18', [
+            'individual_contributions' => 20,
+            'asset_administration' => 5,
+        ])->assertOk();
+
+        $data = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data');
+        $day = $this->findDay($data, '2026-08-18');
+
+        $expectedIncome = (float) $day['project_administration']
+            + (float) $day['cash_fund_contributions']
+            + (float) $day['individual_contributions']
+            + (float) $day['debt_recovery'];
+
+        $this->assertMoneyEquals($expectedIncome, $day['total_income']);
+        $this->assertRoundedMoneyEquals(50.0, $day['total_income']);
+        $this->assertRoundedMoneyEquals(5.0, $day['total_expenses']);
+        $this->assertRoundedMoneyEquals(45.0, $day['net']);
+        $this->assertRoundedMoneyEquals(46.0, $day['total_administrative_percentage']);
+        $this->assertRoundedMoneyEquals(50.0, $data['summary']['total_income']);
+        $this->assertRoundedMoneyEquals(45.0, $data['summary']['administrative_net']);
+    }
+
+    public function test_recalculation_updates_each_column_independently(): void
+    {
+        $this->actAs('finance');
+        $project = $this->createProject();
+        $entry = $this->seedEntry($project->id, '2026-08-20', [
+            'administrative_fee' => 40,
+            'uncovered_administrative_expense' => 15,
+        ]);
+
+        $day = $this->findDay(
+            $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data'),
+            '2026-08-20',
+        );
+        $this->assertRoundedMoneyEquals(15.0, $day['project_administration']);
+        $this->assertRoundedMoneyEquals(40.0, $day['total_administrative_percentage']);
+
+        $entry->forceFill(['uncovered_administrative_expense' => 65])->save();
+
+        $day = $this->findDay(
+            $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data'),
+            '2026-08-20',
+        );
+        $this->assertRoundedMoneyEquals(65.0, $day['project_administration']);
+        $this->assertRoundedMoneyEquals(40.0, $day['total_administrative_percentage']);
+
+        $entry->forceFill(['administrative_fee' => 90])->save();
+
+        $day = $this->findDay(
+            $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data'),
+            '2026-08-20',
+        );
+        $this->assertRoundedMoneyEquals(65.0, $day['project_administration']);
+        $this->assertRoundedMoneyEquals(90.0, $day['total_administrative_percentage']);
+    }
+
+    private function assertMoneyEquals(float $expected, string|float|null $actual): void
+    {
+        $this->assertEqualsWithDelta($expected, (float) $actual, 0.001);
+    }
+
+    private function assertRoundedMoneyEquals(float $expected, string|float|null $actual): void
+    {
+        $this->assertEqualsWithDelta(round($expected), (float) $actual, 0.001);
     }
 
     public function test_debt_recovery_from_ads_created_at_day(): void
@@ -151,9 +302,9 @@ class AdministrativeFundApiTest extends TestCase
         $data = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data');
         $day = $this->findDay($data, '2026-08-12');
 
-        $this->assertSame('80.00', $day['debt_recovery']);
-        $this->assertSame('80.00', $day['total_income']);
-        $this->assertSame('80.00', $data['summary']['debt_recovery']);
+        $this->assertRoundedMoneyEquals(80.0, $day['debt_recovery']);
+        $this->assertRoundedMoneyEquals(80.0, $day['total_income']);
+        $this->assertRoundedMoneyEquals(80.0, $data['summary']['debt_recovery']);
     }
 
     public function test_put_updates_manuals_and_recalculates(): void
@@ -176,16 +327,18 @@ class AdministrativeFundApiTest extends TestCase
             ->json('data');
 
         $day = $this->findDay($data, '2026-08-05');
-        $this->assertSame('100.00', $day['project_administration']);
+        $this->assertRoundedMoneyEquals(0.0, $day['project_administration']);
+        $this->assertRoundedMoneyEquals(100.0, $day['total_administrative_percentage']);
         $this->assertSame('25.50', $day['individual_contributions']);
         $this->assertSame('10.00', $day['asset_administration']);
-        $this->assertSame('125.50', $day['total_income']);
-        $this->assertSame('10.00', $day['total_expenses']);
-        $this->assertSame('115.50', $day['net']);
+        $this->assertRoundedMoneyEquals(25.5, $day['total_income']);
+        $this->assertRoundedMoneyEquals(10.0, $day['total_expenses']);
+        $this->assertRoundedMoneyEquals(15.5, $day['net']);
         $this->assertSame('test note', $day['notes']);
-        $this->assertSame('125.50', $data['summary']['total_income']);
-        $this->assertSame('10.00', $data['summary']['total_expenses']);
-        $this->assertSame('115.50', $data['summary']['administrative_net']);
+        $this->assertRoundedMoneyEquals(25.5, $data['summary']['total_income']);
+        $this->assertRoundedMoneyEquals(10.0, $data['summary']['total_expenses']);
+        $this->assertRoundedMoneyEquals(15.5, $data['summary']['administrative_net']);
+        $this->assertRoundedMoneyEquals(100.0, $data['summary']['total_administrative_percentage']);
     }
 
     public function test_put_updates_operational_administration_and_recalculates(): void
@@ -200,10 +353,10 @@ class AdministrativeFundApiTest extends TestCase
 
         $day = $this->findDay($data, '2026-08-05');
         $this->assertSame('60.00', $day['operational_administration']);
-        $this->assertSame('60.00', $day['total_expenses']);
-        $this->assertSame('-60.00', $day['net']);
-        $this->assertSame('60.00', $data['summary']['operational_administration']);
-        $this->assertSame('60.00', $data['totals']['operational_administration']);
+        $this->assertRoundedMoneyEquals(60.0, $day['total_expenses']);
+        $this->assertRoundedMoneyEquals(-60.0, $day['net']);
+        $this->assertRoundedMoneyEquals(60.0, $data['summary']['operational_administration']);
+        $this->assertRoundedMoneyEquals(60.0, $data['totals']['operational_administration']);
 
         $data = $this->putJson(self::ENDPOINT.'/2026-08-05', [
             'operational_administration' => 90,
@@ -213,8 +366,8 @@ class AdministrativeFundApiTest extends TestCase
 
         $day = $this->findDay($data, '2026-08-05');
         $this->assertSame('90.00', $day['operational_administration']);
-        $this->assertSame('90.00', $day['total_expenses']);
-        $this->assertSame('-90.00', $day['net']);
+        $this->assertRoundedMoneyEquals(90.0, $day['total_expenses']);
+        $this->assertRoundedMoneyEquals(-90.0, $day['net']);
     }
 
     public function test_notes_only_put_recalculates(): void
@@ -228,7 +381,7 @@ class AdministrativeFundApiTest extends TestCase
         $day = $this->findDay($data, '2026-08-01');
         $this->assertSame('notes only', $day['notes']);
         $this->assertSame('0.00', $day['individual_contributions']);
-        $this->assertSame('0.00', $day['net']);
+        $this->assertRoundedMoneyEquals(0.0, $day['net']);
     }
 
     public function test_rejects_calculated_fields(): void
@@ -238,6 +391,10 @@ class AdministrativeFundApiTest extends TestCase
         $this->putJson(self::ENDPOINT.'/2026-08-01', [
             'project_administration' => 99,
             'individual_contributions' => 1,
+        ])->assertStatus(422);
+
+        $this->putJson(self::ENDPOINT.'/2026-08-01', [
+            'total_administrative_percentage' => 46,
         ])->assertStatus(422);
     }
 
@@ -271,15 +428,22 @@ class AdministrativeFundApiTest extends TestCase
         $sumIncome = 0.0;
         $sumExpenses = 0.0;
         $sumNet = 0.0;
+        $sumAdministrativePercentage = 0.0;
         foreach ($data['days'] as $day) {
             $sumIncome += (float) $day['total_income'];
             $sumExpenses += (float) $day['total_expenses'];
             $sumNet += (float) $day['net'];
+            $sumAdministrativePercentage += (float) $day['total_administrative_percentage'];
         }
 
-        $this->assertSame($data['totals']['total_income'], number_format($sumIncome, 2, '.', ''));
-        $this->assertSame($data['totals']['total_expenses'], number_format($sumExpenses, 2, '.', ''));
-        $this->assertSame($data['totals']['net'], number_format($sumNet, 2, '.', ''));
+        $this->assertMoneyEquals($sumIncome, $data['totals']['total_income']);
+        $this->assertMoneyEquals($sumExpenses, $data['totals']['total_expenses']);
+        $this->assertMoneyEquals($sumNet, $data['totals']['net']);
+        $this->assertMoneyEquals($sumAdministrativePercentage, $data['totals']['total_administrative_percentage']);
         $this->assertSame($data['summary']['administrative_net'], $data['totals']['net']);
+
+        // The day's administrative percentage (fee 40) must not have leaked into income.
+        $this->assertMoneyEquals(40.0, $data['totals']['total_administrative_percentage']);
+        $this->assertMoneyEquals(10.0, $data['totals']['total_income']);
     }
 }

@@ -3042,6 +3042,7 @@ SAMPLE_ADMINISTRATIVE_FUND_DAY = {
     "date": "2026-08-01",
     "day": "Saturday",
     "project_administration": "100.00",
+    "total_administrative_percentage": "46.00",
     "cash_fund_contributions": "0.00",
     "individual_contributions": "25.00",
     "debt_recovery": "0.00",
@@ -3055,6 +3056,7 @@ SAMPLE_ADMINISTRATIVE_FUND_DAY = {
 
 SAMPLE_ADMINISTRATIVE_FUND_SUMMARY = {
     "project_administration": "100.00",
+    "total_administrative_percentage": "46.00",
     "cash_fund_contributions": "0.00",
     "individual_contributions": "25.00",
     "debt_recovery": "0.00",
@@ -3072,6 +3074,7 @@ SAMPLE_ADMINISTRATIVE_FUND_PAYLOAD = {
     "days": [SAMPLE_ADMINISTRATIVE_FUND_DAY],
     "totals": {
         "project_administration": "100.00",
+        "total_administrative_percentage": "46.00",
         "cash_fund_contributions": "0.00",
         "individual_contributions": "25.00",
         "debt_recovery": "0.00",
@@ -3099,7 +3102,9 @@ def administrative_fund_show() -> dict:
         path,
         description=(
             "Month calendar for the Administrative Fund. "
-            "Auto: project_administration (DJ collected admin %), debt_recovery (ADS). "
+            "Auto: project_administration (DJ administrative expense left uncovered by fund surpluses), "
+            "total_administrative_percentage (DJ admin percentage deducted from projects that day, display-only), "
+            "debt_recovery (ADS). "
             "Stubs until other pages exist: cash_fund_contributions=0, operational_administration=0. "
             "Manual via PUT: individual_contributions, asset_administration, notes. "
             "Realtime: room `administrative-fund.{YYYY}-{MM}`, event `administrative-fund.updated`."
@@ -3108,6 +3113,9 @@ def administrative_fund_show() -> dict:
         enums=(
             "`month` 1–12, `year` 2000–2100\n"
             "One row per calendar day of the month\n"
+            "project_administration = SUM(daily_journal_entries.uncovered_administrative_expense)\n"
+            "total_administrative_percentage = SUM(daily_journal_entries.administrative_fee); "
+            "display-only, never added to project_administration, income or net\n"
             "total_income = project_admin + cash_fund_contrib + individual + debt_recovery\n"
             "total_expenses = operational_admin + asset_admin\n"
             "net = total_income − total_expenses"
@@ -3146,8 +3154,8 @@ def administrative_fund_update_day() -> dict:
         roles=ADMINISTRATIVE_FUND_ROLES,
         enums=(
             "Editable: individual_contributions, asset_administration, notes\n"
-            "Forbidden: project_administration, cash_fund_contributions, debt_recovery, "
-            "operational_administration, total_income, total_expenses, net, administrative_net"
+            "Forbidden: project_administration, total_administrative_percentage, cash_fund_contributions, "
+            "debt_recovery, operational_administration, total_income, total_expenses, net, administrative_net"
         ),
         body=body,
         json_body=True,

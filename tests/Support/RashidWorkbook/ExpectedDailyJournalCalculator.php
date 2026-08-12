@@ -60,23 +60,23 @@ class ExpectedDailyJournalCalculator
             $administrativeExpense = 0.0;
 
             $dailyTotal = round(
-                $income + 0.0 - $expense - $administrativeExpense - $administrativeFee - $operationalDeduction,
+                $income + 0.0 - $expense - $administrativeFee - $operationalDeduction,
                 2
             );
 
             $previousFundBalance = $this->fundBalance[$name] ?? 0.0;
-            $fundBalance = round($previousFundBalance + $dailyTotal, 2);
+            $intermediateFundBalance = round($previousFundBalance + $dailyTotal, 2);
 
-            // Expense-first fund consumption + contribution (workbook contribution is always 0).
+            $surplus = max(0, $intermediateFundBalance);
+            $covered = round(min($surplus, $administrativeExpense), 2);
+            $fundBalance = round($intermediateFundBalance - $covered, 2);
+
             $contribution = 0.0;
             $balanceBeforeContribution = round($fundBalance - $contribution, 2);
-            $expenseConsumed = min($administrativeExpense, $administrativeFee);
-            $remainingFee = round($administrativeFee - $expenseConsumed, 2);
-            $expenseDebt = $administrativeExpense > $administrativeFee ? $expenseConsumed : 0.0;
             $deficitDebt = $balanceBeforeContribution < 0
-                ? min(abs($balanceBeforeContribution), $remainingFee)
+                ? min(abs($balanceBeforeContribution), $administrativeFee)
                 : 0.0;
-            $administrativeDebt = round($expenseDebt + $deficitDebt + $contribution, 2);
+            $administrativeDebt = round($deficitDebt + $contribution, 2);
 
             $previousAccumulatedDebt = $this->accumulatedDebt[$name] ?? 0.0;
             $accumulatedDebt = round($previousAccumulatedDebt + $administrativeDebt, 2);

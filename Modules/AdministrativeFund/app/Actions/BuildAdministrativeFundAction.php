@@ -16,7 +16,7 @@ class BuildAdministrativeFundAction
         $start = $startOfMonth->toDateString();
         $end = $endOfMonth->toDateString();
 
-        $projectAdminByDate = $this->projectAdministrationByDate($start, $end);
+        $journalTotalsByDate = $this->journalTotalsByDate($start, $end);
         $debtRecoveryByDate = $this->debtRecoveryByDate($year, $month);
         $manualByDate = $this->manualByDate($start, $end);
 
@@ -28,7 +28,10 @@ class BuildAdministrativeFundAction
             $dateString = $cursor->toDateString();
             $manual = $manualByDate[$dateString] ?? null;
 
-            $projectAdministration = round((float) ($projectAdminByDate[$dateString] ?? 0), 2);
+            $journalTotals = $journalTotalsByDate[$dateString] ?? null;
+
+            $projectAdministration = round((float) ($journalTotals['project_administration'] ?? 0), 2);
+            $totalAdministrativePercentage = round((float) ($journalTotals['total_administrative_percentage'] ?? 0), 2);
             $cashFundContributions = 0.0;
             $individualContributions = round((float) ($manual['individual_contributions'] ?? 0), 2);
             $debtRecovery = round((float) ($debtRecoveryByDate[$dateString] ?? 0), 2);
@@ -46,6 +49,7 @@ class BuildAdministrativeFundAction
                 'date' => $dateString,
                 'day' => $cursor->format('l'),
                 'project_administration' => FormatMoneyDecimal::formatRounded($projectAdministration),
+                'total_administrative_percentage' => FormatMoneyDecimal::formatRounded($totalAdministrativePercentage),
                 'cash_fund_contributions' => FormatMoneyDecimal::formatRounded($cashFundContributions),
                 'individual_contributions' => $this->decimal($individualContributions),
                 'debt_recovery' => FormatMoneyDecimal::formatRounded($debtRecovery),
@@ -60,6 +64,7 @@ class BuildAdministrativeFundAction
             $days[] = $row;
 
             $sums['project_administration'] += $projectAdministration;
+            $sums['total_administrative_percentage'] += $totalAdministrativePercentage;
             $sums['cash_fund_contributions'] += $cashFundContributions;
             $sums['individual_contributions'] += $individualContributions;
             $sums['debt_recovery'] += $debtRecovery;
@@ -74,6 +79,7 @@ class BuildAdministrativeFundAction
 
         $summary = [
             'project_administration' => FormatMoneyDecimal::formatRounded($sums['project_administration']),
+            'total_administrative_percentage' => FormatMoneyDecimal::formatRounded($sums['total_administrative_percentage']),
             'cash_fund_contributions' => FormatMoneyDecimal::formatRounded($sums['cash_fund_contributions']),
             'individual_contributions' => FormatMoneyDecimal::formatRounded($sums['individual_contributions']),
             'debt_recovery' => FormatMoneyDecimal::formatRounded($sums['debt_recovery']),
@@ -91,6 +97,7 @@ class BuildAdministrativeFundAction
             'days' => $days,
             'totals' => [
                 'project_administration' => $summary['project_administration'],
+                'total_administrative_percentage' => $summary['total_administrative_percentage'],
                 'cash_fund_contributions' => $summary['cash_fund_contributions'],
                 'individual_contributions' => $summary['individual_contributions'],
                 'debt_recovery' => $summary['debt_recovery'],
@@ -104,30 +111,35 @@ class BuildAdministrativeFundAction
     }
 
     /**
-     * @return array<string, float>
+     * Project administration and total administrative percentage are two independent
+     * values: the first is administrative expense left uncovered by fund surpluses,
+     * the second is the raw administrative percentage deducted from projects. They are
+     * never substituted for one another.
+     *
+     * @return array<string, array{project_administration: float, total_administrative_percentage: float}>
      */
-    private function projectAdministrationByDate(string $start, string $end): array
+    private function journalTotalsByDate(string $start, string $end): array
     {
         $rows = DB::table('daily_journal_entries')
-            ->join('projects', 'daily_journal_entries.project_id', '=', 'projects.id')
-            ->where('projects.administrative_exempt', false)
             ->where('daily_journal_entries.journal_date', '>=', $start)
             ->where('daily_journal_entries.journal_date', '<=', $end)
             ->groupBy('daily_journal_entries.journal_date')
             ->selectRaw('daily_journal_entries.journal_date as journal_date')
             ->selectRaw(
-                'COALESCE(SUM('
-                .'COALESCE(daily_journal_entries.administrative_fee, 0)'
-                .' - COALESCE(daily_journal_entries.administrative_debt, 0)'
-                .' + COALESCE(daily_journal_entries.contribution, 0)'
-                .'), 0) as project_administration'
+                'COALESCE(SUM(COALESCE(daily_journal_entries.uncovered_administrative_expense, 0)), 0) as project_administration'
+            )
+            ->selectRaw(
+                'COALESCE(SUM(COALESCE(daily_journal_entries.administrative_fee, 0)), 0) as total_administrative_percentage'
             )
             ->get();
 
         $keyed = [];
         foreach ($rows as $row) {
             $dateKey = $this->dateKey((string) $row->journal_date);
-            $keyed[$dateKey] = round((float) $row->project_administration, 2);
+            $keyed[$dateKey] = [
+                'project_administration' => round((float) $row->project_administration, 2),
+                'total_administrative_percentage' => round((float) $row->total_administrative_percentage, 2),
+            ];
         }
 
         return $keyed;
@@ -183,6 +195,7 @@ class BuildAdministrativeFundAction
     /**
      * @return array{
      *     project_administration: float,
+     *     total_administrative_percentage: float,
      *     cash_fund_contributions: float,
      *     individual_contributions: float,
      *     debt_recovery: float,
@@ -197,6 +210,7 @@ class BuildAdministrativeFundAction
     {
         return [
             'project_administration' => 0.0,
+            'total_administrative_percentage' => 0.0,
             'cash_fund_contributions' => 0.0,
             'individual_contributions' => 0.0,
             'debt_recovery' => 0.0,

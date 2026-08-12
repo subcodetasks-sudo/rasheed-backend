@@ -11,6 +11,7 @@ class SaveDailyJournalRequest extends FormRequest
 {
     private const CALCULATED_FIELDS = [
         'administrative_expense',
+        'uncovered_administrative_expense',
         'administrative_fee',
         'operational_deduction',
         'daily_total',

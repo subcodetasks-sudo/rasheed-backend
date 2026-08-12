@@ -15,6 +15,7 @@ class RecalculateDailyJournalAction
         private readonly ResolveAdministrativeExpenseAction $resolveAdministrativeExpenseAction,
         private readonly CalculateDailyTotalsAction $calculateDailyTotalsAction,
         private readonly CalculateFundBalancesAction $calculateFundBalancesAction,
+        private readonly CalculateAdministrativeExpenseCoverageAction $calculateAdministrativeExpenseCoverageAction,
         private readonly CalculateAdministrativeDebtAction $calculateAdministrativeDebtAction,
         private readonly UpdateAccumulatedAdministrativeDebtAction $updateAccumulatedAdministrativeDebtAction,
         private readonly PersistCalculatedDailyJournalFieldsAction $persistCalculatedFieldsAction,
@@ -39,6 +40,7 @@ class RecalculateDailyJournalAction
 
         $entries = $this->calculateDailyTotalsAction->execute($entries);
         $entries = $this->calculateFundBalancesAction->execute($entries, $date);
+        $entries = $this->calculateAdministrativeExpenseCoverageAction->execute($entries);
 
         // Remaining Deficit = abs(negative signed fund balance) for contribution validation.
         $remainingDeficits = [];

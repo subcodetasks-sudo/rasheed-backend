@@ -13,6 +13,7 @@ You are implementing or reviewing the Daily Journal calculation engine for Rashi
 
 **System-calculated (reject if client sends them):**
 - `administrative_expense`
+- `uncovered_administrative_expense`
 - `administrative_fee`
 - `operational_deduction`
 - `daily_total`
@@ -78,48 +79,64 @@ administrative_expense = round(
 daily_total = round(
   income + contribution
   − expense
-  − administrative_expense
   − administrative_fee
   − operational_deduction
 , 2)
 ```
+Administrative expense is **not** subtracted here. It is applied separately from same-day fund surplus (see §5a).
 
-### 5. Fund balance (signed)
+### 5. Fund balance (signed, before administrative expense coverage)
 ```
-fund_balance = round(previous_day_fund_balance + daily_total, 2)
+intermediate_fund_balance = round(previous_day_fund_balance + daily_total, 2)
 ```
 Previous = latest entry with `journal_date < today` for that project, or `0`.
 
 The balance is **signed**: it may be positive, zero, or negative. A negative fund balance is carried forward as-is to the next journal date. It is **not** clamped to zero. A negative balance alone does **not** create Administrative Debt.
 
-### 6. Administrative Debt
-Administrative Debt has three sources. Cases 1 and 2 consume that day’s Administrative Fund (`administrative_fee`). Contribution is a separate additive source (allowed only when Pass-1 Fund Balance is in deficit). Allocation for Cases 1/2 is **expense-first**; the same fee cannot be spent twice. Debt calculation does **not** change Daily Total or Fund Balance — contribution already reduces the fund deficit via `daily_total`.
+### 5a. Administrative expense coverage (fund surplus only)
+
+After `intermediate_fund_balance` is known, cover administrative expense from **same-day surplus only**. Administrative fee (percentage) does **not** participate.
+
+```
+surplus = max(0, intermediate_fund_balance)
+covered = min(surplus, administrative_expense)
+fund_balance = round(intermediate_fund_balance − covered, 2)
+uncovered_administrative_expense = round(administrative_expense − covered, 2)
+```
+
+| Case | Condition | Result |
+|------|-----------|--------|
+| 1 | surplus ≥ expense | Full expense deducted from surplus; `uncovered = 0` |
+| 2 | 0 < surplus < expense | Use all surplus; `fund_balance = 0`; remainder → `uncovered` |
+| 3 | surplus = 0 | `covered = 0`; full expense → `uncovered` |
+
+Uncovered expense is **not** fund deficit and **not** administrative debt. Per day, `SUM(uncovered_administrative_expense)` across all projects feeds Administrative Fund **`project_administration`** (إداري المشروعات).
+
+Separately, per day `SUM(administrative_fee)` across all projects feeds Administrative Fund
+**`total_administrative_percentage`** (إجمالي النسبة الإدارية). That column is display-only: it is never
+added to `project_administration`, never substituted for it, and never enters the Administrative Fund's
+`total_income` / `net`, so the same amount cannot be counted twice.
+
+### 6. Administrative Debt (Case 1 — same-day admin percentage for deficit only)
+
+Administrative Debt has two sources: **Case 1** (deficit cover from that day's full `administrative_fee`) and **Contribution**. Administrative expense is handled in §5a and never creates debt. **Case 2 (fee-for-expense) is removed.** The two procedures are independent.
 
 ```
 balance_before_contribution = round(fund_balance − contribution, 2)
 
-expense_consumed = min(administrative_expense, administrative_fee)
-remaining_fee = round(administrative_fee − expense_consumed, 2)
-
-expense_debt = administrative_expense > administrative_fee
-    ? expense_consumed
-    : 0
-
 deficit_debt = balance_before_contribution < 0
-    ? min(|balance_before_contribution|, remaining_fee)
+    ? min(|balance_before_contribution|, administrative_fee)
     : 0
 
-fund_consumption_debt = round(expense_debt + deficit_debt, 2)
+fund_consumption_debt = round(deficit_debt, 2)
 administrative_debt = round(fund_consumption_debt + contribution, 2)
 ```
 
-**Case 1 — deficit cover:** when pre-contribution `fund_balance < 0`, debt equals the fee remaining after expense allocation (`min(|balance|, remaining_fee)`). If fee is 0 (e.g. exempt) or fully reserved by expense at/below fee, Case 1 debt is 0.
+**Case 1 — deficit cover:** when post-coverage, pre-contribution `fund_balance < 0`, debt equals `min(|balance|, full same-day administrative_fee)`. Unused fee from prior days is **not** carried forward.
 
-**Case 2 — expense exceeds fee:** when `administrative_expense > administrative_fee`, debt equals the fee amount consumed (`expense_consumed` = the full fee). When expense ≤ fee, Case 2 debt is 0; expense still reduces `remaining_fee` for Case 1.
+**Contribution — additive debt + deficit reduction:** requires Pass-1 fund deficit (super-admin + amount ≤ remaining deficit). Re-saving recomputes from the same fund-consumption base (never compounds).
 
-**Contribution — additive debt + deficit reduction:** requires Pass-1 fund deficit (super-admin + amount ≤ remaining deficit). Raises `daily_total` / signed fund (reduces deficit) **and** adds the contribution amount to today’s Administrative Debt. Re-saving a different contribution recomputes from the same fund-consumption base (never compounds: base 100 + 30 → 130; re-save 40 → 140, not 170).
-
-**Not a debt source alone:** a negative fund balance with no available fee and no contribution.
+**Not a debt source:** uncovered administrative expense; negative balance with fee 0 and no contribution.
 
 ### 7. Accumulated debt
 ```
@@ -156,11 +173,12 @@ fund_balance = surplus
 3. Calculate operational deductions
 4. Resolve administrative expense (inventory)
 5. Calculate daily totals
-6. Calculate fund balances (using previous day; signed carry-forward)
-7. Capture `remainingDeficits = |fund_balance| if < 0 else 0` (for contribution validation)
-8. Calculate administrative debt (fund consumption + contribution)
-9. Update accumulated administrative debt
-10. Persist calculated fields
+6. Calculate intermediate fund balances (using previous day; signed carry-forward)
+7. Apply administrative expense coverage from surplus → final `fund_balance`, `uncovered_administrative_expense`
+8. Capture `remainingDeficits = |fund_balance| if < 0 else 0` (for contribution validation)
+9. Calculate administrative debt (Case 1 fund consumption + contribution)
+10. Update accumulated administrative debt
+11. Persist calculated fields
 
 ---
 
@@ -177,7 +195,7 @@ fund_balance = surplus
 - Validate contributions against Pass-1 deficits + role
 - Upsert real contributions
 - Recalculate with `preserveIncomeDerivedDeductions=true`
-  (keep fee / op / admin expense from Pass 1; recompute totals → balances → debt)
+  (keep fee / op / admin expense from Pass 1; recompute totals → balances → expense coverage → debt)
 
 - **PUT** (save): omitted income/expense/contribution → cleared to null
 - **PATCH** (update): only keys present in payload are updated
@@ -225,8 +243,8 @@ available = SUM(administrative_fee) − SUM(admin_percentage_balance_debits.amou
 
 ### Administrative Debt worked examples
 - Income 200 @ 12% → fee 24; expense 0; fund negative → Case 1 debt = **24**
-- Fee 50; admin expense 80; fund ≥ 0 → Case 2 debt = **50**
-- Fee 50; admin expense 30; fund −100 → expense_consumed 30 (no Case 2); remaining_fee 20; Case 1 debt = **20**
+- Income 500; fee 50; admin expense 80; surplus covers expense → debt = **0**; uncovered = 0
+- Income 60; fee 7.2; admin expense 100; surplus 52.8 → fund **0**; uncovered **47.2**; debt **0**
 - Fee 0; fund −150 → debt = **0** (negative alone does not create debt)
 - Fee 100; Pass-1 fund −1100; contribution 30 → base 100 + 30 = **130**; fund −1070
 - Same day re-save contribution 40 → base still 100 + 40 = **140** (not compounded)
@@ -273,10 +291,12 @@ Action rejections:
 |------|----------|
 | Zero / null inputs | Treated as 0 in math |
 | Positive balance | No Case 1 debt from balance |
-| Negative balance, fee available | Case 1 debt = min(\|balance\|, remaining_fee after expense) |
+| Negative balance, fee available | Case 1 debt = min(\|balance\|, full same-day administrative_fee) |
 | Negative balance, fee 0 | Debt 0 (negative alone never creates debt) |
-| Admin expense > fee | Case 2 debt = fee (expense-first) |
-| Admin expense ≤ fee | No Case 2 debt; remaining fee available for Case 1 |
+| Admin expense uncovered | Transferred via `uncovered_administrative_expense`; never debt or extra deficit |
+| Admin expense covered by surplus | Reduces `fund_balance` only; `uncovered = 0` |
+| Admin fee present with uncovered expense | Fee not used for expense; separate Case 1 only if fund deficit |
+| Unused prior-day admin fee | Must not cover later deficit or expense |
 | Contribution | Requires Pass-1 deficit + available admin percentage balance; reduces fund deficit via daily_total; adds amount to debt; permanently debits org admin pool |
 | Contribution clear/lower | Super-admin only; does **not** refund admin percentage pool debits |
 | Contribution re-save | Recomputes from same fund-consumption base (never compounds); additional pool debit only for increases |
@@ -291,14 +311,14 @@ Action rejections:
 ## Quick formula checks
 
 ```
-daily_total(1000,50,100,20,120,30) = 780
-fund_balance(100,50) = 150; fund_balance(40,-100) = -60
-calculateAdministrativeDebt(fund=-60, fee=0, expense=0) = 0
-calculateAdministrativeDebt(fund=-100, fee=24, expense=0) = 24
-calculateAdministrativeDebt(fund=10, fee=50, expense=80) = 50
-calculateAdministrativeDebt(fund=-100, fee=50, expense=30) = 20
-applyDebt(base_fund=-1100, fee=100, expense=0, contribution=30) = 130
-applyDebt(base_fund=-1100, fee=100, expense=0, contribution=40) = 140
+daily_total(1000,50,100,120,30) = 800
+coverage(500, 100) → covered 100, uncovered 0, fund 400
+coverage(60, 100) → covered 60, uncovered 40, fund 0
+calculateAdministrativeDebt(fund=-60, fee=0) = 0
+calculateAdministrativeDebt(fund=-100, fee=24) = 24
+calculateAdministrativeDebt(fund=370, fee=50) = 0
+applyDebt(base_fund=-1100, fee=100, contribution=30) = 130
+applyDebt(base_fund=-1100, fee=100, contribution=40) = 140
 fund_balance(1000,-300) = 700; fund_balance(300,-900) = -600
 fund_balance(-400,250) = -150; fund_balance(-400,800) = 400
 accumulated(10,24) = 34
@@ -308,4 +328,4 @@ repay(40, 0, 100) → (0, 0, 60)
 repay(30, 20, 50) → (0, 0, 20)  // today first, then accumulated
 ```
 
-When implementing, changing, or reviewing Daily Journal logic, preserve this exact order, these formulas, and these validations. Do not auto-repay debt on save. Do not convert negative fund balances into Administrative Debt without Administrative Fund consumption. Contribution requires a Pass-1 fund deficit, increases debt by its amount, and reduces the fund deficit via daily_total; re-saves must not compound. Do not let contributions exceed Pass-1 remaining deficit. Do not recalculate fee/op/admin expense on Pass 2.
+When implementing, changing, or reviewing Daily Journal logic, preserve this exact order, these formulas, and these validations. Do not auto-repay debt on save. Do not use administrative fee to cover administrative expense. Uncovered administrative expense flows to Administrative Fund `project_administration` only, and the day's total administrative percentage flows to the display-only `total_administrative_percentage` column only — never merge the two or let either reach administrative income twice. Case 1 uses same-day full admin fee for deficit only; unused fee does not carry forward. Contribution requires a Pass-1 fund deficit; re-saves must not compound. Do not recalculate fee/op/admin expense on Pass 2.

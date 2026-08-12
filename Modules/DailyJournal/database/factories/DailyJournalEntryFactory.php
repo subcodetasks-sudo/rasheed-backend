@@ -22,6 +22,7 @@ class DailyJournalEntryFactory extends Factory
             'daily_expense' => null,
             'contribution' => null,
             'administrative_expense' => 0,
+            'uncovered_administrative_expense' => 0,
             'administrative_fee' => 0,
             'operational_deduction' => 0,
             'daily_total' => 0,
