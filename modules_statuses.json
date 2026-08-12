@@ -16,5 +16,6 @@
     "OperationalRate": true,
     "ReportsCenter": true,
     "AdvancedReports": true,
-    "MonthlySummary": true
+    "MonthlySummary": true,
+    "AuditLog": true
 }

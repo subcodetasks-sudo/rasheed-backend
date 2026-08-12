@@ -4,12 +4,19 @@ namespace Modules\User\Services;
 
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
+use Modules\AuditLog\Actions\RecordAuditLogAction;
+use Modules\AuditLog\Enums\AuditAction;
+use Modules\AuditLog\Enums\AuditSource;
 use Modules\User\app\Models\RefreshToken;
 use Modules\User\app\Models\User;
 use Modules\User\app\Transformers\UserResource;
 
 class AuthService
 {
+    public function __construct(
+        private readonly RecordAuditLogAction $auditLog,
+    ) {}
+
     public function login(array $data): array
     {
         if (! Auth::once($data)) {
@@ -24,11 +31,27 @@ class AuthService
 
         $user->updateLastLogin();
 
+        $this->auditLog->execute(
+            action: AuditAction::Login,
+            description: __('messages.audit_user_logged_in', ['name' => $user->full_name]),
+            source: AuditSource::User,
+            causer: $user,
+            subject: $user,
+        );
+
         return $this->getUserDataWithToken($user);
     }
 
     public function logout($user): void
     {
+        $this->auditLog->execute(
+            action: AuditAction::Logout,
+            description: __('messages.audit_user_logged_out', ['name' => $user->full_name]),
+            source: AuditSource::User,
+            causer: $user,
+            subject: $user,
+        );
+
         $user->tokens()->delete();
         RefreshToken::query()
             ->where('user_id', $user->uuid)
