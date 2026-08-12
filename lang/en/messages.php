@@ -75,6 +75,7 @@ return [
     'inventory_item_deleted_successfully' => 'Inventory item deleted successfully.',
     'inventory_item_has_movements' => 'Cannot delete inventory item because it has recorded inventory movements.',
     'inventory_item_has_batches' => 'Cannot delete inventory item because it has recorded inventory stock.',
+    'inventory_item_has_related_data' => 'Cannot delete this inventory item because it is linked to existing records.',
     'inventory_movement_not_found' => 'Inventory movement not found.',
     'inventory_movement_deleted_successfully' => 'Inventory movement deleted successfully.',
     'inventory_movement_already_consumed' => 'Cannot delete this movement because part of its stock has already been consumed by a later movement.',

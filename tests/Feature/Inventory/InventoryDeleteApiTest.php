@@ -42,7 +42,26 @@ class InventoryDeleteApiTest extends InventoryFeatureTestCase
         $this->assertDatabaseMissing('inventory_items', ['id' => $itemId]);
     }
 
-    public function test_item_with_movements_cannot_be_deleted(): void
+    public function test_item_with_only_unused_opening_batch_can_be_deleted(): void
+    {
+        $this->actAsInventoryUser();
+        $itemId = $this->createItem(['opening_quantity' => 5]);
+
+        $this->assertDatabaseHas('inventory_batches', [
+            'inventory_item_id' => $itemId,
+            'source_type' => 'opening',
+        ]);
+
+        $this->deleteJson('/api/v1/inventory/items/'.$itemId)
+            ->assertOk()
+            ->assertJsonPath('message', __('messages.inventory_item_deleted_successfully'));
+
+        $this->assertDatabaseMissing('inventory_items', ['id' => $itemId]);
+        $this->assertDatabaseMissing('inventory_batches', ['inventory_item_id' => $itemId]);
+        $this->assertDatabaseMissing('inventory_movements', ['inventory_item_id' => $itemId]);
+    }
+
+    public function test_item_with_incoming_movement_cannot_be_deleted(): void
     {
         $this->actAsInventoryUser();
         $itemId = $this->createItem(['opening_quantity' => 5]);
@@ -55,21 +74,129 @@ class InventoryDeleteApiTest extends InventoryFeatureTestCase
 
         $this->deleteJson('/api/v1/inventory/items/'.$itemId)
             ->assertStatus(422)
-            ->assertJsonPath('message', __('messages.inventory_item_has_movements'));
+            ->assertJsonPath('message', __('messages.inventory_item_has_related_data'));
 
         $this->assertDatabaseHas('inventory_items', ['id' => $itemId]);
+        $this->assertSame(1, InventoryMovement::query()->where('inventory_item_id', $itemId)->count());
     }
 
-    public function test_item_with_only_opening_batch_cannot_be_deleted(): void
+    public function test_item_with_outgoing_movement_cannot_be_deleted(): void
     {
         $this->actAsInventoryUser();
-        $itemId = $this->createItem(['opening_quantity' => 5]);
+        $itemId = $this->createItem(['opening_quantity' => 10]);
+
+        $this->postJson('/api/v1/inventory/movements/outgoing', [
+            'inventory_item_id' => $itemId,
+            'quantity' => 3,
+            'beneficiary_project_id' => $this->createActiveProject()->id,
+            'expense_type' => InventoryExpenseType::Operational->value,
+        ])->assertCreated();
 
         $this->deleteJson('/api/v1/inventory/items/'.$itemId)
             ->assertStatus(422)
-            ->assertJsonPath('message', __('messages.inventory_item_has_batches'));
+            ->assertJsonPath('message', __('messages.inventory_item_has_related_data'));
 
         $this->assertDatabaseHas('inventory_items', ['id' => $itemId]);
+        $this->assertSame(1, InventoryMovement::query()->where('inventory_item_id', $itemId)->count());
+    }
+
+    public function test_item_with_incoming_and_outgoing_movements_cannot_be_deleted(): void
+    {
+        $this->actAsInventoryUser();
+        $itemId = $this->createItem(['opening_quantity' => 10]);
+
+        $this->postJson('/api/v1/inventory/movements/incoming', [
+            'inventory_item_id' => $itemId,
+            'quantity' => 5,
+            'unit_price' => 2,
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/inventory/movements/outgoing', [
+            'inventory_item_id' => $itemId,
+            'quantity' => 4,
+            'beneficiary_project_id' => $this->createActiveProject()->id,
+            'expense_type' => InventoryExpenseType::Operational->value,
+        ])->assertCreated();
+
+        $this->deleteJson('/api/v1/inventory/items/'.$itemId)
+            ->assertStatus(422)
+            ->assertJsonPath('message', __('messages.inventory_item_has_related_data'));
+
+        $this->assertDatabaseHas('inventory_items', ['id' => $itemId]);
+        $this->assertSame(2, InventoryMovement::query()->where('inventory_item_id', $itemId)->count());
+    }
+
+    public function test_item_with_zero_stock_but_historical_movements_cannot_be_deleted(): void
+    {
+        $this->actAsInventoryUser();
+        $itemId = $this->createItem(['opening_quantity' => 0]);
+
+        $this->postJson('/api/v1/inventory/movements/incoming', [
+            'inventory_item_id' => $itemId,
+            'quantity' => 10,
+            'unit_price' => 2,
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/inventory/movements/outgoing', [
+            'inventory_item_id' => $itemId,
+            'quantity' => 10,
+            'beneficiary_project_id' => $this->createActiveProject()->id,
+            'expense_type' => InventoryExpenseType::Operational->value,
+        ])->assertCreated();
+
+        $this->assertSame('0.00', InventoryItem::query()->findOrFail($itemId)->current_balance);
+
+        $this->deleteJson('/api/v1/inventory/items/'.$itemId)
+            ->assertStatus(422)
+            ->assertJsonPath('message', __('messages.inventory_item_has_related_data'));
+
+        $this->assertDatabaseHas('inventory_items', ['id' => $itemId]);
+        $this->assertSame(2, InventoryMovement::query()->where('inventory_item_id', $itemId)->count());
+    }
+
+    public function test_deleting_a_movement_does_not_delete_the_item(): void
+    {
+        $this->actAsInventoryUser();
+        $itemId = $this->createItem(['opening_quantity' => 100]);
+
+        $movementId = $this->postJson('/api/v1/inventory/movements/incoming', [
+            'inventory_item_id' => $itemId,
+            'quantity' => 50,
+            'unit_price' => 10,
+        ])->json('data.id');
+
+        $this->deleteJson('/api/v1/inventory/movements/'.$movementId)
+            ->assertOk()
+            ->assertJsonPath('data.current_balance', '100.00');
+
+        $this->assertDatabaseHas('inventory_items', ['id' => $itemId]);
+        $this->assertDatabaseMissing('inventory_movements', ['id' => $movementId]);
+    }
+
+    public function test_item_can_be_deleted_after_all_movements_are_removed(): void
+    {
+        $this->actAsInventoryUser();
+        $itemId = $this->createItem(['opening_quantity' => 100]);
+
+        $movementId = $this->postJson('/api/v1/inventory/movements/incoming', [
+            'inventory_item_id' => $itemId,
+            'quantity' => 50,
+            'unit_price' => 10,
+        ])->json('data.id');
+
+        $this->deleteJson('/api/v1/inventory/items/'.$itemId)
+            ->assertStatus(422)
+            ->assertJsonPath('message', __('messages.inventory_item_has_related_data'));
+
+        $this->deleteJson('/api/v1/inventory/movements/'.$movementId)->assertOk();
+
+        $this->deleteJson('/api/v1/inventory/items/'.$itemId)
+            ->assertOk()
+            ->assertJsonPath('message', __('messages.inventory_item_deleted_successfully'));
+
+        $this->assertDatabaseMissing('inventory_items', ['id' => $itemId]);
+        $this->assertDatabaseMissing('inventory_batches', ['inventory_item_id' => $itemId]);
+        $this->assertDatabaseMissing('inventory_movements', ['inventory_item_id' => $itemId]);
     }
 
     public function test_deleting_non_existent_item_returns_not_found(): void

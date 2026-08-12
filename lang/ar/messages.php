@@ -75,6 +75,7 @@ return [
     'inventory_item_deleted_successfully' => 'تم حذف صنف المخزون بنجاح.',
     'inventory_item_has_movements' => 'لا يمكن حذف صنف المخزون لوجود حركات مخزون مسجلة عليه.',
     'inventory_item_has_batches' => 'لا يمكن حذف صنف المخزون لوجود رصيد مخزون مسجل عليه.',
+    'inventory_item_has_related_data' => 'لا يمكن حذف الصنف لأنه مرتبط ببيانات قائمة.',
     'inventory_movement_not_found' => 'حركة المخزون غير موجودة.',
     'inventory_movement_deleted_successfully' => 'تم حذف حركة المخزون بنجاح.',
     'inventory_movement_already_consumed' => 'لا يمكن حذف هذه الحركة لأن جزءًا من كميتها تم استهلاكه بواسطة حركة لاحقة.',
