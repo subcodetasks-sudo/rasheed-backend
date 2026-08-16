@@ -14,16 +14,6 @@ use Modules\Project\Models\Project;
 
 class BuildCashStationAction
 {
-    /**
-     * @var array<string, array{
-     *     carriedFromPrevious: bool,
-     *     currentAggregates: array<int, object>,
-     *     previousAggregates: array<int, object>,
-     *     contributions: array<int, array{added: float, deducted: float}>
-     * }>
-     */
-    private array $monthBalanceContextCache = [];
-
     public function execute(int $month, int $year): array
     {
         $startOfMonth = Carbon::create($year, $month, 1)->startOfDay();
@@ -49,13 +39,11 @@ class BuildCashStationAction
             $endOfMonth->toDateString(),
         );
 
-        $previousAggregates = $carriedFromPrevious
-            ? $this->monthlyAggregatesByProject(
-                $projectIds,
-                $previousMonth->copy()->startOfMonth()->toDateString(),
-                $previousMonth->copy()->endOfMonth()->toDateString(),
-            )
-            : [];
+        // Net fund is the Daily Journal's own fund_balance — always the current, correct value for that
+        // project as of a date, never independently recomputed. This makes previous/net cash always
+        // accurate regardless of whether a manual month carry-forward was ever run for this project.
+        $balancesAtStart = $this->fundBalancesAsOf($projectIds, $startOfMonth->copy()->subDay()->toDateString());
+        $balancesAtEnd = $this->fundBalancesAsOf($projectIds, $endOfMonth->toDateString());
 
         $debts = $this->administrativeDebtsByProject($projectIds, $endOfMonth->toDateString());
         $adsDebtSettledThisMonth = $this->administrativeDebtSettledInMonthByProject($projectIds, $year, $month);
@@ -80,16 +68,14 @@ class BuildCashStationAction
             $monthlyExpenses = (float) ($aggregate->monthly_expenses ?? 0);
             $administrativePercentage = (float) ($aggregate->administrative_percentage ?? 0);
             $operationalDeduction = (float) ($aggregate->operational_deduction ?? 0);
-            $monthlyTotal = $this->monthlyTotalFromAggregate($aggregate);
 
-            $previousMonthlyTotal = 0.0;
-            if ($carriedFromPrevious) {
-                $previousMonthlyTotal = $this->monthlyTotalFromAggregate($previousAggregates[$project->id] ?? null);
-            }
+            $previousMonthlyTotal = round($balancesAtStart[$project->id] ?? 0.0, 2);
+            $endBalance = round($balancesAtEnd[$project->id] ?? 0.0, 2);
+            $monthlyTotal = round($endBalance - $previousMonthlyTotal, 2);
 
             $added = (float) ($contributions[$project->id]['added'] ?? 0);
             $deducted = (float) ($contributions[$project->id]['deducted'] ?? 0);
-            $netCashFund = $previousMonthlyTotal + $monthlyTotal + $added - $deducted;
+            $netCashFund = round($endBalance + $added - $deducted, 2);
 
             $originatingDebt = (float) ($debts[$project->id] ?? 0);
             $settledDebtThisMonth = (float) ($adsDebtSettledThisMonth[$project->id] ?? 0);
@@ -304,117 +290,76 @@ class BuildCashStationAction
     }
 
     /**
-     * Net cash fund for a project in a month (can be negative).
+     * Net cash fund for a project in a month (can be negative) — the Daily Journal's own fund_balance as
+     * of month-end, plus this month's settlement transfers. Never independently recomputed.
      */
     public function netCashFundForProject(int $projectId, int $month, int $year): float
     {
-        $context = $this->monthBalanceContext($month, $year);
+        $endOfMonth = Carbon::create($year, $month, 1)->startOfDay()->endOfMonth()->startOfDay();
+        $endBalance = $this->fundBalancesAsOf([$projectId], $endOfMonth->toDateString())[$projectId] ?? 0.0;
 
-        $previousMonthlyTotal = 0.0;
-        if ($context['carriedFromPrevious']) {
-            $previousMonthlyTotal = $this->monthlyTotalFromAggregate(
-                $this->aggregateForProjectInContext($context, $projectId, $month, $year, previous: true)
-            );
-        }
+        $contributions = $this->contributionsByProject($this->settlementsForMonth($year, $month));
+        $added = (float) ($contributions[$projectId]['added'] ?? 0);
+        $deducted = (float) ($contributions[$projectId]['deducted'] ?? 0);
 
-        $monthlyTotal = $this->monthlyTotalFromAggregate(
-            $this->aggregateForProjectInContext($context, $projectId, $month, $year, previous: false)
-        );
-        $added = (float) ($context['contributions'][$projectId]['added'] ?? 0);
-        $deducted = (float) ($context['contributions'][$projectId]['deducted'] ?? 0);
-
-        return $previousMonthlyTotal + $monthlyTotal + $added - $deducted;
+        return round($endBalance + $added - $deducted, 2);
     }
 
     /**
-     * @return array{
-     *     carriedFromPrevious: bool,
-     *     currentAggregates: array<int, object>,
-     *     previousAggregates: array<int, object>,
-     *     contributions: array<int, array{added: float, deducted: float}>
-     * }
+     * Latest Daily Journal fund_balance per project as of a date — the authoritative net fund, sourced
+     * directly from `daily_journal_entries` (mirrors DailyJournalCalculationService::previousBalances()'s
+     * "latest entry on/before a date" lookup). 0 if the project has no entry on or before that date.
+     *
+     * @param  array<int, int>  $projectIds
+     * @return array<int, float>
      */
-    private function monthBalanceContext(int $month, int $year): array
+    public function fundBalancesAsOf(array $projectIds, string $asOfDate): array
     {
-        $key = "{$year}-{$month}";
-        if (isset($this->monthBalanceContextCache[$key])) {
-            return $this->monthBalanceContextCache[$key];
+        if ($projectIds === []) {
+            return [];
         }
 
-        $startOfMonth = Carbon::create($year, $month, 1)->startOfDay();
-        $endOfMonth = $startOfMonth->copy()->endOfMonth()->startOfDay();
-        $previousMonth = $startOfMonth->copy()->subMonthNoOverflow();
+        $latestDates = DB::table('daily_journal_entries')
+            ->selectRaw('project_id, MAX(journal_date) as journal_date')
+            ->whereIn('project_id', $projectIds)
+            ->whereDate('journal_date', '<=', $asOfDate)
+            ->groupBy('project_id');
 
-        $carriedFromPrevious = $this->hasCarryFromPrevious(
-            (int) $previousMonth->year,
-            (int) $previousMonth->month,
-            $year,
-            $month,
-        );
+        $rows = DB::table('daily_journal_entries')
+            ->joinSub($latestDates, 'latest', function ($join) {
+                $join->on('daily_journal_entries.project_id', '=', 'latest.project_id')
+                    ->on('daily_journal_entries.journal_date', '=', 'latest.journal_date');
+            })
+            ->select('daily_journal_entries.project_id', 'daily_journal_entries.fund_balance')
+            ->get();
 
-        $projectIds = Project::query()->active()->pluck('id')->all();
-
-        $currentAggregates = $this->monthlyAggregatesByProject(
-            $projectIds,
-            $startOfMonth->toDateString(),
-            $endOfMonth->toDateString(),
-        );
-
-        $previousAggregates = [];
-        if ($carriedFromPrevious) {
-            $previousAggregates = $this->monthlyAggregatesByProject(
-                $projectIds,
-                $previousMonth->copy()->startOfMonth()->toDateString(),
-                $previousMonth->copy()->endOfMonth()->toDateString(),
-            );
+        $keyed = [];
+        foreach ($rows as $row) {
+            $keyed[(int) $row->project_id] = (float) $row->fund_balance;
         }
 
-        $contributions = $this->contributionsByProject(
-            $this->settlementsForMonth($year, $month)
-        );
-
-        return $this->monthBalanceContextCache[$key] = [
-            'carriedFromPrevious' => $carriedFromPrevious,
-            'currentAggregates' => $currentAggregates,
-            'previousAggregates' => $previousAggregates,
-            'contributions' => $contributions,
-        ];
+        return $keyed;
     }
 
     /**
-     * @param  array{
-     *     carriedFromPrevious: bool,
-     *     currentAggregates: array<int, object>,
-     *     previousAggregates: array<int, object>,
-     *     contributions: array<int, array{added: float, deducted: float}>
-     * }  $context
+     * Authoritative monthly flow per project = Daily Journal fund_balance at $endDate minus fund_balance
+     * the day before $startDate (0 if no prior entry) — a pure delta of two already-correct Daily Journal
+     * reads, never an independent recomputation.
+     *
+     * @param  array<int, int>  $projectIds
+     * @return array<int, float>
      */
-    private function aggregateForProjectInContext(
-        array $context,
-        int $projectId,
-        int $month,
-        int $year,
-        bool $previous,
-    ): mixed {
-        $aggregates = $previous ? $context['previousAggregates'] : $context['currentAggregates'];
+    public function fundBalanceDeltasByProject(array $projectIds, string $startDate, string $endDate): array
+    {
+        $before = $this->fundBalancesAsOf($projectIds, Carbon::parse($startDate)->subDay()->toDateString());
+        $end = $this->fundBalancesAsOf($projectIds, $endDate);
 
-        if (array_key_exists($projectId, $aggregates)) {
-            return $aggregates[$projectId];
+        $deltas = [];
+        foreach ($projectIds as $projectId) {
+            $deltas[$projectId] = round(($end[$projectId] ?? 0.0) - ($before[$projectId] ?? 0.0), 2);
         }
 
-        $startOfMonth = Carbon::create($year, $month, 1)->startOfDay();
-        if ($previous) {
-            $monthAnchor = $startOfMonth->copy()->subMonthNoOverflow();
-            $start = $monthAnchor->copy()->startOfMonth()->toDateString();
-            $end = $monthAnchor->copy()->endOfMonth()->toDateString();
-        } else {
-            $start = $startOfMonth->toDateString();
-            $end = $startOfMonth->copy()->endOfMonth()->toDateString();
-        }
-
-        $loaded = $this->monthlyAggregatesByProject([$projectId], $start, $end);
-
-        return $loaded[$projectId] ?? null;
+        return $deltas;
     }
 
     /**

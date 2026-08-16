@@ -38,7 +38,9 @@ class BuildMonthlySummaryAction
 
         $projectIds = $projects->pluck('id')->all();
 
-        $aggregates = $this->buildCashStationAction->monthlyAggregatesByProject(
+        // Net result is the Daily Journal's own fund_balance delta for the period — the authoritative
+        // value, never independently recomputed from raw components.
+        $monthlyTotals = $this->buildCashStationAction->fundBalanceDeltasByProject(
             $projectIds,
             $start,
             $end,
@@ -50,9 +52,7 @@ class BuildMonthlySummaryAction
 
         $projectRows = [];
         foreach ($projects as $project) {
-            $monthlyTotal = $this->buildCashStationAction->monthlyTotalFromAggregate(
-                $aggregates[$project->id] ?? null
-            );
+            $monthlyTotal = $monthlyTotals[$project->id] ?? 0.0;
             $added = (float) ($contributions[$project->id]['added'] ?? 0);
             $deducted = (float) ($contributions[$project->id]['deducted'] ?? 0);
             $debt = (float) ($debts[$project->id] ?? 0);

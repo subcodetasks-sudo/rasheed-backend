@@ -48,20 +48,41 @@ class MonthlySummaryApiTest extends TestCase
 
     private function seedEntry(int $projectId, string $date, array $attrs = []): DailyJournalEntry
     {
-        return DailyJournalEntry::factory()->create(array_merge([
+        $merged = array_merge([
             'project_id' => $projectId,
             'journal_date' => $date,
             'daily_income' => 0,
             'daily_expense' => 0,
             'contribution' => 0,
             'administrative_expense' => 0,
+            'uncovered_administrative_expense' => 0,
+            'project_administration_settled' => 0,
             'administrative_fee' => 0,
             'operational_deduction' => 0,
             'daily_total' => 0,
-            'fund_balance' => 0,
             'administrative_debt' => 0,
             'accumulated_administrative_debt' => 0,
-        ], $attrs));
+        ], $attrs);
+
+        // Monthly Summary now reads its net result from the Daily Journal's own fund_balance (single
+        // source of truth) instead of recomputing from these components, so tests must seed a fund_balance
+        // consistent with what DailyJournalCalculationService would actually produce, unless a test
+        // explicitly overrides fund_balance itself (e.g. to model a multi-day carry-forward chain).
+        if (! array_key_exists('fund_balance', $attrs)) {
+            $covered = (float) $merged['administrative_expense'] - (float) $merged['uncovered_administrative_expense'];
+            $merged['fund_balance'] = round(
+                (float) $merged['daily_income']
+                + (float) $merged['contribution']
+                - (float) $merged['daily_expense']
+                - (float) $merged['administrative_fee']
+                - (float) $merged['operational_deduction']
+                - $covered
+                - (float) $merged['project_administration_settled'],
+                2
+            );
+        }
+
+        return DailyJournalEntry::factory()->create($merged);
     }
 
     private function findProject(array $payload, int $projectId): array
