@@ -11,6 +11,7 @@ use Modules\CashStation\Models\CashStationMonthCarry;
 use Modules\CashStation\Models\CashStationSettlement;
 use Modules\DailyJournal\Actions\ReadAccumulatedAdministrativeDebtTipAction;
 use Modules\DailyJournal\Actions\ReadFundBalanceAsOfAction;
+use Modules\MonthlySummary\Enums\ContributionType;
 use Modules\Project\Models\Project;
 
 class BuildCashStationAction
@@ -59,6 +60,11 @@ class BuildCashStationAction
         $adsDebtSettledThisMonth = $this->administrativeDebtSettledInMonthByProject($projectIds, $year, $month);
         $settlements = $this->settlementsForMonth($year, $month);
         $contributions = $this->contributionsByProject($settlements);
+        // fund_deficit contributions are already permanently baked into the beneficiary's fund_balance
+        // (see MonthlySummary's ApplyContributionFundBalanceAction) — counting them again here via $added
+        // would double them. This second map is used only for net_cash_fund below; the displayed
+        // added_contribution/deducted_contribution fields keep showing full totals via $contributions.
+        $addedExcludingFundDeficit = $this->addedContributionsExcludingFundDeficit($settlements);
 
         $projectRows = [];
         $totalSurplus = 0.0;
@@ -87,7 +93,8 @@ class BuildCashStationAction
 
             $added = (float) ($contributions[$project->id]['added'] ?? 0);
             $deducted = (float) ($contributions[$project->id]['deducted'] ?? 0);
-            $netCashFund = round(($authoritativeBalances[$project->id] ?? 0.0) + $added - $deducted, 2);
+            $netCashFundAdded = (float) ($addedExcludingFundDeficit[$project->id] ?? 0);
+            $netCashFund = round(($authoritativeBalances[$project->id] ?? 0.0) + $netCashFundAdded - $deducted, 2);
 
             $originatingDebt = (float) ($debts[$project->id] ?? 0);
             $settledDebtThisMonth = (float) ($adsDebtSettledThisMonth[$project->id] ?? 0);
@@ -310,9 +317,10 @@ class BuildCashStationAction
         $endOfMonth = Carbon::create($year, $month, 1)->startOfDay()->endOfMonth()->startOfDay();
         $balance = (new ReadFundBalanceAsOfAction)->execute([$projectId], $endOfMonth->toDateString())[$projectId] ?? 0.0;
 
-        $contributions = $this->contributionsByProject($this->settlementsForMonth($year, $month));
-        $added = (float) ($contributions[$projectId]['added'] ?? 0);
-        $deducted = (float) ($contributions[$projectId]['deducted'] ?? 0);
+        $settlements = $this->settlementsForMonth($year, $month);
+        $deducted = (float) ($this->contributionsByProject($settlements)[$projectId]['deducted'] ?? 0);
+        // fund_deficit contributions are already inside $balance — see addedContributionsExcludingFundDeficit().
+        $added = (float) ($this->addedContributionsExcludingFundDeficit($settlements)[$projectId] ?? 0);
 
         return round($balance + $added - $deducted, 2);
     }
@@ -361,5 +369,33 @@ class BuildCashStationAction
         }
 
         return $contributions;
+    }
+
+    /**
+     * Added-contribution total per beneficiary project, excluding fund_deficit-type settlements.
+     *
+     * MonthlySummary's ApplyContributionFundBalanceAction permanently adds a fund_deficit contribution's
+     * amount directly into the beneficiary's daily_journal_entries.fund_balance (reapplied on every
+     * recalculation — it's a structural part of fund_balance going forward, not a one-time nudge). Since
+     * net_cash_fund now reads fund_balance directly, including fund_deficit settlements here too would
+     * double-count that amount. administrative_debt-type settlements never touch fund_balance, so they're
+     * still counted normally, matching contributionsByProject()'s existing behavior.
+     *
+     * @param  Collection<int, CashStationSettlement>  $settlements
+     * @return array<int, float>
+     */
+    private function addedContributionsExcludingFundDeficit(Collection $settlements): array
+    {
+        $added = [];
+
+        foreach ($settlements as $settlement) {
+            if ($settlement->contribution_type === ContributionType::FundDeficit) {
+                continue;
+            }
+
+            $added[$settlement->to_project_id] = ($added[$settlement->to_project_id] ?? 0.0) + (float) $settlement->amount;
+        }
+
+        return $added;
     }
 }

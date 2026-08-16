@@ -5,8 +5,10 @@ namespace Tests\Feature\CashStation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Modules\DailyJournal\Models\DailyJournalEntry;
+use Modules\MonthlySummary\Enums\ContributionType;
 use Modules\Project\Enums\OperationalDeductionType;
 use Modules\Project\Enums\ProjectStatus;
+use Modules\Project\Models\Category;
 use Modules\Project\Models\Project;
 use Modules\User\app\Models\User;
 use Spatie\Permission\Models\Role;
@@ -755,5 +757,55 @@ class CashStationApiTest extends TestCase
 
         $this->assertSame('0', $row['monthly_total']);
         $this->assertSame('0', $row['net_cash_fund']);
+    }
+
+    public function test_net_cash_fund_does_not_double_count_fund_deficit_contribution(): void
+    {
+        $this->actAs('finance');
+        $category = Category::factory()->create();
+        $from = $this->createProject(['name' => 'مساهم', 'category_id' => $category->id]);
+        $to = $this->createProject(['name' => 'مستفيد', 'category_id' => $category->id]);
+
+        // Contributor: real surplus of 1000.
+        $this->seedEntry($from->id, '2026-07-12', [
+            'daily_income' => 1000,
+        ]);
+        // Beneficiary: real deficit of -500.
+        $this->seedEntry($to->id, '2026-07-12', [
+            'daily_expense' => 500,
+        ]);
+
+        $this->postJson('/api/v1/monthly-summary/contributions', [
+            'month' => 7,
+            'year' => 2026,
+            'from_project_id' => $from->id,
+            'to_project_id' => $to->id,
+            'contribution_type' => ContributionType::FundDeficit->value,
+            'amount' => 300,
+        ])->assertCreated();
+
+        // The 300 is now permanently added into $to's Daily Journal fund_balance (-500 + 300 = -200) by
+        // MonthlySummary's ApplyContributionFundBalanceAction. net_cash_fund must reflect that single
+        // application, not double it via the settlement's added/deducted math on top.
+        $this->assertSame(
+            '-200.00',
+            number_format((float) DailyJournalEntry::query()
+                ->where('project_id', $to->id)
+                ->whereDate('journal_date', '2026-07-12')
+                ->value('fund_balance'), 2, '.', ''),
+        );
+
+        $data = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
+
+        $toRow = $this->findProject($data, $to->id);
+        $this->assertSame('-200', $toRow['net_cash_fund']);
+        $this->assertSame('deficit', $toRow['status']);
+        // Displayed contribution totals still show the full amount for transparency.
+        $this->assertSame('300', $toRow['added_contribution']);
+
+        $fromRow = $this->findProject($data, $from->id);
+        $this->assertSame('700', $fromRow['net_cash_fund']);
+        $this->assertSame('surplus', $fromRow['status']);
+        $this->assertSame('300', $fromRow['deducted_contribution']);
     }
 }

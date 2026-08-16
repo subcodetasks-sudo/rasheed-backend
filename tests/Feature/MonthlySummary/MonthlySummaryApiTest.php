@@ -134,7 +134,9 @@ class MonthlySummaryApiTest extends TestCase
 
         $this->seedEntry($project->id, '2026-07-10', [
             'daily_income' => 1000,
-            'administrative_fee' => 100,
+            // Exempt projects always get fee 0 from the real calculation engine (EQUATIONS.md §1) — an
+            // exempt entry with a non-zero fee can't occur in real data, so it isn't seeded here either.
+            'administrative_fee' => 0,
             'administrative_debt' => 40,
             'contribution' => 0,
             'daily_expense' => 200,

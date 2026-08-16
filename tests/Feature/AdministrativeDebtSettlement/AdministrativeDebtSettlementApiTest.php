@@ -382,19 +382,20 @@ class AdministrativeDebtSettlementApiTest extends TestCase
         $this->actAs('super-admin');
         $project = $this->createProject();
 
-        // Monthly Total = 50; debt 100 → amount 80 is ≤ debt but > surplus
+        // Real fund_balance (income − fee, unconditionally — unpaid fee becoming debt does not restore
+        // it) = 200 − 100 = 100 surplus; debt 150 → amount 120 is ≤ debt but > the real surplus.
         $this->seedEntry($project->id, '2026-07-15', [
-            'daily_income' => 50,
+            'daily_income' => 200,
             'administrative_fee' => 100,
-            'administrative_debt' => 100,
-            'accumulated_administrative_debt' => 100,
+            'administrative_debt' => 150,
+            'accumulated_administrative_debt' => 150,
         ]);
 
         $this->postJson(self::ENDPOINT, [
             'year' => 2026,
             'month' => 7,
             'project_id' => $project->id,
-            'amount' => 80,
+            'amount' => 120,
         ])
             ->assertStatus(422)
             ->assertJsonPath('message', __('messages.administrative_debt_settlement_exceeds_surplus'));
@@ -515,8 +516,9 @@ class AdministrativeDebtSettlementApiTest extends TestCase
         $this->actAs('finance');
         $project = $this->createProject();
 
+        // Real fund_balance = 200 − 100 = 100 surplus, enough to cover the 20 requested below.
         $this->seedEntry($project->id, '2026-07-15', [
-            'daily_income' => 50,
+            'daily_income' => 200,
             'administrative_fee' => 100,
             'administrative_debt' => 100,
             'accumulated_administrative_debt' => 100,

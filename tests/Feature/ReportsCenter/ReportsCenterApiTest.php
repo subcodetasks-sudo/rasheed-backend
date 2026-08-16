@@ -5,6 +5,7 @@ namespace Tests\Feature\ReportsCenter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Modules\CashStation\Actions\BuildCashStationAction;
+use Modules\DailyJournal\Actions\ReadFundBalanceDeltaAction;
 use Modules\DailyJournal\Models\DailyJournalEntry;
 use Modules\Project\Enums\FundType;
 use Modules\Project\Enums\OperationalDeductionType;
@@ -43,20 +44,47 @@ class ReportsCenterApiTest extends TestCase
 
     private function seedEntry(int $projectId, string $date, array $attrs = []): DailyJournalEntry
     {
-        return DailyJournalEntry::factory()->create(array_merge([
+        $merged = array_merge([
             'project_id' => $projectId,
             'journal_date' => $date,
             'daily_income' => 0,
             'daily_expense' => 0,
             'contribution' => 0,
             'administrative_expense' => 0,
+            'uncovered_administrative_expense' => 0,
+            'project_administration_settled' => 0,
             'administrative_fee' => 0,
             'operational_deduction' => 0,
             'daily_total' => 0,
-            'fund_balance' => 0,
             'administrative_debt' => 0,
             'accumulated_administrative_debt' => 0,
-        ], $attrs));
+        ], $attrs);
+
+        // Reports Center's "net" now reads the Daily Journal's own fund_balance (single source of
+        // truth) instead of recomputing from these components, so tests must seed a fund_balance
+        // consistent with what DailyJournalCalculationService would actually produce — chained from
+        // whatever this project's previous entry (if any) already has — unless a test explicitly
+        // overrides fund_balance itself.
+        if (! array_key_exists('fund_balance', $attrs)) {
+            $previousBalance = (float) (DailyJournalEntry::query()
+                ->where('project_id', $projectId)
+                ->where('journal_date', '<', $date)
+                ->orderByDesc('journal_date')
+                ->value('fund_balance') ?? 0);
+
+            $covered = (float) $merged['administrative_expense'] - (float) $merged['uncovered_administrative_expense'];
+            $delta = (float) $merged['daily_income']
+                + (float) $merged['contribution']
+                - (float) $merged['daily_expense']
+                - (float) $merged['administrative_fee']
+                - (float) $merged['operational_deduction']
+                - $covered
+                - (float) $merged['project_administration_settled'];
+
+            $merged['fund_balance'] = round($previousBalance + $delta, 2);
+        }
+
+        return DailyJournalEntry::factory()->create($merged);
     }
 
     public function test_guest_gets_401(): void
@@ -274,7 +302,9 @@ class ReportsCenterApiTest extends TestCase
             '2026-08-31',
         );
         $aggregate = $aggregates[(int) $project->id];
-        $net = $cs->monthlyTotalFromAggregate($aggregate);
+        // net is sourced from the Daily Journal's own fund_balance (single source of truth), not from
+        // monthlyTotalFromAggregate() — see BuildReportsCenterAction.
+        $net = (new ReadFundBalanceDeltaAction)->execute([(int) $project->id], '2026-08-01', '2026-08-31')[(int) $project->id];
 
         $this->assertSame(
             number_format((float) $aggregate->monthly_revenue, 2, '.', ''),
