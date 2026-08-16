@@ -124,24 +124,6 @@ outstanding_project_administration = round(
 , 2)
 ```
 
-### 5b. Zero-activity day (income and expense both 0)
-
-When `daily_income == 0` **and** `daily_expense == 0` for an entry (both, not just one), that entry is exempt
-from every deduction that isn't already naturally 0:
-
-- `operational_deduction` is forced to `0`, regardless of the project's operational deduction type —
-  including `fixed`, which otherwise always charges `project.operational_fixed_amount` (§2). `relative`/`exempt`
-  are already `0` in this case.
-- Administrative expense coverage/settlement (§5a) is **skipped**: `administrative_expense` is still resolved
-  from Inventory as usual (it is a real, independent cost — see §3), but none of it is deducted from
-  `fund_balance` that day. The full amount rolls into `uncovered_administrative_expense`,
-  `project_administration_settled` is `0`, and it is added to `outstanding_project_administration` to be
-  settled from surplus on a later, non-zero-activity day.
-- `fund_balance` for a zero-activity day is therefore just `previous_day_fund_balance + contribution` (income,
-  expense, administrative_fee, and operational_deduction are all 0) — i.e. nothing is deducted from it.
-- `administrative_fee` and Administrative Debt (§6) are unaffected by this rule because they are already
-  naturally `0` whenever `daily_income` is `0` (see Edge cases below).
-
 Rules:
 
 - `uncovered_administrative_expense` stays associated with the **original day** (new transfer that day); later settlement does not rewrite it.
@@ -334,7 +316,6 @@ Action rejections:
 | Case | Behavior |
 |------|----------|
 | Zero / null inputs | Treated as 0 in math |
-| Income and expense both 0 | Operational deduction forced 0 (even `fixed` type); admin expense coverage/settlement skipped so `fund_balance` is untouched (§5b) |
 | Positive balance | No Case 1 debt from balance |
 | Negative balance, fee available | Case 1 debt = min(\|balance\|, full same-day administrative_fee) |
 | Negative balance, fee 0 | Debt 0 (negative alone never creates debt) |
