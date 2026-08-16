@@ -669,4 +669,94 @@ class CashStationApiTest extends TestCase
             ->assertNotFound()
             ->assertJsonPath('message', __('messages.cash_station_settlement_not_found'));
     }
+
+    /**
+     * Regression for the reported "Food Takiya" bug: a day with heavy income/expense (inventory)
+     * activity where the inventory-charged administrative_expense exceeds the administrative_fee
+     * pushes the WHOLE fee into administrative_debt. The old formula (fee − debt + contribution)
+     * then nets the fee to zero and never accounts for administrative_expense at all, so it showed
+     * a large surplus even though Daily Journal's real daily_total/fund_balance is negative.
+     */
+    public function test_food_takiya_regression_administrative_expense_deficit_not_shown_as_surplus(): void
+    {
+        $this->actAs('finance');
+        $project = $this->createProject(['name' => 'تكية الطعام']);
+
+        // Real daily_total = 1000 − 950 (admin_expense) − 120 (fee) = −70 (deficit).
+        // administrative_expense (950) > administrative_fee (120) → the whole fee becomes debt,
+        // which is exactly what made the old "fee − debt" formula collapse to 0 and hide the loss.
+        $this->seedEntry($project->id, '2026-08-14', [
+            'daily_income' => 1000,
+            'administrative_expense' => 950,
+            'administrative_fee' => 120,
+            'administrative_debt' => 120,
+            'accumulated_administrative_debt' => 120,
+        ]);
+
+        $data = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data');
+        $row = $this->findProject($data, $project->id);
+
+        $this->assertSame('-70.00', $row['monthly_total']);
+        $this->assertSame('deficit', $row['status']);
+        $this->assertSame('0.00', $data['summary']['total_monthly_surplus']);
+        $this->assertSame('70.00', $data['summary']['total_monthly_deficit']);
+    }
+
+    public function test_deficit_from_multiple_days_aggregates_exactly_without_omission_or_double_count(): void
+    {
+        $this->actAs('finance');
+        $project = $this->createProject();
+
+        $this->seedEntry($project->id, '2026-08-01', ['daily_income' => 300]);
+        // fund_balance 300
+        $this->seedEntry($project->id, '2026-08-10', ['daily_expense' => 100]);
+        // fund_balance 200
+        $this->seedEntry($project->id, '2026-08-15', ['daily_expense' => 500]);
+        // fund_balance -300 (deficit)
+        $this->seedEntry($project->id, '2026-08-20', ['daily_income' => 50]);
+        // fund_balance -250 (still deficit)
+
+        $data = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data');
+        $row = $this->findProject($data, $project->id);
+
+        // Sum of daily_total across all four days: 300 - 100 - 500 + 50 = -250.
+        $this->assertSame('-250.00', $row['monthly_total']);
+        $this->assertSame('deficit', $row['status']);
+    }
+
+    public function test_editing_journal_day_through_write_endpoint_updates_monthly_total_live(): void
+    {
+        $this->actAs('super-admin');
+        $project = $this->createProject(['administrative_exempt' => true]);
+
+        $this->putJson('/api/v1/daily-journals', [
+            'journal_date' => '2026-08-05',
+            'entries' => [[
+                'project_id' => $project->id,
+                'daily_income' => 500,
+                'daily_expense' => 100,
+                'contribution' => 0,
+            ]],
+        ])->assertOk();
+
+        $before = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data');
+        $this->assertSame('400.00', $this->findProject($before, $project->id)['monthly_total']);
+        $this->assertSame('surplus', $this->findProject($before, $project->id)['status']);
+
+        // Recalculating the same day into a deficit must not leave the old surplus cached/stale.
+        $this->putJson('/api/v1/daily-journals', [
+            'journal_date' => '2026-08-05',
+            'entries' => [[
+                'project_id' => $project->id,
+                'daily_income' => 100,
+                'daily_expense' => 900,
+                'contribution' => 0,
+            ]],
+        ])->assertOk();
+
+        $after = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data');
+        $row = $this->findProject($after, $project->id);
+        $this->assertSame('-800.00', $row['monthly_total']);
+        $this->assertSame('deficit', $row['status']);
+    }
 }

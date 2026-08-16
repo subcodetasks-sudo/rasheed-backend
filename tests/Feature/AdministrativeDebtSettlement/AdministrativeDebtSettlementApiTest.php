@@ -536,4 +536,144 @@ class AdministrativeDebtSettlementApiTest extends TestCase
                 && isset($event->payload['projects']);
         });
     }
+
+    /**
+     * Regression for the reported "Food Takiya" bug: administrative_expense (inventory) exceeds
+     * the administrative_fee, pushing the whole fee into debt while daily_total/fund_balance is
+     * genuinely negative. The old net_cash_fund-derived surplus (which never read
+     * administrative_expense and netted debt out of the fee) would have wrongly allowed this
+     * fund to pay down its administrative debt despite being in deficit.
+     */
+    public function test_food_takiya_regression_deficit_fund_cannot_settle_debt(): void
+    {
+        $this->actAs('finance');
+        $project = $this->createProject(['name' => 'تكية الطعام']);
+
+        // Real daily_total = 1000 − 950 (admin_expense) − 120 (fee) = −70 (deficit).
+        $this->seedEntry($project->id, '2026-08-14', [
+            'daily_income' => 1000,
+            'administrative_expense' => 950,
+            'administrative_fee' => 120,
+            'administrative_debt' => 120,
+            'accumulated_administrative_debt' => 120,
+        ]);
+
+        $this->postJson(self::ENDPOINT, [
+            'year' => 2026,
+            'month' => 8,
+            'project_id' => $project->id,
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('message', __('messages.administrative_debt_settlement_requires_surplus'));
+    }
+
+    public function test_project_flips_to_deficit_after_recalculation_cannot_settle(): void
+    {
+        $this->actAs('super-admin');
+        $project = $this->createProject();
+
+        $this->putJson('/api/v1/daily-journals', [
+            'journal_date' => '2026-08-01',
+            'entries' => [[
+                'project_id' => $project->id,
+                'daily_income' => 200,
+                'daily_expense' => 1000,
+                'contribution' => 0,
+            ]],
+        ])->assertOk();
+        // fee = 24 (12% of 200); fund_balance = 200 - 1000 - 24 = -824 (deficit day) → debt 24
+
+        $this->putJson('/api/v1/daily-journals', [
+            'journal_date' => '2026-08-02',
+            'entries' => [[
+                'project_id' => $project->id,
+                'daily_income' => 2000,
+                'daily_expense' => 0,
+                'contribution' => 0,
+            ]],
+        ])->assertOk();
+        // fee = 240; fund_balance = -824 + 2000 - 240 = 936 (net surplus again; debt 24 remains)
+
+        $before = collect($this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data.projects'))
+            ->firstWhere('project_id', $project->id);
+        $this->assertNotNull($before);
+        $this->assertTrue($before['can_settle']);
+
+        // Recalculate day 2 so the fund flips back to a net deficit.
+        $this->putJson('/api/v1/daily-journals', [
+            'journal_date' => '2026-08-02',
+            'entries' => [[
+                'project_id' => $project->id,
+                'daily_income' => 200,
+                'daily_expense' => 0,
+                'contribution' => 0,
+            ]],
+        ])->assertOk();
+
+        $entry = DailyJournalEntry::query()
+            ->where('project_id', $project->id)
+            ->whereDate('journal_date', '2026-08-02')
+            ->first();
+        $this->assertLessThan(0, (float) $entry->fund_balance);
+
+        $after = collect($this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data.projects'))
+            ->firstWhere('project_id', $project->id);
+        $this->assertNotNull($after);
+        $this->assertFalse($after['can_settle']);
+
+        $this->postJson(self::ENDPOINT, [
+            'year' => 2026,
+            'month' => 8,
+            'project_id' => $project->id,
+            'amount' => 1,
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('message', __('messages.administrative_debt_settlement_requires_surplus'));
+    }
+
+    public function test_different_projects_deficit_and_surplus_do_not_leak(): void
+    {
+        $this->actAs('finance');
+        $surplusProject = $this->createProject(['name' => 'فائض']);
+        $deficitProject = $this->createProject(['name' => 'عجز']);
+
+        // Surplus project: comfortable surplus with some debt outstanding.
+        $this->seedEntry($surplusProject->id, '2026-08-05', [
+            'daily_income' => 1000,
+            'administrative_fee' => 100,
+            'administrative_debt' => 20,
+            'accumulated_administrative_debt' => 20,
+        ]);
+        // real daily_total = 1000 - 100 = 900 (surplus)
+
+        // Deficit project: same debt amount, but genuinely underwater.
+        $this->seedEntry($deficitProject->id, '2026-08-05', [
+            'daily_income' => 50,
+            'administrative_expense' => 100,
+            'administrative_fee' => 20,
+            'administrative_debt' => 20,
+            'accumulated_administrative_debt' => 20,
+        ]);
+        // real daily_total = 50 - 100 - 20 = -70 (deficit)
+
+        $rows = collect($this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data.projects'))
+            ->keyBy('project_id');
+
+        $this->assertTrue($rows[$surplusProject->id]['can_settle']);
+        $this->assertFalse($rows[$deficitProject->id]['can_settle']);
+
+        $this->postJson(self::ENDPOINT, [
+            'year' => 2026,
+            'month' => 8,
+            'project_id' => $surplusProject->id,
+        ])->assertCreated();
+
+        $this->postJson(self::ENDPOINT, [
+            'year' => 2026,
+            'month' => 8,
+            'project_id' => $deficitProject->id,
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('message', __('messages.administrative_debt_settlement_requires_surplus'));
+    }
 }
