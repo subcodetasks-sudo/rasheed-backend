@@ -11,7 +11,7 @@ thin cross-cutting concerns (base controller, media handling, exception handler,
 Active modules (see `modules_statuses.json`): `User`, `Authorization`, `Settings`, `Project`, `DailyJournal`,
 `AdministrationRates`, `Inventory`, `Dashboard`, `CashStation`, `CashFundExpenses`, `Notifications`,
 `AdministrativeDebtSettlement`, `AdministrativeFund`, `OperationalFund`, `OperationalRate`, `ReportsCenter`,
-`AdvancedReports`, `MonthlySummary`.
+`AdvancedReports`, `MonthlySummary`, `AuditLog`.
 
 ## Common commands
 
@@ -160,7 +160,8 @@ filters/sorts, resource shape, or delete-guard behavior for users, check whether
 - File uploads go through `spatie/laravel-medialibrary`, wrapped by `app/Core` (`MediaServiceInterface`/
   `MediaService`, `HasStandardMedia` trait for models, `MediaResource`). A generic `App\Http\Controllers\Api\MediaController`
   exposes upload/show/download/destroy under `v1/media`, decoupled from any specific module.
-- `spatie/laravel-activitylog` is installed for auditing (`ActivityPolicy` gates who can view logs).
+- `spatie/laravel-activitylog` is installed and is what the `AuditLog` module (see below) writes to and reads from
+  (`Spatie\Activitylog\Models\Activity`, filtered by `log_name = 'audit'`).
 
 ### Localization
 
@@ -407,6 +408,36 @@ extension point: a rule declares which `context` string it `handles()` and is `e
 (e.g. `InventoryStockNotificationRule` for low-stock warnings). Unlike `Project`'s deletion-constraint registry
 (container-tagged, open for any module to extend), this registry is a hardcoded list built in
 `NotificationsServiceProvider::register()` — add new rules there, not via tagging.
+
+### AuditLog: cross-module audit trail
+
+`AuditLog` writes to and reads from Spatie's `activity()` helper (`spatie/laravel-activitylog`, `log_name = 'audit'`
+via `config('auditlog.log_name')`), with two independent write paths:
+
+1. **Mutation events** — `Modules\AuditLog\Providers\EventServiceProvider` is a hardcoded `$listen` map (same
+   pattern as `Notifications`: registered explicitly, `$shouldDiscoverEvents = false`) covering events from
+   `Project`, category, `User`, `DailyJournal`, `Inventory`, `CashStation`, `AdministrativeDebtSettlement`,
+   `OperationalFund`, `AdministrativeFund`, and `Settings`. Each listener uses the `RecordsAuditSafely` trait
+   (`protected function record(...)`, wrapped in try/catch so a logging failure never breaks the triggering
+   request) to call `RecordAuditLogAction::execute()`.
+2. **Read/view tracking** — `Modules\AuditLog\Http\Middleware\RecordViewedAuditLog` runs on `terminate()` (after
+   the response is sent) for successful `GET` requests, allow-listing specific `v1/*` prefixes (`projects`,
+   `daily-journals`, `cash-station`, ...) and explicitly excluding a few (`audit-logs`, `my-activity-logs`,
+   `notifications`, `media`, `realtime`, `auth/login|refresh|logout`) to avoid logging the audit/notification
+   endpoints themselves or noisy auth polling.
+
+`RecordAuditLogAction::execute()` defers the actual write via `DB::afterCommit()` whenever called inside an open
+transaction (skipped in tests), so an audit entry is only ever recorded for a change that actually committed.
+Vocabulary is two backed enums: `AuditAction` (`created`/`updated`/`deleted`/`archived`/`restored`/`saved`/
+`contribution`/`transfer`/`incoming`/`outgoing`/`login`/`logout`/`viewed`/`repaid`/`carried_forward`/
+`status_updated`) and `AuditSource` (`user`/`api`).
+
+Two read endpoints, different role gates: `GET /v1/audit-logs` (`role:super-admin` only, full log via
+`ListAuditLogsQuery`, which layers `causer_id`/`event`/date-range filters on top of the shared
+`App\Support\Query\BaseQueryService`) and `GET /v1/my-activity-logs` (`role:super-admin|finance|inventory`, same
+query forced to the current user's own `causer_id` — a self-service activity view). This module is the actual
+implementation behind what the "Media & activity log" section above calls `ActivityPolicy`-gated auditing — the
+`spatie/laravel-activitylog` package itself is unopinionated about *what* gets logged; `AuditLog` is what decides.
 
 ### Realtime updates: Socket.IO broadcasting
 

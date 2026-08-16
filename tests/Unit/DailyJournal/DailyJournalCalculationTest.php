@@ -214,6 +214,30 @@ class DailyJournalCalculationTest extends TestCase
         $this->assertEquals(0.0, (float) $result[$exempt->id]->operational_deduction);
     }
 
+    public function test_operational_deduction_forced_zero_when_income_and_expense_both_zero(): void
+    {
+        app(SettingService::class)->update('total_operational_deduction', 1081, 'decimal', true);
+
+        // Fixed type normally charges its flat amount regardless of income — must be
+        // suppressed when the entry has zero income AND zero expense.
+        $fixed = Project::factory()->fixedDeduction(154)->create(['status' => ProjectStatus::Active]);
+
+        $zeroActivity = tap(
+            new DailyJournalEntry(['project_id' => $fixed->id, 'daily_income' => 0, 'daily_expense' => 0]),
+            fn ($e) => $e->setRelation('project', $fixed)
+        );
+        $result = $this->service->applyOperationalDeductions(collect([$zeroActivity]))->keyBy('project_id');
+        $this->assertEquals(0.0, (float) $result[$fixed->id]->operational_deduction);
+
+        // Regression: a non-zero-activity Fixed-type entry must still get its flat deduction.
+        $withExpenseOnly = tap(
+            new DailyJournalEntry(['project_id' => $fixed->id, 'daily_income' => 0, 'daily_expense' => 20]),
+            fn ($e) => $e->setRelation('project', $fixed)
+        );
+        $result = $this->service->applyOperationalDeductions(collect([$withExpenseOnly]))->keyBy('project_id');
+        $this->assertEquals(154.0, (float) $result[$fixed->id]->operational_deduction);
+    }
+
     public function test_fund_balance_and_administrative_debt_pipeline(): void
     {
         $project = Project::factory()->create([
@@ -250,6 +274,73 @@ class DailyJournalCalculationTest extends TestCase
 
         $entries = $this->service->applyAccumulatedAdministrativeDebt($entries, $previous);
         $this->assertEquals(34.0, (float) $entries->first()->accumulated_administrative_debt);
+    }
+
+    public function test_administrative_expense_coverage_skipped_when_income_and_expense_both_zero(): void
+    {
+        $project = Project::factory()->create([
+            'status' => ProjectStatus::Active,
+            'operational_deduction_type' => OperationalDeductionType::Exempt,
+        ]);
+
+        $previousBalances = [
+            $project->id => [
+                'fund_balance' => 500,
+                'accumulated_administrative_debt' => 0,
+                'outstanding_project_administration' => 30,
+            ],
+        ];
+
+        // Zero-activity day with a real inventory-sourced administrative expense and same-day surplus:
+        // the expense must still be recorded/uncovered/rolled into outstanding, but fund_balance must
+        // NOT be reduced by it.
+        $entry = new DailyJournalEntry([
+            'project_id' => $project->id,
+            'daily_income' => 0,
+            'daily_expense' => 0,
+            'fund_balance' => 500,
+            'administrative_expense' => 100,
+        ]);
+
+        $result = $this->service->applyAdministrativeExpenseCoverage(collect([$entry]), $previousBalances)->first();
+
+        $this->assertEquals(500.0, (float) $result->fund_balance);
+        $this->assertEquals(100.0, (float) $result->uncovered_administrative_expense);
+        $this->assertEquals(0.0, (float) $result->project_administration_settled);
+        $this->assertEquals(130.0, (float) $result->outstanding_project_administration);
+    }
+
+    public function test_administrative_expense_coverage_unaffected_when_income_or_expense_present(): void
+    {
+        $project = Project::factory()->create([
+            'status' => ProjectStatus::Active,
+            'operational_deduction_type' => OperationalDeductionType::Exempt,
+        ]);
+
+        $previousBalances = [
+            $project->id => [
+                'fund_balance' => 500,
+                'accumulated_administrative_debt' => 0,
+                'outstanding_project_administration' => 30,
+            ],
+        ];
+
+        // Same numbers as the zero-activity case above, but with non-zero income — coverage/settlement
+        // must run exactly as before (regression guard for the "don't change old logic" constraint).
+        $entry = new DailyJournalEntry([
+            'project_id' => $project->id,
+            'daily_income' => 50,
+            'daily_expense' => 0,
+            'fund_balance' => 500,
+            'administrative_expense' => 100,
+        ]);
+
+        $result = $this->service->applyAdministrativeExpenseCoverage(collect([$entry]), $previousBalances)->first();
+
+        $this->assertEquals(370.0, (float) $result->fund_balance);
+        $this->assertEquals(0.0, (float) $result->uncovered_administrative_expense);
+        $this->assertEquals(30.0, (float) $result->project_administration_settled);
+        $this->assertEquals(0.0, (float) $result->outstanding_project_administration);
     }
 
     public function test_contribution_adds_to_administrative_debt_from_pre_contribution_base(): void

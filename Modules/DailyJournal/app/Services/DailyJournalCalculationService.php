@@ -174,7 +174,11 @@ class DailyJournalCalculationService
         $deductions = $this->operationalDeductionService->distribute($projects, $incomes, $journalDate);
 
         foreach ($entries as $entry) {
-            $entry->operational_deduction = (float) ($deductions[$entry->project_id] ?? 0);
+            $isZeroActivity = $entry->incomeAmount() === 0.0 && $entry->expenseAmount() === 0.0;
+
+            $entry->operational_deduction = $isZeroActivity
+                ? 0.0
+                : (float) ($deductions[$entry->project_id] ?? 0);
         }
 
         return $entries;
@@ -226,6 +230,18 @@ class DailyJournalCalculationService
                 (float) ($previousBalances[$entry->project_id]['outstanding_project_administration'] ?? 0),
                 2
             );
+
+            $isZeroActivity = $entry->incomeAmount() === 0.0 && $entry->expenseAmount() === 0.0;
+
+            if ($isZeroActivity) {
+                $expense = round(max(0, (float) $entry->administrative_expense), 2);
+
+                $entry->uncovered_administrative_expense = $expense;
+                $entry->project_administration_settled = 0.0;
+                $entry->outstanding_project_administration = round($previousOutstanding + $expense, 2);
+
+                continue;
+            }
 
             $coverage = $this->calculateAdministrativeExpenseCoverage(
                 (float) $entry->fund_balance,
