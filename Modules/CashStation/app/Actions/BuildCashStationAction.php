@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Schema;
 use Modules\CashStation\Models\CashStationMonthCarry;
 use Modules\CashStation\Models\CashStationSettlement;
 use Modules\DailyJournal\Actions\ReadAccumulatedAdministrativeDebtTipAction;
+use Modules\DailyJournal\Actions\ReadFundBalanceAsOfAction;
 use Modules\Project\Models\Project;
 
 class BuildCashStationAction
@@ -39,11 +40,20 @@ class BuildCashStationAction
             $endOfMonth->toDateString(),
         );
 
-        // Net fund is the Daily Journal's own fund_balance — always the current, correct value for that
-        // project as of a date, never independently recomputed. This makes previous/net cash always
-        // accurate regardless of whether a manual month carry-forward was ever run for this project.
-        $balancesAtStart = $this->fundBalancesAsOf($projectIds, $startOfMonth->copy()->subDay()->toDateString());
-        $balancesAtEnd = $this->fundBalancesAsOf($projectIds, $endOfMonth->toDateString());
+        $previousAggregates = $carriedFromPrevious
+            ? $this->monthlyAggregatesByProject(
+                $projectIds,
+                $previousMonth->copy()->startOfMonth()->toDateString(),
+                $previousMonth->copy()->endOfMonth()->toDateString(),
+            )
+            : [];
+
+        // net_cash_fund / status are the fields that answer "is this project's fund in surplus or
+        // deficit" — that must always match Daily Journal's own fund_balance exactly, so it's read
+        // directly here rather than derived from previous_monthly_total/monthly_total below. Those two
+        // fields (and everything else in this method) are intentionally left on the original
+        // component-sum calculation — see monthlyTotalFromAggregate().
+        $authoritativeBalances = (new ReadFundBalanceAsOfAction)->execute($projectIds, $endOfMonth->toDateString());
 
         $debts = $this->administrativeDebtsByProject($projectIds, $endOfMonth->toDateString());
         $adsDebtSettledThisMonth = $this->administrativeDebtSettledInMonthByProject($projectIds, $year, $month);
@@ -68,14 +78,16 @@ class BuildCashStationAction
             $monthlyExpenses = (float) ($aggregate->monthly_expenses ?? 0);
             $administrativePercentage = (float) ($aggregate->administrative_percentage ?? 0);
             $operationalDeduction = (float) ($aggregate->operational_deduction ?? 0);
+            $monthlyTotal = $this->monthlyTotalFromAggregate($aggregate);
 
-            $previousMonthlyTotal = round($balancesAtStart[$project->id] ?? 0.0, 2);
-            $endBalance = round($balancesAtEnd[$project->id] ?? 0.0, 2);
-            $monthlyTotal = round($endBalance - $previousMonthlyTotal, 2);
+            $previousMonthlyTotal = 0.0;
+            if ($carriedFromPrevious) {
+                $previousMonthlyTotal = $this->monthlyTotalFromAggregate($previousAggregates[$project->id] ?? null);
+            }
 
             $added = (float) ($contributions[$project->id]['added'] ?? 0);
             $deducted = (float) ($contributions[$project->id]['deducted'] ?? 0);
-            $netCashFund = round($endBalance + $added - $deducted, 2);
+            $netCashFund = round(($authoritativeBalances[$project->id] ?? 0.0) + $added - $deducted, 2);
 
             $originatingDebt = (float) ($debts[$project->id] ?? 0);
             $settledDebtThisMonth = (float) ($adsDebtSettledThisMonth[$project->id] ?? 0);
@@ -141,7 +153,7 @@ class BuildCashStationAction
     }
 
     /**
-     * Transferable surplus for a project in a month = max(0, previous + monthly_total + added − deducted).
+     * Transferable surplus for a project in a month = max(0, net cash fund).
      */
     public function transferableBalance(int $projectId, int $month, int $year): float
     {
@@ -290,76 +302,19 @@ class BuildCashStationAction
     }
 
     /**
-     * Net cash fund for a project in a month (can be negative) — the Daily Journal's own fund_balance as
-     * of month-end, plus this month's settlement transfers. Never independently recomputed.
+     * Net cash fund for a project in a month (can be negative) — Daily Journal's own fund_balance as of
+     * month-end (the single source of truth for surplus/deficit), plus this month's settlement transfers.
      */
     public function netCashFundForProject(int $projectId, int $month, int $year): float
     {
         $endOfMonth = Carbon::create($year, $month, 1)->startOfDay()->endOfMonth()->startOfDay();
-        $endBalance = $this->fundBalancesAsOf([$projectId], $endOfMonth->toDateString())[$projectId] ?? 0.0;
+        $balance = (new ReadFundBalanceAsOfAction)->execute([$projectId], $endOfMonth->toDateString())[$projectId] ?? 0.0;
 
         $contributions = $this->contributionsByProject($this->settlementsForMonth($year, $month));
         $added = (float) ($contributions[$projectId]['added'] ?? 0);
         $deducted = (float) ($contributions[$projectId]['deducted'] ?? 0);
 
-        return round($endBalance + $added - $deducted, 2);
-    }
-
-    /**
-     * Latest Daily Journal fund_balance per project as of a date — the authoritative net fund, sourced
-     * directly from `daily_journal_entries` (mirrors DailyJournalCalculationService::previousBalances()'s
-     * "latest entry on/before a date" lookup). 0 if the project has no entry on or before that date.
-     *
-     * @param  array<int, int>  $projectIds
-     * @return array<int, float>
-     */
-    public function fundBalancesAsOf(array $projectIds, string $asOfDate): array
-    {
-        if ($projectIds === []) {
-            return [];
-        }
-
-        $latestDates = DB::table('daily_journal_entries')
-            ->selectRaw('project_id, MAX(journal_date) as journal_date')
-            ->whereIn('project_id', $projectIds)
-            ->whereDate('journal_date', '<=', $asOfDate)
-            ->groupBy('project_id');
-
-        $rows = DB::table('daily_journal_entries')
-            ->joinSub($latestDates, 'latest', function ($join) {
-                $join->on('daily_journal_entries.project_id', '=', 'latest.project_id')
-                    ->on('daily_journal_entries.journal_date', '=', 'latest.journal_date');
-            })
-            ->select('daily_journal_entries.project_id', 'daily_journal_entries.fund_balance')
-            ->get();
-
-        $keyed = [];
-        foreach ($rows as $row) {
-            $keyed[(int) $row->project_id] = (float) $row->fund_balance;
-        }
-
-        return $keyed;
-    }
-
-    /**
-     * Authoritative monthly flow per project = Daily Journal fund_balance at $endDate minus fund_balance
-     * the day before $startDate (0 if no prior entry) — a pure delta of two already-correct Daily Journal
-     * reads, never an independent recomputation.
-     *
-     * @param  array<int, int>  $projectIds
-     * @return array<int, float>
-     */
-    public function fundBalanceDeltasByProject(array $projectIds, string $startDate, string $endDate): array
-    {
-        $before = $this->fundBalancesAsOf($projectIds, Carbon::parse($startDate)->subDay()->toDateString());
-        $end = $this->fundBalancesAsOf($projectIds, $endDate);
-
-        $deltas = [];
-        foreach ($projectIds as $projectId) {
-            $deltas[$projectId] = round(($end[$projectId] ?? 0.0) - ($before[$projectId] ?? 0.0), 2);
-        }
-
-        return $deltas;
+        return round($balance + $added - $deducted, 2);
     }
 
     /**

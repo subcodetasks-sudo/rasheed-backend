@@ -8,6 +8,7 @@ use Illuminate\Support\Collection;
 use Modules\CashStation\Actions\BuildCashStationAction;
 use Modules\CashStation\Models\CashStationMonthCarry;
 use Modules\CashStation\Models\CashStationSettlement;
+use Modules\DailyJournal\Actions\ReadFundBalanceDeltaAction;
 use Modules\Project\Models\Project;
 
 class BuildMonthlySummaryAction
@@ -38,13 +39,9 @@ class BuildMonthlySummaryAction
 
         $projectIds = $projects->pluck('id')->all();
 
-        // Net result is the Daily Journal's own fund_balance delta for the period — the authoritative
-        // value, never independently recomputed from raw components.
-        $monthlyTotals = $this->buildCashStationAction->fundBalanceDeltasByProject(
-            $projectIds,
-            $start,
-            $end,
-        );
+        // Net result is the Daily Journal's own fund_balance delta for the period — the single source
+        // of truth, never independently recomputed from raw components.
+        $monthlyTotals = (new ReadFundBalanceDeltaAction)->execute($projectIds, $start, $end);
 
         $debts = $this->buildCashStationAction->administrativeDebtsByProject($projectIds, $end);
         $settlements = $this->buildCashStationAction->settlementsForMonth($year, $month);

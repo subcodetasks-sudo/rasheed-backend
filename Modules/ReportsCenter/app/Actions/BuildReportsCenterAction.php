@@ -7,6 +7,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Modules\CashStation\Actions\BuildCashStationAction;
 use Modules\DailyJournal\Actions\ReadAccumulatedAdministrativeDebtTipAction;
+use Modules\DailyJournal\Actions\ReadFundBalanceDeltaAction;
 use Modules\Project\Models\Project;
 
 class BuildReportsCenterAction
@@ -40,6 +41,11 @@ class BuildReportsCenterAction
             $endBound,
         );
 
+        // net is the field claiming "this project's fund result for the period" — the single source of
+        // truth, read from Daily Journal's own fund_balance rather than independently recomputed from
+        // the raw SUM()'d columns above (those still drive income/expense/administrative/operational).
+        $fundBalanceDeltas = (new ReadFundBalanceDeltaAction)->execute($projectIds, $startDate, $endDate);
+
         $debts = $this->readAccumulatedAdministrativeDebtTipAction->execute($projectIds, $endDate);
 
         $projectRows = [];
@@ -58,7 +64,7 @@ class BuildReportsCenterAction
             $expense = round((float) ($aggregate->monthly_expenses ?? 0), 2);
             $administrative = round((float) ($aggregate->administrative_percentage ?? 0), 2);
             $operational = round((float) ($aggregate->operational_deduction ?? 0), 2);
-            $net = round($this->buildCashStationAction->monthlyTotalFromAggregate($aggregate), 2);
+            $net = round($fundBalanceDeltas[$projectId] ?? 0.0, 2);
             $debt = round((float) ($debts[$projectId] ?? 0), 2);
 
             $fundType = $project->fund_type?->value ?? (string) $project->fund_type;

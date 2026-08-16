@@ -69,20 +69,26 @@ class AdministrativeDebtSettlementApiTest extends TestCase
 
         // Settlement eligibility now reads surplus from the Daily Journal's own fund_balance (single
         // source of truth) instead of recomputing from these components, so tests must seed a fund_balance
-        // consistent with what DailyJournalCalculationService would actually produce, unless a test
-        // explicitly overrides fund_balance itself (e.g. to model a multi-day carry-forward chain).
+        // consistent with what DailyJournalCalculationService would actually produce — chained from
+        // whatever this project's previous entry (if any) already has, exactly like the real calculation
+        // service — unless a test explicitly overrides fund_balance itself.
         if (! array_key_exists('fund_balance', $attrs)) {
+            $previousBalance = (float) (DailyJournalEntry::query()
+                ->where('project_id', $projectId)
+                ->where('journal_date', '<', $date)
+                ->orderByDesc('journal_date')
+                ->value('fund_balance') ?? 0);
+
             $covered = (float) $merged['administrative_expense'] - (float) $merged['uncovered_administrative_expense'];
-            $merged['fund_balance'] = round(
-                (float) $merged['daily_income']
+            $delta = (float) $merged['daily_income']
                 + (float) $merged['contribution']
                 - (float) $merged['daily_expense']
                 - (float) $merged['administrative_fee']
                 - (float) $merged['operational_deduction']
                 - $covered
-                - (float) $merged['project_administration_settled'],
-                2
-            );
+                - (float) $merged['project_administration_settled'];
+
+            $merged['fund_balance'] = round($previousBalance + $delta, 2);
         }
 
         return DailyJournalEntry::factory()->create($merged);

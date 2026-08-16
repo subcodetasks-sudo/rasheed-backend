@@ -58,20 +58,26 @@ class CashStationApiTest extends TestCase
 
         // CashStation now reads fund_balance directly from the Daily Journal (single source of truth)
         // instead of recomputing it from these components, so tests must seed a fund_balance consistent
-        // with what DailyJournalCalculationService would actually produce for these inputs, unless a test
-        // explicitly overrides fund_balance itself (e.g. to model a multi-day carry-forward chain).
+        // with what DailyJournalCalculationService would actually produce for these inputs — chained from
+        // whatever this project's previous entry (if any) already has, exactly like the real calculation
+        // service — unless a test explicitly overrides fund_balance itself.
         if (! array_key_exists('fund_balance', $attrs)) {
+            $previousBalance = (float) (DailyJournalEntry::query()
+                ->where('project_id', $projectId)
+                ->where('journal_date', '<', $date)
+                ->orderByDesc('journal_date')
+                ->value('fund_balance') ?? 0);
+
             $covered = (float) $merged['administrative_expense'] - (float) $merged['uncovered_administrative_expense'];
-            $merged['fund_balance'] = round(
-                (float) $merged['daily_income']
+            $delta = (float) $merged['daily_income']
                 + (float) $merged['contribution']
                 - (float) $merged['daily_expense']
                 - (float) $merged['administrative_fee']
                 - (float) $merged['operational_deduction']
                 - $covered
-                - (float) $merged['project_administration_settled'],
-                2
-            );
+                - (float) $merged['project_administration_settled'];
+
+            $merged['fund_balance'] = round($previousBalance + $delta, 2);
         }
 
         return DailyJournalEntry::factory()->create($merged);
@@ -114,11 +120,15 @@ class CashStationApiTest extends TestCase
         $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk();
     }
 
-    public function test_monthly_total_uses_underlying_fields_not_daily_total_or_fund_balance(): void
+    public function test_monthly_total_uses_underlying_fields_regardless_of_fund_balance(): void
     {
         $this->actAs('finance');
         $project = $this->createProject(['name' => 'مشروع أ']);
 
+        // fund_balance is deliberately set far away from what these underlying fields would produce, to
+        // prove monthly_total/previous_monthly_total/summary fields stay purely component-sum-based and
+        // ignore it. net_cash_fund is the one field that must reflect the real fund_balance instead — see
+        // the assertion below (6666, the latest entry's fund_balance, not 1000).
         $this->seedEntry($project->id, '2026-07-10', [
             'daily_income' => 1000,
             'administrative_fee' => 100,
@@ -146,9 +156,12 @@ class CashStationApiTest extends TestCase
         // (1000+500) - (100+40) - (50+10) - (200+100) = 1000
         $this->assertSame('1000.00', $row['monthly_total']);
         $this->assertSame('0.00', $row['previous_monthly_total']);
-        $this->assertSame('1000.00', $row['net_cash_fund']);
         $this->assertSame('40.00', $row['administrative_debt']);
         $this->assertSame('40.00', $row['remaining_administrative_debt']);
+
+        // net_cash_fund / status are sourced from the Daily Journal's real fund_balance (single source of
+        // truth), not from monthly_total — the latest entry's 6666, not the component-sum's 1000.
+        $this->assertSame('6666.00', $row['net_cash_fund']);
         $this->assertSame('surplus', $row['status']);
 
         $this->assertSame('1500.00', $data['summary']['monthly_revenue']);
@@ -156,7 +169,7 @@ class CashStationApiTest extends TestCase
         $this->assertSame('140.00', $data['summary']['total_administrative_percentage']);
         $this->assertSame('60.00', $data['summary']['total_operational_deduction']);
         $this->assertSame('1000.00', $data['summary']['net_month']);
-        $this->assertSame('1000.00', $data['summary']['net_cash_funds']);
+        $this->assertSame('6666.00', $data['summary']['net_cash_funds']);
         $this->assertSame('40.00', $data['summary']['administrative_debts']);
         $this->assertFalse($data['carried_forward_from_previous']);
     }
