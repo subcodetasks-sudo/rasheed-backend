@@ -47,9 +47,16 @@ class AdministrativeDebtSettlementApiTest extends TestCase
         ], $attrs));
     }
 
+    /**
+     * Seeds a journal row. Unless the caller explicitly overrides `daily_total`/`fund_balance`,
+     * both are auto-computed with the exact DailyJournalCalculationService formula (daily_total =
+     * income + contribution − expense − administrative_expense − administrative_fee −
+     * operational_deduction; fund_balance = previous day's fund_balance + daily_total), so seeded
+     * fixtures stay internally consistent the same way real persisted rows are.
+     */
     private function seedEntry(int $projectId, string $date, array $attrs = []): DailyJournalEntry
     {
-        return DailyJournalEntry::factory()->create(array_merge([
+        $merged = array_merge([
             'project_id' => $projectId,
             'journal_date' => $date,
             'daily_income' => 0,
@@ -58,11 +65,31 @@ class AdministrativeDebtSettlementApiTest extends TestCase
             'administrative_expense' => 0,
             'administrative_fee' => 0,
             'operational_deduction' => 0,
-            'daily_total' => 0,
-            'fund_balance' => 0,
             'administrative_debt' => 0,
             'accumulated_administrative_debt' => 0,
-        ], $attrs));
+        ], $attrs);
+
+        if (! array_key_exists('daily_total', $attrs)) {
+            $merged['daily_total'] = round(
+                (float) $merged['daily_income'] + (float) $merged['contribution']
+                - (float) $merged['daily_expense'] - (float) $merged['administrative_expense']
+                - (float) $merged['administrative_fee'] - (float) $merged['operational_deduction'],
+                2
+            );
+        }
+
+        if (! array_key_exists('fund_balance', $attrs)) {
+            $previousFundBalance = (float) (DailyJournalEntry::query()
+                ->where('project_id', $projectId)
+                ->whereDate('journal_date', '<', $date)
+                ->orderByDesc('journal_date')
+                ->orderByDesc('id')
+                ->value('fund_balance') ?? 0);
+
+            $merged['fund_balance'] = round($previousFundBalance + (float) $merged['daily_total'], 2);
+        }
+
+        return DailyJournalEntry::factory()->create($merged);
     }
 
     public function test_guest_gets_401(): void
@@ -151,9 +178,10 @@ class AdministrativeDebtSettlementApiTest extends TestCase
         $this->actAs('finance');
         $project = $this->createProject();
 
-        // Collected admin % = fee − debt = 0 → Monthly Total = 50; debt 100 → recoverable 50
+        // Real daily_total (source of truth) = income − fee = 150 − 100 = 50 → fund_balance 50
+        // (genuine surplus); debt 100 → recoverable capped at the 50 available.
         $this->seedEntry($project->id, '2026-07-15', [
-            'daily_income' => 50,
+            'daily_income' => 150,
             'administrative_fee' => 100,
             'administrative_debt' => 100,
             'accumulated_administrative_debt' => 100,
@@ -353,9 +381,9 @@ class AdministrativeDebtSettlementApiTest extends TestCase
         $this->actAs('super-admin');
         $project = $this->createProject();
 
-        // Monthly Total = 50; debt 100 → amount 80 is ≤ debt but > surplus
+        // Real fund_balance = income − fee = 150 − 100 = 50; debt 100 → amount 80 is ≤ debt but > surplus
         $this->seedEntry($project->id, '2026-07-15', [
-            'daily_income' => 50,
+            'daily_income' => 150,
             'administrative_fee' => 100,
             'administrative_debt' => 100,
             'accumulated_administrative_debt' => 100,
@@ -487,7 +515,7 @@ class AdministrativeDebtSettlementApiTest extends TestCase
         $project = $this->createProject();
 
         $this->seedEntry($project->id, '2026-07-15', [
-            'daily_income' => 50,
+            'daily_income' => 150,
             'administrative_fee' => 100,
             'administrative_debt' => 100,
             'accumulated_administrative_debt' => 100,

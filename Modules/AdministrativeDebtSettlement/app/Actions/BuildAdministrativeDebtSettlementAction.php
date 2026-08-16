@@ -35,6 +35,7 @@ class BuildAdministrativeDebtSettlementAction
             $previousMonth->copy()->endOfMonth()->toDateString(),
         );
         $monthEndAccumulated = $this->accumulatedAsOf($projectIds, $endOfMonth->toDateString());
+        $fundBalances = $this->fundBalanceAsOf($projectIds, $endOfMonth->toDateString());
 
         $rows = [];
 
@@ -44,7 +45,7 @@ class BuildAdministrativeDebtSettlementAction
                 $projectId,
                 $year,
                 $month,
-                (float) $project['net_cash_fund'],
+                (float) ($fundBalances[$projectId] ?? 0.0),
                 (float) $project['previous_monthly_total'],
                 (float) $project['monthly_total'],
                 (float) $project['added_contribution'],
@@ -96,7 +97,7 @@ class BuildAdministrativeDebtSettlementAction
         int $projectId,
         int $year,
         int $month,
-        float $netCashFund,
+        float $fundBalance,
         float $previousMonthlyTotal,
         float $monthlyTotal,
         float $addedContribution,
@@ -143,7 +144,9 @@ class BuildAdministrativeDebtSettlementAction
             }
         }
 
-        $grossSurplus = round(max(0, $netCashFund), 2);
+        // Gross surplus is grounded in Daily Journal's real fund_balance, never Cash Station's
+        // month-scoped Net Cash Fund — a deficit fund_balance must never look available here.
+        $grossSurplus = round(max(0, $fundBalance), 2);
         // Cumulative surplus capacity: prior ADS settlements this month consume surplus without mutating Net Cash.
         $surplus = round(max(0, $grossSurplus - $settledSurplusThisMonth), 2);
 
@@ -165,7 +168,7 @@ class BuildAdministrativeDebtSettlementAction
         };
 
         return [
-            'net_cash_balance' => round($netCashFund, 2),
+            'net_cash_balance' => round($fundBalance, 2),
             'administrative_debt' => $administrativeDebt,
             'current_remaining' => $currentRemaining,
             'carried_remaining' => $carriedRemaining,
@@ -265,6 +268,18 @@ class BuildAdministrativeDebtSettlementAction
     public function accumulatedAsOf(array $projectIds, string $asOfDate): array
     {
         return (new ReadAccumulatedAdministrativeDebtTipAction)->execute($projectIds, $asOfDate);
+    }
+
+    /**
+     * Daily Journal's real cumulative fund_balance per project, as-of a date — the ground
+     * truth "available surplus for settlement" must never exceed.
+     *
+     * @param  array<int, int>  $projectIds
+     * @return array<int, float>
+     */
+    public function fundBalanceAsOf(array $projectIds, string $asOfDate): array
+    {
+        return $this->buildCashStationAction->fundBalancesByProject($projectIds, $asOfDate);
     }
 
     private function debtAllocated(AdministrativeDebtSettlement $settlement): float

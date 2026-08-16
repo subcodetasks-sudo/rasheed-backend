@@ -38,9 +38,16 @@ class CashStationApiTest extends TestCase
         ], $attrs));
     }
 
+    /**
+     * Seeds a journal row. Unless the caller explicitly overrides `daily_total`/`fund_balance`,
+     * both are auto-computed with the exact DailyJournalCalculationService formula (daily_total =
+     * income + contribution − expense − administrative_expense − administrative_fee −
+     * operational_deduction; fund_balance = previous day's fund_balance + daily_total), so seeded
+     * fixtures stay internally consistent the same way real persisted rows are.
+     */
     private function seedEntry(int $projectId, string $date, array $attrs = []): DailyJournalEntry
     {
-        return DailyJournalEntry::factory()->create(array_merge([
+        $merged = array_merge([
             'project_id' => $projectId,
             'journal_date' => $date,
             'daily_income' => 0,
@@ -49,11 +56,31 @@ class CashStationApiTest extends TestCase
             'administrative_expense' => 0,
             'administrative_fee' => 0,
             'operational_deduction' => 0,
-            'daily_total' => 0,
-            'fund_balance' => 0,
             'administrative_debt' => 0,
             'accumulated_administrative_debt' => 0,
-        ], $attrs));
+        ], $attrs);
+
+        if (! array_key_exists('daily_total', $attrs)) {
+            $merged['daily_total'] = round(
+                (float) $merged['daily_income'] + (float) $merged['contribution']
+                - (float) $merged['daily_expense'] - (float) $merged['administrative_expense']
+                - (float) $merged['administrative_fee'] - (float) $merged['operational_deduction'],
+                2
+            );
+        }
+
+        if (! array_key_exists('fund_balance', $attrs)) {
+            $previousFundBalance = (float) (DailyJournalEntry::query()
+                ->where('project_id', $projectId)
+                ->whereDate('journal_date', '<', $date)
+                ->orderByDesc('journal_date')
+                ->orderByDesc('id')
+                ->value('fund_balance') ?? 0);
+
+            $merged['fund_balance'] = round($previousFundBalance + (float) $merged['daily_total'], 2);
+        }
+
+        return DailyJournalEntry::factory()->create($merged);
     }
 
     private function findProject(array $payload, int $projectId): array
@@ -93,18 +120,21 @@ class CashStationApiTest extends TestCase
         $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk();
     }
 
-    public function test_monthly_total_uses_underlying_fields_not_daily_total_or_fund_balance(): void
+    public function test_monthly_total_equals_sum_of_daily_total_not_underlying_fields(): void
     {
         $this->actAs('finance');
         $project = $this->createProject(['name' => 'مشروع أ']);
 
+        // daily_total is deliberately inconsistent with the raw income/fee/expense columns here,
+        // to prove Monthly Total is sourced from Daily Journal's own persisted daily_total (the
+        // source of truth) rather than being independently reconstructed from those columns.
         $this->seedEntry($project->id, '2026-07-10', [
             'daily_income' => 1000,
             'administrative_fee' => 100,
             'operational_deduction' => 50,
             'daily_expense' => 200,
             'daily_total' => 9999,
-            'fund_balance' => 8888,
+            'fund_balance' => 9999,
             'accumulated_administrative_debt' => 25,
         ]);
 
@@ -113,8 +143,8 @@ class CashStationApiTest extends TestCase
             'administrative_fee' => 40,
             'operational_deduction' => 10,
             'daily_expense' => 100,
-            'daily_total' => 7777,
-            'fund_balance' => 6666,
+            'daily_total' => 1,
+            'fund_balance' => 10000,
             'accumulated_administrative_debt' => 40,
         ]);
 
@@ -122,10 +152,11 @@ class CashStationApiTest extends TestCase
         $data = $response->json('data');
         $row = $this->findProject($data, $project->id);
 
-        // (1000+500) - (100+40) - (50+10) - (200+100) = 1000
-        $this->assertSame('1000.00', $row['monthly_total']);
+        // Monthly Total = SUM(daily_total) = 9999 + 1 = 10000, NOT the raw-component formula
+        // ((1000+500) - (100+40) - (50+10) - (200+100) = 1000).
+        $this->assertSame('10000.00', $row['monthly_total']);
         $this->assertSame('0.00', $row['previous_monthly_total']);
-        $this->assertSame('1000.00', $row['net_cash_fund']);
+        $this->assertSame('10000.00', $row['net_cash_fund']);
         $this->assertSame('40.00', $row['administrative_debt']);
         $this->assertSame('40.00', $row['remaining_administrative_debt']);
         $this->assertSame('surplus', $row['status']);
@@ -134,8 +165,8 @@ class CashStationApiTest extends TestCase
         $this->assertSame('300.00', $data['summary']['monthly_expenses']);
         $this->assertSame('140.00', $data['summary']['total_administrative_percentage']);
         $this->assertSame('60.00', $data['summary']['total_operational_deduction']);
-        $this->assertSame('1000.00', $data['summary']['net_month']);
-        $this->assertSame('1000.00', $data['summary']['net_cash_funds']);
+        $this->assertSame('10000.00', $data['summary']['net_month']);
+        $this->assertSame('10000.00', $data['summary']['net_cash_funds']);
         $this->assertSame('40.00', $data['summary']['administrative_debts']);
         $this->assertFalse($data['carried_forward_from_previous']);
     }
@@ -232,6 +263,8 @@ class CashStationApiTest extends TestCase
 
         $entry->update([
             'daily_income' => 1500,
+            'daily_total' => 1300,
+            'fund_balance' => 1300,
         ]);
         // monthly total becomes 1300
 
@@ -489,7 +522,8 @@ class CashStationApiTest extends TestCase
             'administrative_exempt' => true,
         ]);
 
-        // collected = fee − debt + contribution = 120 − 80 + 30 = 70
+        // collected (breakdown card only) = fee − debt + contribution = 120 − 80 + 30 = 70
+        // daily_total (Monthly Total's real source) always deducts the FULL fee: 1000+30-120=910.
         $this->seedEntry($eligible->id, '2026-07-10', [
             'daily_income' => 1000,
             'administrative_fee' => 120,
@@ -498,34 +532,39 @@ class CashStationApiTest extends TestCase
             'daily_expense' => 0,
         ]);
 
-        // Exempt fees must not enter the collected summary card.
+        // Exempt fees must not enter the collected summary card. A real exempt entry always has
+        // fee=0 (AdministrativeDeductionService zeroes it at write time); the fee column here is
+        // only set to exercise the exemption CASE WHEN defensively, so daily_total is pinned to
+        // the fee-free outcome a real exempt entry would actually have.
         $this->seedEntry($exempt->id, '2026-07-10', [
             'daily_income' => 500,
             'administrative_fee' => 50,
             'administrative_debt' => 0,
             'contribution' => 0,
+            'daily_total' => 500,
+            'fund_balance' => 500,
         ]);
 
         $data = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
 
         $this->assertSame('70.00', $data['summary']['total_administrative_percentage']);
 
-        // Monthly Total / Net Monthly Result deduct collected only: 1000 − 70 = 930.
-        // Unpaid portion (debt-related) is not deducted from monthly_total.
-        $this->assertSame('930.00', $this->findProject($data, $eligible->id)['monthly_total']);
+        // Monthly Total sums Daily Journal's own daily_total, which always deducts the FULL fee
+        // (the unpaid/debt portion is bookkeeping only and never reduces daily_total/fund_balance).
+        $this->assertSame('910.00', $this->findProject($data, $eligible->id)['monthly_total']);
 
-        // Exempt fee is ignored for both collected card and monthly_total admin deduction.
-        // Exempt monthly_total = 500 − 0 = 500.
         $this->assertSame('500.00', $this->findProject($data, $exempt->id)['monthly_total']);
-        $this->assertSame('1430.00', $data['summary']['net_month']);
+        $this->assertSame('1410.00', $data['summary']['net_month']);
     }
 
-    public function test_net_month_does_not_deduct_unpaid_administrative_percentage(): void
+    public function test_net_month_deducts_full_administrative_fee_including_unpaid_debt_portion(): void
     {
         $this->actAs('finance');
         $project = $this->createProject();
 
-        // Gross fee 200, of which 80 is unpaid debt and contribution 0 → collected 120.
+        // Gross fee 200, of which 80 is unpaid debt and contribution 0 → collected 120 (breakdown
+        // card only). Daily Journal's daily_total always deducts the FULL fee regardless of
+        // collectibility, so Monthly Total must agree with it, not the "collected" figure.
         $this->seedEntry($project->id, '2026-07-10', [
             'daily_income' => 1000,
             'administrative_fee' => 200,
@@ -538,10 +577,11 @@ class CashStationApiTest extends TestCase
 
         $data = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
 
-        // Net month = 1000 − 120 − 50 − 100 = 730 (not 1000 − 200 − 50 − 100 = 650).
+        // total_administrative_percentage (breakdown card) still nets debt out: 200 − 80 = 120.
+        // Monthly Total = daily_total = 1000 − 200 − 50 − 100 = 650 (full fee, not 730).
         $this->assertSame('120.00', $data['summary']['total_administrative_percentage']);
-        $this->assertSame('730.00', $data['summary']['net_month']);
-        $this->assertSame('730.00', $this->findProject($data, $project->id)['monthly_total']);
+        $this->assertSame('650.00', $data['summary']['net_month']);
+        $this->assertSame('650.00', $this->findProject($data, $project->id)['monthly_total']);
         $this->assertSame('80.00', $data['summary']['administrative_debts']);
     }
 

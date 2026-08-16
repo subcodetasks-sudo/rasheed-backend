@@ -47,12 +47,13 @@ class ValidateAdministrativeDebtSettlementAction
         );
         $priorAccumulated = $this->buildAdministrativeDebtSettlementAction->accumulatedAsOf([$projectId], $previousEnd);
         $monthEndAccumulated = $this->buildAdministrativeDebtSettlementAction->accumulatedAsOf([$projectId], $end);
+        $fundBalance = $this->buildAdministrativeDebtSettlementAction->fundBalanceAsOf([$projectId], $end);
 
         $snapshot = $this->buildAdministrativeDebtSettlementAction->projectDebtSnapshot(
             $projectId,
             $year,
             $month,
-            (float) $projectRow['net_cash_fund'],
+            (float) ($fundBalance[$projectId] ?? 0.0),
             (float) $projectRow['previous_monthly_total'],
             (float) $projectRow['monthly_total'],
             (float) $projectRow['added_contribution'],

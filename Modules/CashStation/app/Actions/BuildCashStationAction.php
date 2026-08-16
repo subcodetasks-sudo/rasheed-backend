@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Schema;
 use Modules\CashStation\Models\CashStationMonthCarry;
 use Modules\CashStation\Models\CashStationSettlement;
 use Modules\DailyJournal\Actions\ReadAccumulatedAdministrativeDebtTipAction;
+use Modules\DailyJournal\Actions\ReadFundBalanceTipAction;
 use Modules\Project\Models\Project;
 
 class BuildCashStationAction
@@ -191,7 +192,8 @@ class BuildCashStationAction
      *     monthly_revenue: float|string,
      *     monthly_expenses: float|string,
      *     administrative_percentage: float|string,
-     *     operational_deduction: float|string
+     *     operational_deduction: float|string,
+     *     journal_monthly_total: float|string
      * }>
      */
     public function monthlyAggregatesByProject(array $projectIds, string $startDate, string $endDate): array
@@ -200,9 +202,10 @@ class BuildCashStationAction
             return [];
         }
 
-        // administrative_percentage here is collected intake only (fee − debt + contribution).
-        // Unpaid fee stays in Administrative Debt and must not reduce Monthly Total / Net Monthly Result.
-        // Exempt projects contribute 0.
+        // administrative_percentage / operational_deduction here feed the breakdown cards only.
+        // Monthly Total itself (journal_monthly_total) sums Daily Journal's own persisted daily_total,
+        // so it always agrees with Daily Journal's fund_balance movement for the month — see EQUATIONS.md.
+        // Exempt projects contribute 0 to administrative_percentage.
         $rows = DB::table('daily_journal_entries')
             ->join('projects', 'daily_journal_entries.project_id', '=', 'projects.id')
             ->whereIn('daily_journal_entries.project_id', $projectIds)
@@ -220,6 +223,7 @@ class BuildCashStationAction
                 .' ELSE 0 END), 0) as administrative_percentage'
             )
             ->selectRaw('COALESCE(SUM(COALESCE(daily_journal_entries.operational_deduction, 0)), 0) as operational_deduction')
+            ->selectRaw('COALESCE(SUM(COALESCE(daily_journal_entries.daily_total, 0)), 0) as journal_monthly_total')
             ->get();
 
         $keyed = [];
@@ -236,10 +240,7 @@ class BuildCashStationAction
             return 0.0;
         }
 
-        return (float) ($aggregate->monthly_revenue ?? 0)
-            - (float) ($aggregate->administrative_percentage ?? 0)
-            - (float) ($aggregate->operational_deduction ?? 0)
-            - (float) ($aggregate->monthly_expenses ?? 0);
+        return (float) ($aggregate->journal_monthly_total ?? 0);
     }
 
     /**
@@ -307,8 +308,13 @@ class BuildCashStationAction
         );
         $added = (float) ($context['contributions'][$projectId]['added'] ?? 0);
         $deducted = (float) ($context['contributions'][$projectId]['deducted'] ?? 0);
+        $rawNetCashFund = $previousMonthlyTotal + $monthlyTotal + $added - $deducted;
 
-        return $previousMonthlyTotal + $monthlyTotal + $added - $deducted;
+        // Never claim more transferable than Daily Journal's true cumulative fund_balance allows.
+        $endOfMonth = Carbon::create($year, $month, 1)->endOfMonth()->toDateString();
+        $fundBalance = $this->fundBalancesByProject([$projectId], $endOfMonth)[$projectId] ?? 0.0;
+
+        return min($rawNetCashFund, $fundBalance);
     }
 
     /**
@@ -409,6 +415,18 @@ class BuildCashStationAction
     public function administrativeDebtsByProject(array $projectIds, string $asOfDate): array
     {
         return (new ReadAccumulatedAdministrativeDebtTipAction)->execute($projectIds, $asOfDate);
+    }
+
+    /**
+     * Daily Journal's real cumulative fund_balance per project, as-of a date — the ground
+     * truth any "available surplus" calculation must never exceed.
+     *
+     * @param  array<int, int>  $projectIds
+     * @return array<int, float>
+     */
+    public function fundBalancesByProject(array $projectIds, string $asOfDate): array
+    {
+        return (new ReadFundBalanceTipAction)->execute($projectIds, $asOfDate);
     }
 
     /**
