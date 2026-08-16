@@ -180,10 +180,10 @@ class AdministrativeDebtSettlementApiTest extends TestCase
         $this->actAs('finance');
         $project = $this->createProject();
 
-        // Collected admin % = fee − debt = 0 → Monthly Total = 50; debt 100 → recoverable 50
+        // Real fund_balance (income, no fee here to keep this isolated from fee/debt netting) = 50;
+        // accumulated debt is independently 100 → surplus caps recoverable at 50, not the full 100.
         $this->seedEntry($project->id, '2026-07-15', [
             'daily_income' => 50,
-            'administrative_fee' => 100,
             'administrative_debt' => 100,
             'accumulated_administrative_debt' => 100,
         ]);
