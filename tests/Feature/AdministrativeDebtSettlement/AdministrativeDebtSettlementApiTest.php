@@ -607,6 +607,66 @@ class AdministrativeDebtSettlementApiTest extends TestCase
         $this->assertEqualsWithDelta(50.0, (float) $remaining[$low->id]['administrative_debt'], 0.001);
     }
 
+    public function test_exact_boundary_amount_equal_to_remaining_debt_is_accepted(): void
+    {
+        $this->actAs('finance');
+        $project = $this->createProject();
+
+        // A huge surplus (mirrors a real reported case: ~73,169) and a small exact debt (2.00, a true
+        // 2-decimal value since administrative_debt/accumulated_administrative_debt are decimal(15,2)
+        // columns). Requesting exactly the remaining debt (amount == remaining_debt) must be accepted,
+        // not rejected as "exceeds debt" — 2 <= 2 is valid, only amount > remaining_debt should reject.
+        $this->seedEntry($project->id, '2026-07-15', [
+            'daily_income' => 73169,
+            'administrative_debt' => 2,
+            'accumulated_administrative_debt' => 2,
+        ]);
+
+        $list = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data.projects.0');
+        $this->assertSame('2.00', $list['remaining_debt']);
+        $this->assertSame('2.00', $list['recoverable_amount']);
+
+        $this->postJson(self::ENDPOINT, [
+            'year' => 2026,
+            'month' => 7,
+            'project_id' => $project->id,
+            'amount' => 2,
+        ])->assertCreated();
+
+        $after = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data.projects');
+        $this->assertCount(0, $after, 'project must drop off the list once its debt is fully settled');
+    }
+
+    public function test_displayed_remaining_debt_matches_the_amount_that_actually_validates(): void
+    {
+        $this->actAs('finance');
+        $project = $this->createProject();
+
+        // A non-integer debt (1.60) that formatRounded (0 decimals) used to display as "2" — a user
+        // typing that displayed value would then be rejected as "exceeds debt" against the real 1.60.
+        // remaining_debt/recoverable_amount must show full 2-decimal precision so the displayed value is
+        // always exactly what settling with that amount will validate against.
+        $this->seedEntry($project->id, '2026-07-15', [
+            'daily_income' => 73169,
+            'administrative_debt' => 1.6,
+            'accumulated_administrative_debt' => 1.6,
+        ]);
+
+        $list = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data.projects.0');
+        $this->assertSame('1.60', $list['remaining_debt']);
+        $this->assertSame('1.60', $list['recoverable_amount']);
+
+        $this->postJson(self::ENDPOINT, [
+            'year' => 2026,
+            'month' => 7,
+            'project_id' => $project->id,
+            'amount' => (float) $list['remaining_debt'],
+        ])->assertCreated();
+
+        $after = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data.projects');
+        $this->assertCount(0, $after, 'project must drop off the list once its debt is fully settled');
+    }
+
     public function test_rejects_settle_when_surplus_is_consumed_by_administrative_expense_coverage(): void
     {
         $this->actAs('finance');
