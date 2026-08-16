@@ -191,7 +191,10 @@ class BuildCashStationAction
      *     monthly_revenue: float|string,
      *     monthly_expenses: float|string,
      *     administrative_percentage: float|string,
-     *     operational_deduction: float|string
+     *     operational_deduction: float|string,
+     *     administrative_expense: float|string,
+     *     uncovered_administrative_expense: float|string,
+     *     project_administration_settled: float|string
      * }>
      */
     public function monthlyAggregatesByProject(array $projectIds, string $startDate, string $endDate): array
@@ -220,6 +223,9 @@ class BuildCashStationAction
                 .' ELSE 0 END), 0) as administrative_percentage'
             )
             ->selectRaw('COALESCE(SUM(COALESCE(daily_journal_entries.operational_deduction, 0)), 0) as operational_deduction')
+            ->selectRaw('COALESCE(SUM(COALESCE(daily_journal_entries.administrative_expense, 0)), 0) as administrative_expense')
+            ->selectRaw('COALESCE(SUM(COALESCE(daily_journal_entries.uncovered_administrative_expense, 0)), 0) as uncovered_administrative_expense')
+            ->selectRaw('COALESCE(SUM(COALESCE(daily_journal_entries.project_administration_settled, 0)), 0) as project_administration_settled')
             ->get();
 
         $keyed = [];
@@ -236,10 +242,19 @@ class BuildCashStationAction
             return 0.0;
         }
 
+        // Administrative expense is covered from same-day fund surplus only (see DailyJournal EQUATIONS.md
+        // §5a) and must reduce the fund exactly like DailyJournal's fund_balance does: by the covered portion
+        // plus any prior outstanding tip settled from later surplus. Uncovered expense itself is never
+        // subtracted here — it never left the fund; it becomes a carried-forward Administrative Fund tip.
+        $administrativeExpenseCovered = (float) ($aggregate->administrative_expense ?? 0)
+            - (float) ($aggregate->uncovered_administrative_expense ?? 0);
+
         return (float) ($aggregate->monthly_revenue ?? 0)
             - (float) ($aggregate->administrative_percentage ?? 0)
             - (float) ($aggregate->operational_deduction ?? 0)
-            - (float) ($aggregate->monthly_expenses ?? 0);
+            - (float) ($aggregate->monthly_expenses ?? 0)
+            - $administrativeExpenseCovered
+            - (float) ($aggregate->project_administration_settled ?? 0);
     }
 
     /**

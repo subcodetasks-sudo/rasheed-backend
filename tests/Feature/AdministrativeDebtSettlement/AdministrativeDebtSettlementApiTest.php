@@ -577,4 +577,35 @@ class AdministrativeDebtSettlementApiTest extends TestCase
         $this->assertArrayNotHasKey($high->id, $remaining->all());
         $this->assertEqualsWithDelta(50.0, (float) $remaining[$low->id]['administrative_debt'], 0.001);
     }
+
+    public function test_rejects_settle_when_surplus_is_consumed_by_administrative_expense_coverage(): void
+    {
+        $this->actAs('finance');
+        $project = $this->createProject();
+
+        // income 200 fully absorbed by same-day administrative_expense coverage (fund_balance = 0),
+        // while an unrelated accumulated debt of 100 remains from a prior day. Net cash has no real
+        // surplus to settle with, even though income alone would look like a 200 surplus.
+        $this->seedEntry($project->id, '2026-07-15', [
+            'daily_income' => 200,
+            'administrative_expense' => 200,
+            'uncovered_administrative_expense' => 0,
+            'accumulated_administrative_debt' => 100,
+            'fund_balance' => 0,
+        ]);
+
+        $csRow = collect($this->getJson(self::CS_ENDPOINT.'?month=7&year=2026')->assertOk()->json('data.projects'))
+            ->firstWhere('project_id', $project->id);
+        $this->assertSame('0', $csRow['net_cash_fund']);
+        $this->assertSame('balanced', $csRow['status']);
+
+        $this->postJson(self::ENDPOINT, [
+            'year' => 2026,
+            'month' => 7,
+            'project_id' => $project->id,
+            'amount' => 50,
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('message', __('messages.administrative_debt_settlement_requires_surplus'));
+    }
 }

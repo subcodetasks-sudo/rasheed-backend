@@ -629,4 +629,97 @@ class CashStationApiTest extends TestCase
             ->assertNotFound()
             ->assertJsonPath('message', __('messages.cash_station_settlement_not_found'));
     }
+
+    public function test_monthly_total_deducts_administrative_expense_covered_from_surplus(): void
+    {
+        $this->actAs('finance');
+        $project = $this->createProject();
+
+        // income 1000, fee 120, admin_expense 100 fully covered by surplus (fund_balance = 780).
+        $this->seedEntry($project->id, '2026-07-10', [
+            'daily_income' => 1000,
+            'administrative_fee' => 120,
+            'administrative_expense' => 100,
+            'uncovered_administrative_expense' => 0,
+            'fund_balance' => 780,
+        ]);
+
+        $data = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
+        $row = $this->findProject($data, $project->id);
+
+        $this->assertSame('780', $row['monthly_total']);
+        $this->assertSame('780', $row['net_cash_fund']);
+        $this->assertSame('surplus', $row['status']);
+    }
+
+    public function test_monthly_total_only_deducts_covered_portion_when_expense_partially_uncovered(): void
+    {
+        $this->actAs('finance');
+        $project = $this->createProject();
+
+        // income 60, fee 7.2, admin_expense 100 → surplus 52.8 covers 52.8, uncovered 47.2, fund_balance = 0.
+        $this->seedEntry($project->id, '2026-07-10', [
+            'daily_income' => 60,
+            'administrative_fee' => 7.2,
+            'administrative_expense' => 100,
+            'uncovered_administrative_expense' => 47.2,
+            'fund_balance' => 0,
+        ]);
+
+        $data = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
+        $row = $this->findProject($data, $project->id);
+
+        $this->assertSame('0', $row['monthly_total']);
+        $this->assertSame('0', $row['net_cash_fund']);
+        $this->assertSame('balanced', $row['status']);
+    }
+
+    public function test_monthly_total_unaffected_when_expense_fully_uncovered(): void
+    {
+        $this->actAs('finance');
+        $project = $this->createProject();
+
+        // no surplus available (income 0) → covered = 0, all 80 uncovered, fund_balance stays 0.
+        $this->seedEntry($project->id, '2026-07-10', [
+            'daily_income' => 0,
+            'administrative_expense' => 80,
+            'uncovered_administrative_expense' => 80,
+            'fund_balance' => 0,
+        ]);
+
+        $data = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
+        $row = $this->findProject($data, $project->id);
+
+        $this->assertSame('0', $row['monthly_total']);
+        $this->assertSame('0', $row['net_cash_fund']);
+    }
+
+    public function test_monthly_total_deducts_project_administration_settled_within_month(): void
+    {
+        $this->actAs('finance');
+        $project = $this->createProject();
+
+        // day 1: no income, admin_expense 100 fully uncovered → tip 100, fund_balance stays 0.
+        $this->seedEntry($project->id, '2026-07-05', [
+            'daily_income' => 0,
+            'administrative_expense' => 100,
+            'uncovered_administrative_expense' => 100,
+            'fund_balance' => 0,
+        ]);
+
+        // day 2: income 80, admin_expense 50 fully covered, remaining surplus 30 settles part of the tip.
+        $this->seedEntry($project->id, '2026-07-15', [
+            'daily_income' => 80,
+            'administrative_expense' => 50,
+            'uncovered_administrative_expense' => 0,
+            'project_administration_settled' => 30,
+            'fund_balance' => 0,
+        ]);
+
+        $data = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
+        $row = $this->findProject($data, $project->id);
+
+        $this->assertSame('0', $row['monthly_total']);
+        $this->assertSame('0', $row['net_cash_fund']);
+    }
 }
