@@ -100,17 +100,11 @@ class BuildMonthlySummaryAction
     {
         $startOfMonth = Carbon::create($year, $month, 1)->startOfDay();
         $endOfMonth = $startOfMonth->copy()->endOfMonth()->startOfDay();
-        $today = Carbon::today()->startOfDay();
-
-        $end = $endOfMonth;
-        if ($today->year === $year && $today->month === $month && $today->lt($endOfMonth)) {
-            $end = $today->copy();
-        }
 
         return [
             $startOfMonth->toDateString(),
-            $end->toDateString(),
-            $end->toDateString(),
+            $endOfMonth->toDateString(),
+            $endOfMonth->toDateString(),
         ];
     }
 

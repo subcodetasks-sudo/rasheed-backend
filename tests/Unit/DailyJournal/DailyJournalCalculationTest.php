@@ -269,7 +269,7 @@ class DailyJournalCalculationTest extends TestCase
 
         $entries = $this->service->applyAdministrativeExpenseCoverage($entries);
         $entries = $this->service->applyAdministrativeDebt($entries);
-        $this->assertEquals(-60.0, (float) $entries->first()->fund_balance);
+        $this->assertEquals(-36.0, (float) $entries->first()->fund_balance);
         $this->assertEquals(24.0, (float) $entries->first()->administrative_debt);
 
         $entries = $this->service->applyAccumulatedAdministrativeDebt($entries, $previous);
@@ -357,6 +357,7 @@ class DailyJournalCalculationTest extends TestCase
             130.0,
             (float) $this->service->applyAdministrativeDebt(collect([$withThirty]))->first()->administrative_debt
         );
+        $this->assertEquals(-970.0, (float) $withThirty->fund_balance);
 
         // Re-save contribution 40 against same day math → fund=-1060; base still 100; debt 140 (not 170)
         $withForty = new DailyJournalEntry([
@@ -369,8 +370,9 @@ class DailyJournalCalculationTest extends TestCase
             140.0,
             (float) $this->service->applyAdministrativeDebt(collect([$withForty]))->first()->administrative_debt
         );
+        $this->assertEquals(-960.0, (float) $withForty->fund_balance);
 
-        // Fee 0 (exempt): contribution alone is the debt
+        // Fee 0 (exempt): contribution alone is the debt; fund unchanged
         $exempt = new DailyJournalEntry([
             'contribution' => 100,
             'fund_balance' => -50,
@@ -381,6 +383,7 @@ class DailyJournalCalculationTest extends TestCase
             100.0,
             (float) $this->service->applyAdministrativeDebt(collect([$exempt]))->first()->administrative_debt
         );
+        $this->assertEquals(-50.0, (float) $exempt->fund_balance);
     }
 
     public function test_explicit_repayment_fully_repays_accumulated_debt_from_surplus(): void

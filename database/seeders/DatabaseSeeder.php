@@ -69,9 +69,9 @@ class DatabaseSeeder extends Seeder
             }
         }
 
-        // $this->call([
-        //     ProjectDatabaseSeeder::class,
-        //     InventoryDatabaseSeeder::class,
-        // ]);
+        $this->call([
+            ProjectDatabaseSeeder::class,
+            InventoryDatabaseSeeder::class,
+        ]);
     }
 }

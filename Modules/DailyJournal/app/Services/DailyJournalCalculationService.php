@@ -280,6 +280,10 @@ class DailyJournalCalculationService
             );
 
             $entry->administrative_debt = round($fundConsumptionDebt + $contribution, 2);
+
+            // Same-day deficit coverage: restore only Case 1 onto persisted fund_balance.
+            // Contribution is already in daily_total. Unused fee is not a carry-forward pool.
+            $entry->fund_balance = round((float) $entry->fund_balance + $fundConsumptionDebt, 2);
         }
 
         return $entries;

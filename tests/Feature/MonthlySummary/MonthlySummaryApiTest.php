@@ -3,6 +3,7 @@
 namespace Tests\Feature\MonthlySummary;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Event;
 use Laravel\Sanctum\Sanctum;
 use Modules\AdministrativeDebtSettlement\Events\AdministrativeDebtSettlementUpdated;
@@ -757,5 +758,62 @@ class MonthlySummaryApiTest extends TestCase
         Event::assertDispatched(MonthlySummaryUpdated::class, function (MonthlySummaryUpdated $event) {
             return $event->year === 2026 && $event->month === 7;
         });
+    }
+
+    public function test_current_month_includes_future_in_month_journal_entries(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-17 12:00:00'));
+
+        try {
+            $this->actAs('finance');
+            $project = $this->createProject(['name' => 'مشروع مياه نسبية']);
+
+            $this->seedEntry($project->id, '2026-08-17', [
+                'daily_income' => 1000,
+                'daily_expense' => 0,
+                'administrative_fee' => 120,
+                'operational_deduction' => 1081,
+                'administrative_debt' => 120,
+                'accumulated_administrative_debt' => 120,
+                'daily_total' => -201,
+                'fund_balance' => -81,
+            ]);
+
+            $dayOne = $this->getJson(self::ENDPOINT.'?month=8&year=2026')
+                ->assertOk()
+                ->json('data');
+
+            $this->assertSame('2026-08-31', $dayOne['calculation_date']);
+            $rowDayOne = $this->findProject($dayOne, $project->id);
+            $this->assertSame('-81', $rowDayOne['project_net_result']);
+            $this->assertSame('deficit', $rowDayOne['net_result_state']);
+            $this->assertSame('120', $rowDayOne['administrative_debt']);
+
+            $this->seedEntry($project->id, '2026-08-18', [
+                'daily_income' => 1000,
+                'daily_expense' => 200,
+                'administrative_fee' => 120,
+                'operational_deduction' => 1081,
+                'administrative_debt' => 120,
+                'accumulated_administrative_debt' => 240,
+                'daily_total' => -401,
+                'fund_balance' => -362,
+            ]);
+
+            $dayTwo = $this->getJson(self::ENDPOINT.'?month=8&year=2026')
+                ->assertOk()
+                ->json('data');
+
+            $rowDayTwo = $this->findProject($dayTwo, $project->id);
+            $this->assertSame('-362', $rowDayTwo['project_net_result']);
+            $this->assertSame('deficit', $rowDayTwo['net_result_state']);
+            $this->assertSame('240', $rowDayTwo['administrative_debt']);
+
+            $cs = $this->cashStationProject(8, 2026, $project->id);
+            $this->assertSame('-362', $cs['monthly_total']);
+            $this->assertSame('-362', $cs['net_cash_fund']);
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 }

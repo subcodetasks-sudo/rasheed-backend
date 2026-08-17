@@ -180,9 +180,9 @@ class AdministrativeExpenseCoverageTest extends DailyJournalFeatureTestCase
             'daily_expense' => 100,
         ]);
 
-        // daily_total -12; intermediate -12; surplus 0
+        // daily_total -12; intermediate -12; surplus 0; Case 1 covers 12 → fund 0
         $this->assertEqualsWithDelta(80.0, (float) $entry->uncovered_administrative_expense, 0.001);
-        $this->assertEqualsWithDelta(-12.0, (float) $entry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $entry->fund_balance, 0.001);
 
         $day = $this->adminFundDay(self::DAY_ONE);
         $this->assertRoundedMoneyEquals(80.0, $day['project_administration']);
@@ -282,8 +282,8 @@ class AdministrativeExpenseCoverageTest extends DailyJournalFeatureTestCase
             'daily_expense' => 200,
         ]);
 
-        // daily_total -112; no surplus for expense; fund stays -112
-        $this->assertEqualsWithDelta(-112.0, (float) $entry->fund_balance, 0.001);
+        // daily_total -112; no surplus for expense; uncovered 80; Case 1 12 → fund -100
+        $this->assertEqualsWithDelta(-100.0, (float) $entry->fund_balance, 0.001);
         $this->assertEqualsWithDelta(80.0, (float) $entry->uncovered_administrative_expense, 0.001);
         $this->assertEqualsWithDelta(12.0, (float) $entry->administrative_debt, 0.001);
     }
@@ -301,9 +301,9 @@ class AdministrativeExpenseCoverageTest extends DailyJournalFeatureTestCase
             'daily_expense' => 150,
         ]);
 
-        // daily_total -62; surplus 0; uncovered 30; fund -62; debt min(62,12)=12
+        // daily_total -62; surplus 0; uncovered 30; debt min(62,12)=12; fund restored to -50
         $this->assertEqualsWithDelta(30.0, (float) $entry->uncovered_administrative_expense, 0.001);
-        $this->assertEqualsWithDelta(-62.0, (float) $entry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(-50.0, (float) $entry->fund_balance, 0.001);
         $this->assertEqualsWithDelta(12.0, (float) $entry->administrative_debt, 0.001);
     }
 

@@ -65,10 +65,6 @@ class ListBeneficiaryOptionsAction
         }
 
         $end = sprintf('%04d-%02d-%02d', $year, $month, (int) date('t', mktime(0, 0, 0, $month, 1, $year)));
-        $today = now()->toDateString();
-        if ((int) now()->format('Y') === $year && (int) now()->format('n') === $month && $today < $end) {
-            $end = $today;
-        }
 
         $debts = $this->buildCashStationAction->administrativeDebtsByProject([$projectId], $end);
 

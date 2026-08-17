@@ -715,12 +715,12 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
 
         $entry = collect($response->json('data.entries'))->firstWhere('project.id', $project->id);
 
-        $this->assertSame('12.00', $entry['administrative_fee']);
-        $this->assertSame('0.00', $entry['operational_deduction']);
-        $this->assertSame('-612.00', $entry['daily_total']);
-        $this->assertSame('100.00', $entry['contribution']);
-        $this->assertSame('112.00', $entry['administrative_debt']);
-        $this->assertSame('-172.00', $entry['fund_balance']);
+        $this->assertEqualsWithDelta(12.0, (float) $entry['administrative_fee'], 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $entry['operational_deduction'], 0.001);
+        $this->assertEqualsWithDelta(-612.0, (float) $entry['daily_total'], 0.001);
+        $this->assertEqualsWithDelta(100.0, (float) $entry['contribution'], 0.001);
+        $this->assertEqualsWithDelta(112.0, (float) $entry['administrative_debt'], 0.001);
+        $this->assertEqualsWithDelta(-160.0, (float) $entry['fund_balance'], 0.001);
     }
 
     public function test_contribution_debt_recomputation_does_not_compound(): void
@@ -740,9 +740,9 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
         ])->assertOk();
 
         $entry = collect($first->json('data.entries'))->firstWhere('project.id', $project->id);
-        $this->assertSame('-1070.00', $entry['fund_balance']);
-        $this->assertSame('130.00', $entry['administrative_debt']);
-        $this->assertSame('130.00', $entry['accumulated_administrative_debt']);
+        $this->assertEqualsWithDelta(-970.0, (float) $entry['fund_balance'], 0.001);
+        $this->assertEqualsWithDelta(130.0, (float) $entry['administrative_debt'], 0.001);
+        $this->assertEqualsWithDelta(130.0, (float) $entry['accumulated_administrative_debt'], 0.001);
 
         $second = $this->putJson('/api/v1/daily-journals', [
             'entries' => [
@@ -751,9 +751,9 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
         ])->assertOk();
 
         $entry = collect($second->json('data.entries'))->firstWhere('project.id', $project->id);
-        $this->assertSame('-1060.00', $entry['fund_balance']);
-        $this->assertSame('140.00', $entry['administrative_debt']);
-        $this->assertSame('140.00', $entry['accumulated_administrative_debt']);
+        $this->assertEqualsWithDelta(-960.0, (float) $entry['fund_balance'], 0.001);
+        $this->assertEqualsWithDelta(140.0, (float) $entry['administrative_debt'], 0.001);
+        $this->assertEqualsWithDelta(140.0, (float) $entry['accumulated_administrative_debt'], 0.001);
     }
 
     public function test_contribution_via_patch_works_with_update_workflow(): void
@@ -810,12 +810,11 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
 
         $entry = collect($response->json('data.entries'))->firstWhere('project.id', $project->id);
 
-        // daily_total = 200 - 300 - 24 = -124; fund = -124
-        // Case 1 debt = min(124, 24) = 24
-        $this->assertSame('24.00', $entry['administrative_fee']);
-        $this->assertSame('-124.00', $entry['fund_balance']);
-        $this->assertSame('24.00', $entry['administrative_debt']);
-        $this->assertSame('24.00', $entry['accumulated_administrative_debt']);
+        // daily_total = 200 - 300 - 24 = -124; Case 1 debt = min(124, 24) = 24; fund restored to -100
+        $this->assertEqualsWithDelta(24.0, (float) $entry['administrative_fee'], 0.001);
+        $this->assertEqualsWithDelta(-100.0, (float) $entry['fund_balance'], 0.001);
+        $this->assertEqualsWithDelta(24.0, (float) $entry['administrative_debt'], 0.001);
+        $this->assertEqualsWithDelta(24.0, (float) $entry['accumulated_administrative_debt'], 0.001);
     }
 
     public function test_negative_fund_balance_alone_does_not_create_debt(): void
@@ -852,14 +851,14 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
         $yesterday = now()->subDay()->toDateString();
         $today = now()->toDateString();
 
-        // Case 1 debt: income 200 @ 12% = 24 fee; expense 300 → fund -124; debt 24
+        // Case 1 debt: income 200 @ 12% = 24 fee; expense 300 → fund -124 then restore 24 → -100; debt 24
         $this->putJson('/api/v1/daily-journals', [
             'journal_date' => $yesterday,
             'entries' => [['project_id' => $project->id, 'daily_income' => 200, 'daily_expense' => 300]],
         ])->assertOk();
 
         // Surplus day that does not create new debt (income with fee but net positive enough)
-        // previous fund -124; income 400, fee 48 → daily = 400-48 = 352; fund = -124+352 = 228
+        // previous fund -100; income 400, fee 48 → daily = 400-48 = 352; fund = -100+352 = 252
         // fund > 0 → Case 1 debt 0; expense 0 → Case 2 debt 0
         $response = $this->putJson('/api/v1/daily-journals', [
             'journal_date' => $today,
@@ -868,9 +867,9 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
 
         $entry = collect($response->json('data.entries'))->firstWhere('project.id', $project->id);
 
-        $this->assertSame('228.00', $entry['fund_balance']);
-        $this->assertSame('0.00', $entry['administrative_debt']);
-        $this->assertSame('24.00', $entry['accumulated_administrative_debt']);
+        $this->assertEqualsWithDelta(252.0, (float) $entry['fund_balance'], 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $entry['administrative_debt'], 0.001);
+        $this->assertEqualsWithDelta(24.0, (float) $entry['accumulated_administrative_debt'], 0.001);
     }
 
     public function test_explicit_repay_debt_consumes_surplus_against_accumulated_debt(): void
@@ -891,7 +890,7 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
             'entries' => [['project_id' => $project->id, 'daily_income' => 200, 'daily_expense' => 300]],
         ])->assertOk();
 
-        // Surplus day: fund 228, acc 24
+        // Surplus day: fund 252, acc 24
         $this->putJson('/api/v1/daily-journals', [
             'journal_date' => $today,
             'entries' => [['project_id' => $project->id, 'daily_income' => 400]],
@@ -902,10 +901,10 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
             'project_id' => $project->id,
         ]);
 
-        $response->assertOk()
-            ->assertJsonPath('data.fund_balance', '204.00')
-            ->assertJsonPath('data.administrative_debt', '0.00')
-            ->assertJsonPath('data.accumulated_administrative_debt', '0.00');
+        $response->assertOk();
+        $this->assertEqualsWithDelta(228.0, (float) $response->json('data.fund_balance'), 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $response->json('data.administrative_debt'), 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $response->json('data.accumulated_administrative_debt'), 0.001);
     }
 
     public function test_explicit_repay_debt_rejects_when_no_surplus(): void

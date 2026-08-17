@@ -43,6 +43,7 @@ class RecalculateDailyJournalAction
         $entries = $this->calculateAdministrativeExpenseCoverageAction->execute($entries, $date);
 
         // Remaining Deficit = abs(negative signed fund balance) for contribution validation.
+        // Captured before Case 1 fund restore so contribution rules stay unchanged.
         $remainingDeficits = [];
         foreach ($entries as $entry) {
             /** @var DailyJournalEntry $entry */

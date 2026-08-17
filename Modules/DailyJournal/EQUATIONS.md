@@ -181,9 +181,10 @@ deficit_debt = balance_before_contribution < 0
 
 fund_consumption_debt = round(deficit_debt, 2)
 administrative_debt = round(fund_consumption_debt + contribution, 2)
+fund_balance = round(fund_balance + fund_consumption_debt, 2)
 ```
 
-**Case 1 — deficit cover:** when post-coverage, pre-contribution `fund_balance < 0`, debt equals `min(|balance|, full same-day administrative_fee)`. Unused fee from prior days is **not** carried forward.
+**Case 1 — deficit cover:** when post-coverage, pre-contribution `fund_balance < 0`, debt equals `min(|balance|, full same-day administrative_fee)`. That Case 1 amount is then added back onto **that day's** `fund_balance` (the journal fund is the source of truth for the next day). Contribution is **not** added here — it is already in `daily_total`. Unused fee from prior days is **not** carried forward as a coverage pool; a later day's fee must not cover an earlier day's deficit. If there is no same-day deficit, Case 1 is 0 and `fund_balance` is unchanged.
 
 **Contribution — additive debt + deficit reduction:** requires Pass-1 fund deficit (super-admin + amount ≤ remaining deficit). Re-saving recomputes from the same fund-consumption base (never compounds).
 
@@ -226,8 +227,8 @@ fund_balance = surplus
 5. Calculate daily totals
 6. Calculate intermediate fund balances (using previous day; signed carry-forward)
 7. Apply administrative expense coverage from surplus → settle prior project_administration tip → final `fund_balance`, `uncovered_administrative_expense`, `project_administration_settled`, `outstanding_project_administration`
-8. Capture `remainingDeficits = |fund_balance| if < 0 else 0` (for contribution validation)
-9. Calculate administrative debt (Case 1 fund consumption + contribution)
+8. Capture `remainingDeficits = |fund_balance| if < 0 else 0` (for contribution validation; **before** Case 1 fund restore)
+9. Calculate administrative debt (Case 1 fund consumption + contribution) and restore Case 1 onto `fund_balance`
 10. Update accumulated administrative debt
 11. Persist calculated fields
 
@@ -293,12 +294,12 @@ available = SUM(administrative_fee) − SUM(admin_percentage_balance_debits.amou
 - Clear contribution later → journal contribution = 0; pool debits stay 100 (non-refundable)
 
 ### Administrative Debt worked examples
-- Income 200 @ 12% → fee 24; expense 0; fund negative → Case 1 debt = **24**
+- Income 200 @ 12% → fee 24; expense 0; fund negative → Case 1 debt = **24**; then `fund_balance += 24`
 - Income 500; fee 50; admin expense 80; surplus covers expense → debt = **0**; uncovered = 0
 - Income 60; fee 7.2; admin expense 100; surplus 52.8 → fund **0**; uncovered **47.2**; debt **0**
-- Fee 0; fund −150 → debt = **0** (negative alone does not create debt)
-- Fee 100; Pass-1 fund −1100; contribution 30 → base 100 + 30 = **130**; fund −1070
-- Same day re-save contribution 40 → base still 100 + 40 = **140** (not compounded)
+- Fee 0; fund −150 → debt = **0** (negative alone does not create debt); fund unchanged
+- Fee 100; Pass-1 fund −1100; contribution 30 → base 100 + 30 = **130**; fund −1070 then restore Case 1 → **−970**
+- Same day re-save contribution 40 → base still 100 + 40 = **140** (not compounded); fund −1060 then restore Case 1 → **−960**
 
 ---
 
@@ -343,7 +344,7 @@ Action rejections:
 | Zero / null inputs | Treated as 0 in math |
 | Income and expense both 0 | Operational deduction forced 0 (even `fixed` type); admin expense coverage/settlement skipped so `fund_balance` is untouched (§5b) |
 | Positive balance | No Case 1 debt from balance |
-| Negative balance, fee available | Case 1 debt = min(\|balance\|, full same-day administrative_fee) |
+| Negative balance, fee available | Case 1 debt = min(\|balance\|, full same-day administrative_fee); then `fund_balance +=` that Case 1 amount |
 | Negative balance, fee 0 | Debt 0 (negative alone never creates debt) |
 | Admin expense uncovered | Transferred via `uncovered_administrative_expense` into outstanding tip; never debt or extra deficit |
 | Admin expense covered by surplus | Reduces `fund_balance` only; `uncovered = 0` |
@@ -381,4 +382,4 @@ repay(40, 0, 100) → (0, 0, 60)
 repay(30, 20, 50) → (0, 0, 20)  // today first, then accumulated
 ```
 
-When implementing, changing, or reviewing Daily Journal logic, preserve this exact order, these formulas, and these validations. Do not auto-repay debt on save. Do not use administrative fee to cover administrative expense or to settle prior outstanding tip. Uncovered administrative expense becomes a per-project outstanding tip (`outstanding_project_administration`) that Administrative Fund shows as `project_administration`; new daily transfers (`uncovered_administrative_expense`) are subtracted once in Administrative Fund `total_income`. The day's `total_administrative_percentage` is the base of that `total_income` formula — do not substitute the outstanding tip for the daily uncovered transfer. Cover today's expense before settling prior tip. Case 1 uses same-day full admin fee for deficit only; unused fee does not carry forward. Contribution requires a Pass-1 fund deficit; re-saves must not compound. Do not recalculate fee/op/admin expense on Pass 2. After recalculating a date, recalculate later journal dates in order.
+When implementing, changing, or reviewing Daily Journal logic, preserve this exact order, these formulas, and these validations. Do not auto-repay debt on save. Do not use administrative fee to cover administrative expense or to settle prior outstanding tip. Uncovered administrative expense becomes a per-project outstanding tip (`outstanding_project_administration`) that Administrative Fund shows as `project_administration`; new daily transfers (`uncovered_administrative_expense`) are subtracted once in Administrative Fund `total_income`. The day's `total_administrative_percentage` is the base of that `total_income` formula — do not substitute the outstanding tip for the daily uncovered transfer. Cover today's expense before settling prior tip. Case 1 uses same-day full admin fee for deficit only, then restores that Case 1 amount onto `fund_balance`; unused fee does not carry forward as a coverage pool. Contribution requires a Pass-1 fund deficit; re-saves must not compound. Do not recalculate fee/op/admin expense on Pass 2. After recalculating a date, recalculate later journal dates in order.

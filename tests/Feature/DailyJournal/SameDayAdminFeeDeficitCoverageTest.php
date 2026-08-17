@@ -70,9 +70,9 @@ class SameDayAdminFeeDeficitCoverageTest extends DailyJournalFeatureTestCase
             'daily_expense' => 300,
         ]);
 
-        // fee 24; daily_total -124; fund -124 → debt min(124, 24) = 24
+        // fee 24; daily_total -124; fund -124 → debt min(124, 24) = 24; fund restored to -100
         $this->assertEqualsWithDelta(24.0, (float) $entry->administrative_fee, 0.001);
-        $this->assertEqualsWithDelta(-124.0, (float) $entry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(-100.0, (float) $entry->fund_balance, 0.001);
         $this->assertEqualsWithDelta(24.0, (float) $entry->administrative_debt, 0.001);
     }
 
@@ -87,9 +87,9 @@ class SameDayAdminFeeDeficitCoverageTest extends DailyJournalFeatureTestCase
             'daily_expense' => 500,
         ]);
 
-        // fee 12; daily_total -412 → debt = 12
+        // fee 12; daily_total -412 → debt = 12; fund restored to -400
         $this->assertEqualsWithDelta(12.0, (float) $entry->administrative_fee, 0.001);
-        $this->assertEqualsWithDelta(-412.0, (float) $entry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(-400.0, (float) $entry->fund_balance, 0.001);
         $this->assertEqualsWithDelta(12.0, (float) $entry->administrative_debt, 0.001);
     }
 
@@ -122,8 +122,8 @@ class SameDayAdminFeeDeficitCoverageTest extends DailyJournalFeatureTestCase
         $this->assertEqualsWithDelta(120.0, (float) $dayOne->administrative_fee, 0.001);
         $this->assertEqualsWithDelta(0.0, (float) $dayOne->administrative_debt, 0.001);
 
-        // Day 2 starts from Day 1 fund 880; daily_total 200-1100-24=-924; fund -44
-        $this->assertEqualsWithDelta(-44.0, (float) $dayTwo->fund_balance, 0.001);
+        // Day 2 starts from Day 1 fund 880; daily_total 200-1100-24=-924; fund -44; restore 24 → -20
+        $this->assertEqualsWithDelta(-20.0, (float) $dayTwo->fund_balance, 0.001);
         $this->assertEqualsWithDelta(24.0, (float) $dayTwo->administrative_fee, 0.001);
         $this->assertEqualsWithDelta(24.0, (float) $dayTwo->administrative_debt, 0.001);
     }
@@ -181,23 +181,21 @@ class SameDayAdminFeeDeficitCoverageTest extends DailyJournalFeatureTestCase
 
         $this->assertEqualsWithDelta(12.0, (float) $dayOne->administrative_debt, 0.001);
         $this->assertEqualsWithDelta(0.0, (float) $dayTwo->administrative_debt, 0.001);
-        // Day 3: prior fund -112 + 176 = 64; daily_total 50-300-6 = -256 → fund -192 → debt 6
+        // Day 1 fund after cover -100; Day 2 surplus 176 → 76; Day 3 daily_total -256 → fund -180 → debt 6
         $this->assertEqualsWithDelta(6.0, (float) $dayThree->administrative_debt, 0.001);
     }
 
-    /** 8. Editing one day does not recalculate later dates automatically. */
-    public function test_editing_one_day_does_not_recalculate_later_dates(): void
+    /** 8. Editing one day recalculates later dates from persisted fund_balance. */
+    public function test_editing_one_day_forward_recalculates_later_dates_from_persisted_fund(): void
     {
         $this->actAsFinanceUser();
         $project = $this->subjectProject();
 
         $this->saveJournal(self::DAY_ONE, $project->id, ['daily_income' => 1000]);
-        $dayTwoBefore = $this->saveJournal(self::DAY_TWO, $project->id, [
+        $this->saveJournal(self::DAY_TWO, $project->id, [
             'daily_income' => 200,
             'daily_expense' => 1100,
         ]);
-        $dayTwoFundBefore = (float) $dayTwoBefore->fund_balance;
-        $dayTwoDebtBefore = (float) $dayTwoBefore->administrative_debt;
 
         $this->saveJournal(self::DAY_ONE, $project->id, ['daily_income' => 10000]);
 
@@ -206,8 +204,9 @@ class SameDayAdminFeeDeficitCoverageTest extends DailyJournalFeatureTestCase
             ->whereDate('journal_date', self::DAY_TWO)
             ->firstOrFail();
 
-        $this->assertEqualsWithDelta($dayTwoFundBefore, (float) $dayTwoAfter->fund_balance, 0.001);
-        $this->assertEqualsWithDelta($dayTwoDebtBefore, (float) $dayTwoAfter->administrative_debt, 0.001);
+        // Day 1 fund 8800 carries; Day 2 daily_total -924 → surplus 7876; no Case 1
+        $this->assertEqualsWithDelta(7876.0, (float) $dayTwoAfter->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $dayTwoAfter->administrative_debt, 0.001);
     }
 
     /** 9. Historical dates stay isolated from current-day saves. */
@@ -226,7 +225,7 @@ class SameDayAdminFeeDeficitCoverageTest extends DailyJournalFeatureTestCase
 
         $historicalEntry->refresh();
         $this->assertEqualsWithDelta(12.0, (float) $historicalEntry->administrative_debt, 0.001);
-        $this->assertEqualsWithDelta(-162.0, (float) $historicalEntry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(-150.0, (float) $historicalEntry->fund_balance, 0.001);
     }
 
     /** 10. Recalculating a single day preserves same-day fee cap. */

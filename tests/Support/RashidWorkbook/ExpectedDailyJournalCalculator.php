@@ -77,6 +77,7 @@ class ExpectedDailyJournalCalculator
                 ? min(abs($balanceBeforeContribution), $administrativeFee)
                 : 0.0;
             $administrativeDebt = round($deficitDebt + $contribution, 2);
+            $fundBalance = round($fundBalance + $deficitDebt, 2);
 
             $previousAccumulatedDebt = $this->accumulatedDebt[$name] ?? 0.0;
             $accumulatedDebt = round($previousAccumulatedDebt + $administrativeDebt, 2);
