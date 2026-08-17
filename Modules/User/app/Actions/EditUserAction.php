@@ -12,7 +12,7 @@ class EditUserAction
         if (isset($data['name']) && ! isset($data['full_name'])) {
             $data['full_name'] = $data['name'];
         }
-        $fillable = array_intersect_key($data, array_flip(['full_name', 'user_name', 'email', 'password']));
+        $fillable = array_intersect_key($data, array_flip(['full_name', 'user_name', 'email', 'phone', 'password']));
         $user->updateOrFail($fillable);
         $user->refresh();
 

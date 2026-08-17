@@ -2,134 +2,131 @@
 
 namespace Modules\User\app\Models;
 
-use App\Core\Traits\HasStandardMedia;
+use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
-use Modules\User\app\Models\SocialAccount;
-use Modules\UserNotifications\app\Models\UserFcmToken;
-use Modules\UserNotifications\app\Models\UserNotification;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Spatie\Permission\Traits\HasRoles;
-use Spatie\Activitylog\Traits\LogsActivity;
-use Spatie\Activitylog\LogOptions;
 
 class User extends Authenticatable implements HasMedia
 {
-  use HasFactory, Notifiable, HasApiTokens, SoftDeletes, HasRoles, InteractsWithMedia;
+    use HasApiTokens, HasFactory, HasRoles, InteractsWithMedia, Notifiable, SoftDeletes;
 
-  protected $primaryKey = 'uuid';
-  public $incrementing = false;
-  protected $keyType = 'string';
+    protected $primaryKey = 'uuid';
 
-  use LogsActivity;
+    public $incrementing = false;
 
+    protected $keyType = 'string';
 
+    use LogsActivity;
 
-  protected $fillable = [
-    'full_name',
-    'user_name',
-    'email',
-    'password',
-    'status',
-    'last_login_at',
-    'deleted_at',
-    'role_id',
-  ];
-
-  protected $hidden = [
-    'password',
-    'remember_token',
-  ];
-
-  protected function casts(): array
-  {
-    return [
-      'password' => 'hashed',
-      'last_login_at' => 'datetime',
-      'preferences' => 'array',
+    protected $fillable = [
+        'full_name',
+        'user_name',
+        'email',
+        'phone',
+        'password',
+        'status',
+        'last_login_at',
+        'deleted_at',
+        'role_id',
     ];
-  }
 
-  public function getActivitylogOptions(): LogOptions
-  {
-    return LogOptions::defaults()
-      ->logOnly(['full_name', 'email', 'user_name', 'role_id'])
-      ->logOnlyDirty()
-      ->dontSubmitEmptyLogs()
-      ->useLogName('User');
-  }
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
 
-  protected static function boot()
-  {
-    parent::boot();
+    protected function casts(): array
+    {
+        return [
+            'password' => 'hashed',
+            'last_login_at' => 'datetime',
+            'preferences' => 'array',
+        ];
+    }
 
-    static::creating(function ($user) {
-      $user->uuid = (string) Str::uuid();
-    });
-  }
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['full_name', 'email', 'user_name', 'role_id'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('User');
+    }
 
-  public function registerMediaCollections(): void
-  {
-    $this->addMediaCollection('avatar')
-      ->singleFile()
-      ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])
-      ->registerMediaConversions(function (Media $media = null) {
-        $this->addMediaConversion('thumb')
-          ->width(200)
-          ->height(200)
-          ->sharpen(10);
-      });
-  }
+    protected static function boot()
+    {
+        parent::boot();
 
-  public function isActive(): bool
-  {
-    return $this->status === 'active';
-  }
+        static::creating(function ($user) {
+            $user->uuid = (string) Str::uuid();
+        });
+    }
 
-  public function isPending(): bool
-  {
-    return $this->status === 'pending';
-  }
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('avatar')
+            ->singleFile()
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])
+            ->registerMediaConversions(function (?Media $media = null) {
+                $this->addMediaConversion('thumb')
+                    ->width(200)
+                    ->height(200)
+                    ->sharpen(10);
+            });
+    }
 
-  public function isRejected(): bool
-  {
-    return $this->status === 'rejected';
-  }
+    public function isActive(): bool
+    {
+        return $this->status === 'active';
+    }
 
-  public function isSuspended(): bool
-  {
-    return $this->status === 'suspended';
-  }
+    public function isPending(): bool
+    {
+        return $this->status === 'pending';
+    }
 
-  public function isBanned(): bool
-  {
-    return $this->status === 'banned';
-  }
+    public function isRejected(): bool
+    {
+        return $this->status === 'rejected';
+    }
 
-  public function updateLastLogin(): void
-  {
-    $this->update(['last_login_at' => now()]);
-  }
+    public function isSuspended(): bool
+    {
+        return $this->status === 'suspended';
+    }
 
-  public function refreshTokens()
-  {
-    return $this->hasMany(RefreshToken::class);
-  }
+    public function isBanned(): bool
+    {
+        return $this->status === 'banned';
+    }
 
-  
-  public function getRouteKeyName()
-  {
-    return 'uuid';
-  }
+    public function updateLastLogin(): void
+    {
+        $this->update(['last_login_at' => now()]);
+    }
 
-  protected static function newFactory()
-  {
-    return \Database\Factories\UserFactory::new();
-  }
+    public function refreshTokens()
+    {
+        return $this->hasMany(RefreshToken::class);
+    }
+
+    public function getRouteKeyName()
+    {
+        return 'uuid';
+    }
+
+    protected static function newFactory()
+    {
+        return UserFactory::new();
+    }
 }

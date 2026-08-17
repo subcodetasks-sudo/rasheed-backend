@@ -13,6 +13,7 @@ class CreateUserAction
             'full_name' => $data['full_name'],
             'user_name' => $data['user_name'],
             'email' => $data['email'],
+            'phone' => $data['phone'] ?? null,
             'password' => bcrypt($data['password']),
             'status' => 'active',
         ]);

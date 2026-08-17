@@ -1988,7 +1988,7 @@
                 "description": "**Roles:** `super-admin`\n\nCreate a user and assign a single role.\n\n**Enums / allowed values:**\n`role`: super-admin | finance | inventory (must exist in `roles` table)",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"full_name\": \"Finance Manager\",\n  \"user_name\": \"finance_user\",\n  \"email\": \"finance@rashid.test\",\n  \"password\": \"Password123!\",\n  \"role\": \"finance\"\n}",
+                  "raw": "{\n  \"full_name\": \"Finance Manager\",\n  \"user_name\": \"finance_user\",\n  \"email\": \"finance@rashid.test\",\n  \"phone\": \"0599000000\",\n  \"password\": \"Password123!\",\n  \"role\": \"finance\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -2020,7 +2020,7 @@
                     ],
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"full_name\": \"Finance Manager\",\n  \"user_name\": \"finance_user\",\n  \"email\": \"finance@rashid.test\",\n  \"password\": \"Password123!\",\n  \"role\": \"finance\"\n}",
+                      "raw": "{\n  \"full_name\": \"Finance Manager\",\n  \"user_name\": \"finance_user\",\n  \"email\": \"finance@rashid.test\",\n  \"phone\": \"0599000000\",\n  \"password\": \"Password123!\",\n  \"role\": \"finance\"\n}",
                       "options": {
                         "raw": {
                           "language": "json"
@@ -2047,7 +2047,7 @@
                       "value": "application/json"
                     }
                   ],
-                  "body": "{\n  \"success\": true,\n  \"message\": \"User created successfully\",\n  \"data\": {\n    \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"name\": \"Finance Manager\",\n    \"user_name\": \"finance_user\",\n    \"email\": \"finance@rashid.test\",\n    \"status\": \"active\",\n    \"lastLoginAt\": \"2026-07-28 12:00:00\",\n    \"role\": \"finance\"\n  }\n}",
+                  "body": "{\n  \"success\": true,\n  \"message\": \"User created successfully\",\n  \"data\": {\n    \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"name\": \"Finance Manager\",\n    \"user_name\": \"finance_user\",\n    \"email\": \"finance@rashid.test\",\n    \"phone\": \"0599000000\",\n    \"status\": \"active\",\n    \"lastLoginAt\": \"2026-07-28 12:00:00\",\n    \"role\": \"finance\"\n  }\n}",
                   "id": "011c64b1-4fda-4eba-a953-4fbc817a873e"
                 },
                 {
@@ -2073,7 +2073,7 @@
                     ],
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"full_name\": \"Finance Manager\",\n  \"user_name\": \"finance_user\",\n  \"email\": \"finance@rashid.test\",\n  \"password\": \"Password123!\",\n  \"role\": \"finance\"\n}",
+                      "raw": "{\n  \"full_name\": \"Finance Manager\",\n  \"user_name\": \"finance_user\",\n  \"email\": \"finance@rashid.test\",\n  \"phone\": \"0599000000\",\n  \"password\": \"Password123!\",\n  \"role\": \"finance\"\n}",
                       "options": {
                         "raw": {
                           "language": "json"
@@ -2126,7 +2126,7 @@
                     ],
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"full_name\": \"Finance Manager\",\n  \"user_name\": \"finance_user\",\n  \"email\": \"finance@rashid.test\",\n  \"password\": \"Password123!\",\n  \"role\": \"finance\"\n}",
+                      "raw": "{\n  \"full_name\": \"Finance Manager\",\n  \"user_name\": \"finance_user\",\n  \"email\": \"finance@rashid.test\",\n  \"phone\": \"0599000000\",\n  \"password\": \"Password123!\",\n  \"role\": \"finance\"\n}",
                       "options": {
                         "raw": {
                           "language": "json"
@@ -2179,7 +2179,7 @@
                     ],
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"full_name\": \"Finance Manager\",\n  \"user_name\": \"finance_user\",\n  \"email\": \"finance@rashid.test\",\n  \"password\": \"Password123!\",\n  \"role\": \"finance\"\n}",
+                      "raw": "{\n  \"full_name\": \"Finance Manager\",\n  \"user_name\": \"finance_user\",\n  \"email\": \"finance@rashid.test\",\n  \"phone\": \"0599000000\",\n  \"password\": \"Password123!\",\n  \"role\": \"finance\"\n}",
                       "options": {
                         "raw": {
                           "language": "json"
@@ -37042,7 +37042,7 @@
                 "description": "**Roles:** `super-admin`\n\nCreate a user and assign a single role.\n\n**Enums / allowed values:**\n`role`: super-admin | finance | inventory (must exist in `roles` table)",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"full_name\": \"Finance Manager\",\n  \"user_name\": \"finance_user\",\n  \"email\": \"finance@rashid.test\",\n  \"password\": \"Password123!\",\n  \"role\": \"finance\"\n}",
+                  "raw": "{\n  \"full_name\": \"Finance Manager\",\n  \"user_name\": \"finance_user\",\n  \"email\": \"finance@rashid.test\",\n  \"phone\": \"0599000000\",\n  \"password\": \"Password123!\",\n  \"role\": \"finance\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -37074,7 +37074,7 @@
                     ],
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"full_name\": \"Finance Manager\",\n  \"user_name\": \"finance_user\",\n  \"email\": \"finance@rashid.test\",\n  \"password\": \"Password123!\",\n  \"role\": \"finance\"\n}",
+                      "raw": "{\n  \"full_name\": \"Finance Manager\",\n  \"user_name\": \"finance_user\",\n  \"email\": \"finance@rashid.test\",\n  \"phone\": \"0599000000\",\n  \"password\": \"Password123!\",\n  \"role\": \"finance\"\n}",
                       "options": {
                         "raw": {
                           "language": "json"
@@ -37101,7 +37101,7 @@
                       "value": "application/json"
                     }
                   ],
-                  "body": "{\n  \"success\": true,\n  \"message\": \"User created successfully\",\n  \"data\": {\n    \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"name\": \"Finance Manager\",\n    \"user_name\": \"finance_user\",\n    \"email\": \"finance@rashid.test\",\n    \"status\": \"active\",\n    \"lastLoginAt\": \"2026-07-28 12:00:00\",\n    \"role\": \"finance\"\n  }\n}",
+                  "body": "{\n  \"success\": true,\n  \"message\": \"User created successfully\",\n  \"data\": {\n    \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"name\": \"Finance Manager\",\n    \"user_name\": \"finance_user\",\n    \"email\": \"finance@rashid.test\",\n    \"phone\": \"0599000000\",\n    \"status\": \"active\",\n    \"lastLoginAt\": \"2026-07-28 12:00:00\",\n    \"role\": \"finance\"\n  }\n}",
                   "id": "31841b86-bfbf-4b3f-8c61-c52ae2ac37c7"
                 },
                 {
@@ -37127,7 +37127,7 @@
                     ],
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"full_name\": \"Finance Manager\",\n  \"user_name\": \"finance_user\",\n  \"email\": \"finance@rashid.test\",\n  \"password\": \"Password123!\",\n  \"role\": \"finance\"\n}",
+                      "raw": "{\n  \"full_name\": \"Finance Manager\",\n  \"user_name\": \"finance_user\",\n  \"email\": \"finance@rashid.test\",\n  \"phone\": \"0599000000\",\n  \"password\": \"Password123!\",\n  \"role\": \"finance\"\n}",
                       "options": {
                         "raw": {
                           "language": "json"
@@ -37180,7 +37180,7 @@
                     ],
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"full_name\": \"Finance Manager\",\n  \"user_name\": \"finance_user\",\n  \"email\": \"finance@rashid.test\",\n  \"password\": \"Password123!\",\n  \"role\": \"finance\"\n}",
+                      "raw": "{\n  \"full_name\": \"Finance Manager\",\n  \"user_name\": \"finance_user\",\n  \"email\": \"finance@rashid.test\",\n  \"phone\": \"0599000000\",\n  \"password\": \"Password123!\",\n  \"role\": \"finance\"\n}",
                       "options": {
                         "raw": {
                           "language": "json"
@@ -37233,7 +37233,7 @@
                     ],
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"full_name\": \"Finance Manager\",\n  \"user_name\": \"finance_user\",\n  \"email\": \"finance@rashid.test\",\n  \"password\": \"Password123!\",\n  \"role\": \"finance\"\n}",
+                      "raw": "{\n  \"full_name\": \"Finance Manager\",\n  \"user_name\": \"finance_user\",\n  \"email\": \"finance@rashid.test\",\n  \"phone\": \"0599000000\",\n  \"password\": \"Password123!\",\n  \"role\": \"finance\"\n}",
                       "options": {
                         "raw": {
                           "language": "json"

@@ -224,6 +224,7 @@ SAMPLE_USER = {
     "name": "Super Admin",
     "user_name": "super_admin",
     "email": "admin@rashid.test",
+    "phone": null,
     "status": "active",
     "lastLoginAt": "2026-07-28 12:00:00",
     "role": "super-admin",
@@ -682,6 +683,7 @@ def auth_users_create() -> dict:
         "full_name": "Finance Manager",
         "user_name": "finance_user",
         "email": "finance@rashid.test",
+        "phone": "0599000000",
         "password": "Password123!",
         "role": "finance",
     }
@@ -696,7 +698,7 @@ def auth_users_create() -> dict:
         body=body,
         json_body=True,
         responses=[
-            example("200 OK", 200, ok("User created successfully", {**SAMPLE_USER, "name": "Finance Manager", "user_name": "finance_user", "email": "finance@rashid.test", "role": "finance"}), original_request=original),
+            example("200 OK", 200, ok("User created successfully", {**SAMPLE_USER, "name": "Finance Manager", "user_name": "finance_user", "email": "finance@rashid.test", "phone": "0599000000", "role": "finance"}), original_request=original),
             *std_auth_errors(original, include_validation=True),
         ],
     )
@@ -708,6 +710,7 @@ def auth_users_update() -> dict:
         "full_name": "Updated Name",
         "user_name": "updated_user",
         "email": "updated@rashid.test",
+        "phone": "0599111111",
         "password": "Password123!",
         "role": "inventory",
     }
