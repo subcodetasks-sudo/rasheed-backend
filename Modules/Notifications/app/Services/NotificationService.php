@@ -138,13 +138,22 @@ class NotificationService
         if (isset($meta['project_id']) && is_numeric($meta['project_id'])) {
             $projectId = (int) $meta['project_id'];
 
-            return $projectId > 0 ? $projectId : null;
+            return $this->existingProjectId($projectId);
         }
 
         if ($subject instanceof Project) {
-            return (int) $subject->getKey();
+            return $this->existingProjectId((int) $subject->getKey());
         }
 
         return null;
+    }
+
+    private function existingProjectId(int $projectId): ?int
+    {
+        if ($projectId <= 0) {
+            return null;
+        }
+
+        return Project::query()->whereKey($projectId)->exists() ? $projectId : null;
     }
 }

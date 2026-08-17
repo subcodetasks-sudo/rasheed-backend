@@ -4,6 +4,7 @@ namespace Tests\Feature\Project;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Modules\Notifications\Models\Notification;
 use Modules\Project\Enums\FundType;
 use Modules\Project\Enums\OperationalDeductionType;
 use Modules\Project\Enums\ProjectStatus;
@@ -285,6 +286,30 @@ class ProjectApiTest extends TestCase
             ->assertJsonPath('success', true);
 
         $this->assertDatabaseMissing('projects', ['id' => $project->id]);
+    }
+
+    public function test_delete_project_stores_notification_without_project_fk(): void
+    {
+        $project = Project::factory()->create([
+            'name' => 'يثيث',
+            'category_id' => $this->category->id,
+        ]);
+        $projectId = $project->id;
+
+        $this->deleteJson("/api/v1/projects/{$projectId}")
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertDatabaseMissing('projects', ['id' => $projectId]);
+
+        $notification = Notification::query()
+            ->where('meta->action', 'deleted')
+            ->latest('id')
+            ->first();
+
+        $this->assertNotNull($notification);
+        $this->assertNull($notification->project_id);
+        $this->assertSame($projectId, (int) $notification->meta['project_id']);
     }
 
     public function test_project_name_must_be_unique(): void
