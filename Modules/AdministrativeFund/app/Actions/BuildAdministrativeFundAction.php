@@ -41,7 +41,9 @@ class BuildAdministrativeFundAction
             $assetAdministration = round((float) ($manual['asset_administration'] ?? 0), 2);
 
             $totalIncome = round(
-                $projectAdministrationIncome + $cashFundContributions + $individualContributions + $debtRecovery,
+                $totalAdministrativePercentage
+                - ($projectAdministrationIncome + $cashFundContributions + $individualContributions)
+                + $debtRecovery,
                 2,
             );
             $totalExpenses = round($operationalAdministration + $assetAdministration, 2);
@@ -50,8 +52,8 @@ class BuildAdministrativeFundAction
             $row = [
                 'date' => $dateString,
                 'day' => $cursor->format('l'),
-                'project_administration' => FormatMoneyDecimal::formatRounded($projectAdministration),
                 'total_administrative_percentage' => FormatMoneyDecimal::formatRounded($totalAdministrativePercentage),
+                'project_administration' => FormatMoneyDecimal::formatRounded($projectAdministration),
                 'cash_fund_contributions' => FormatMoneyDecimal::formatRounded($cashFundContributions),
                 'individual_contributions' => $this->decimal($individualContributions),
                 'debt_recovery' => FormatMoneyDecimal::formatRounded($debtRecovery),
@@ -79,8 +81,8 @@ class BuildAdministrativeFundAction
         }
 
         $summary = [
-            'project_administration' => FormatMoneyDecimal::formatRounded($monthEndTip),
             'total_administrative_percentage' => FormatMoneyDecimal::formatRounded($sums['total_administrative_percentage']),
+            'project_administration' => FormatMoneyDecimal::formatRounded($monthEndTip),
             'cash_fund_contributions' => FormatMoneyDecimal::formatRounded($sums['cash_fund_contributions']),
             'individual_contributions' => FormatMoneyDecimal::formatRounded($sums['individual_contributions']),
             'debt_recovery' => FormatMoneyDecimal::formatRounded($sums['debt_recovery']),
@@ -97,8 +99,8 @@ class BuildAdministrativeFundAction
             'summary' => $summary,
             'days' => $days,
             'totals' => [
-                'project_administration' => $summary['project_administration'],
                 'total_administrative_percentage' => $summary['total_administrative_percentage'],
+                'project_administration' => $summary['project_administration'],
                 'cash_fund_contributions' => $summary['cash_fund_contributions'],
                 'individual_contributions' => $summary['individual_contributions'],
                 'debt_recovery' => $summary['debt_recovery'],
@@ -112,8 +114,8 @@ class BuildAdministrativeFundAction
     }
 
     /**
-     * Per day: outstanding tip (display) and new uncovered transfers (income).
-     * Administrative percentage remains an independent display-only column.
+     * Per day: outstanding tip (display) and new uncovered transfers (subtracted in total_income).
+     * Administrative percentage is the base of total_income (إجمالي إداري الصناديق).
      *
      * @return array<string, array{
      *     project_administration: float,
@@ -225,8 +227,8 @@ class BuildAdministrativeFundAction
 
     /**
      * @return array{
-     *     project_administration: float,
      *     total_administrative_percentage: float,
+     *     project_administration: float,
      *     cash_fund_contributions: float,
      *     individual_contributions: float,
      *     debt_recovery: float,
@@ -240,8 +242,8 @@ class BuildAdministrativeFundAction
     private function emptyMoneyBag(): array
     {
         return [
-            'project_administration' => 0.0,
             'total_administrative_percentage' => 0.0,
+            'project_administration' => 0.0,
             'cash_fund_contributions' => 0.0,
             'individual_contributions' => 0.0,
             'debt_recovery' => 0.0,

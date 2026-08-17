@@ -164,7 +164,7 @@ class AdministrativeExpenseCoverageTest extends DailyJournalFeatureTestCase
 
         $day = $this->adminFundDay(self::DAY_ONE);
         $this->assertRoundedMoneyEquals(47.2, $day['project_administration']);
-        $this->assertRoundedMoneyEquals(47.2, $day['total_income']);
+        $this->assertRoundedMoneyEquals(-40.0, $day['total_income']);
     }
 
     /** 4. Zero surplus → full expense uncovered. */
@@ -345,7 +345,7 @@ class AdministrativeExpenseCoverageTest extends DailyJournalFeatureTestCase
 
         $this->assertRoundedMoneyEquals(47.2, $this->adminFundDay(self::DAY_ONE)['project_administration']);
         $this->assertRoundedMoneyEquals(0.0, $this->adminFundDay(self::DAY_TWO)['project_administration']);
-        $this->assertRoundedMoneyEquals(0.0, $this->adminFundDay(self::DAY_TWO)['total_income']);
+        $this->assertRoundedMoneyEquals(600.0, $this->adminFundDay(self::DAY_TWO)['total_income']);
     }
 
     /** 13b. Confirmed Day 2 math: expense 50, surplus 80, prior 100 → settle 30, tip 70. */

@@ -132,7 +132,7 @@ class AdministrativeFundApiTest extends TestCase
         $day = $this->findDay($data, '2026-08-10');
 
         $this->assertRoundedMoneyEquals(95.0, $day['project_administration']);
-        $this->assertRoundedMoneyEquals(95.0, $day['total_income']);
+        $this->assertRoundedMoneyEquals(-95.0, $day['total_income']);
         $this->assertRoundedMoneyEquals(95.0, $data['summary']['project_administration']);
         $this->assertRoundedMoneyEquals(95.0, $data['totals']['project_administration']);
 
@@ -157,12 +157,12 @@ class AdministrativeFundApiTest extends TestCase
 
         $this->assertRoundedMoneyEquals(46.0, $day['total_administrative_percentage']);
         $this->assertRoundedMoneyEquals(0.0, $day['project_administration']);
-        $this->assertRoundedMoneyEquals(0.0, $day['total_income']);
-        $this->assertRoundedMoneyEquals(0.0, $day['net']);
+        $this->assertRoundedMoneyEquals(46.0, $day['total_income']);
+        $this->assertRoundedMoneyEquals(46.0, $day['net']);
         $this->assertRoundedMoneyEquals(46.0, $data['summary']['total_administrative_percentage']);
         $this->assertRoundedMoneyEquals(46.0, $data['totals']['total_administrative_percentage']);
         $this->assertRoundedMoneyEquals(0.0, $data['totals']['project_administration']);
-        $this->assertRoundedMoneyEquals(0.0, $data['totals']['total_income']);
+        $this->assertRoundedMoneyEquals(46.0, $data['totals']['total_income']);
     }
 
     public function test_both_values_stay_in_their_own_column_on_the_same_day(): void
@@ -181,8 +181,8 @@ class AdministrativeFundApiTest extends TestCase
 
         $this->assertRoundedMoneyEquals(30.0, $day['project_administration']);
         $this->assertRoundedMoneyEquals(46.0, $day['total_administrative_percentage']);
-        $this->assertRoundedMoneyEquals(30.0, $day['total_income']);
-        $this->assertRoundedMoneyEquals(30.0, $day['net']);
+        $this->assertRoundedMoneyEquals(16.0, $day['total_income']);
+        $this->assertRoundedMoneyEquals(16.0, $day['net']);
     }
 
     public function test_exempt_project_uncovered_expense_feeds_project_administration_only(): void
@@ -210,10 +210,10 @@ class AdministrativeFundApiTest extends TestCase
 
         $this->assertRoundedMoneyEquals(55.0, $day['project_administration']);
         $this->assertRoundedMoneyEquals(24.0, $day['total_administrative_percentage']);
-        $this->assertRoundedMoneyEquals(55.0, $day['total_income']);
+        $this->assertRoundedMoneyEquals(-31.0, $day['total_income']);
     }
 
-    public function test_administrative_percentage_never_enters_income_or_net(): void
+    public function test_total_income_is_percentage_minus_uncovered_and_contributions_plus_debt_recovery(): void
     {
         $this->actAs('finance');
         $project = $this->createProject();
@@ -231,19 +231,18 @@ class AdministrativeFundApiTest extends TestCase
         $data = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data');
         $day = $this->findDay($data, '2026-08-18');
 
-        $expectedIncome = 30.0
-            + (float) $day['cash_fund_contributions']
-            + (float) $day['individual_contributions']
+        $expectedIncome = 46.0
+            - (30.0 + (float) $day['cash_fund_contributions'] + (float) $day['individual_contributions'])
             + (float) $day['debt_recovery'];
 
         $this->assertMoneyEquals($expectedIncome, $day['total_income']);
         $this->assertRoundedMoneyEquals(30.0, $day['project_administration']);
-        $this->assertRoundedMoneyEquals(50.0, $day['total_income']);
+        $this->assertRoundedMoneyEquals(-4.0, $day['total_income']);
         $this->assertRoundedMoneyEquals(5.0, $day['total_expenses']);
-        $this->assertRoundedMoneyEquals(45.0, $day['net']);
+        $this->assertRoundedMoneyEquals(-9.0, $day['net']);
         $this->assertRoundedMoneyEquals(46.0, $day['total_administrative_percentage']);
-        $this->assertRoundedMoneyEquals(50.0, $data['summary']['total_income']);
-        $this->assertRoundedMoneyEquals(45.0, $data['summary']['administrative_net']);
+        $this->assertRoundedMoneyEquals(-4.0, $data['summary']['total_income']);
+        $this->assertRoundedMoneyEquals(-9.0, $data['summary']['administrative_net']);
     }
 
     public function test_recalculation_updates_each_column_independently(): void
@@ -272,7 +271,7 @@ class AdministrativeFundApiTest extends TestCase
             '2026-08-20',
         );
         $this->assertRoundedMoneyEquals(65.0, $day['project_administration']);
-        $this->assertRoundedMoneyEquals(65.0, $day['total_income']);
+        $this->assertRoundedMoneyEquals(-25.0, $day['total_income']);
         $this->assertRoundedMoneyEquals(40.0, $day['total_administrative_percentage']);
 
         $entry->forceFill(['administrative_fee' => 90])->save();
@@ -306,11 +305,11 @@ class AdministrativeFundApiTest extends TestCase
         $day11 = $this->findDay($data, '2026-08-11');
 
         $this->assertRoundedMoneyEquals(100.0, $day10['project_administration']);
-        $this->assertRoundedMoneyEquals(100.0, $day10['total_income']);
+        $this->assertRoundedMoneyEquals(-100.0, $day10['total_income']);
         $this->assertRoundedMoneyEquals(60.0, $day11['project_administration']);
         $this->assertRoundedMoneyEquals(0.0, $day11['total_income']);
         $this->assertRoundedMoneyEquals(60.0, $data['summary']['project_administration']);
-        $this->assertRoundedMoneyEquals(100.0, $data['summary']['total_income']);
+        $this->assertRoundedMoneyEquals(-100.0, $data['summary']['total_income']);
     }
 
     public function test_month_summary_project_administration_is_month_end_tip_not_sum_of_daily_tips(): void
@@ -340,7 +339,7 @@ class AdministrativeFundApiTest extends TestCase
         $this->assertRoundedMoneyEquals(45.0, $this->findDay($data, '2026-08-31')['project_administration']);
         $this->assertRoundedMoneyEquals(45.0, $data['summary']['project_administration']);
         $this->assertRoundedMoneyEquals(45.0, $data['totals']['project_administration']);
-        $this->assertRoundedMoneyEquals(100.0, $data['summary']['total_income']);
+        $this->assertRoundedMoneyEquals(-100.0, $data['summary']['total_income']);
     }
 
     private function assertMoneyEquals(float $expected, string|float|null $actual): void
@@ -404,13 +403,13 @@ class AdministrativeFundApiTest extends TestCase
         $this->assertRoundedMoneyEquals(100.0, $day['total_administrative_percentage']);
         $this->assertSame('25.50', $day['individual_contributions']);
         $this->assertSame('10.00', $day['asset_administration']);
-        $this->assertRoundedMoneyEquals(25.5, $day['total_income']);
+        $this->assertRoundedMoneyEquals(74.5, $day['total_income']);
         $this->assertRoundedMoneyEquals(10.0, $day['total_expenses']);
-        $this->assertRoundedMoneyEquals(15.5, $day['net']);
+        $this->assertRoundedMoneyEquals(64.5, $day['net']);
         $this->assertSame('test note', $day['notes']);
-        $this->assertRoundedMoneyEquals(25.5, $data['summary']['total_income']);
+        $this->assertRoundedMoneyEquals(74.5, $data['summary']['total_income']);
         $this->assertRoundedMoneyEquals(10.0, $data['summary']['total_expenses']);
-        $this->assertRoundedMoneyEquals(15.5, $data['summary']['administrative_net']);
+        $this->assertRoundedMoneyEquals(64.5, $data['summary']['administrative_net']);
         $this->assertRoundedMoneyEquals(100.0, $data['summary']['total_administrative_percentage']);
     }
 
@@ -515,8 +514,8 @@ class AdministrativeFundApiTest extends TestCase
         $this->assertMoneyEquals($sumAdministrativePercentage, $data['totals']['total_administrative_percentage']);
         $this->assertSame($data['summary']['administrative_net'], $data['totals']['net']);
 
-        // The day's administrative percentage (fee 40) must not have leaked into income.
+        // fee 40 − individual 10 = 30 (percentage is the base of total_income).
         $this->assertMoneyEquals(40.0, $data['totals']['total_administrative_percentage']);
-        $this->assertMoneyEquals(10.0, $data['totals']['total_income']);
+        $this->assertMoneyEquals(30.0, $data['totals']['total_income']);
     }
 }

@@ -153,13 +153,20 @@ Rules:
 Administrative Fund:
 
 - Daily **`project_administration`** (إداري المشروعات) = `SUM(outstanding_project_administration)` for entries on that date (outstanding tip).
-- Daily **income** from this source uses `SUM(uncovered_administrative_expense)` only (new transfers), so settlement does not double-count or reverse income.
-- Month **summary / totals `project_administration`** = org tip as of month-end (latest tip per project with `journal_date ≤` last day), not the sum of daily tips.
+- Daily **`total_administrative_percentage`** (وارد النسبة الإدارية) = `SUM(administrative_fee)`.
+- Daily **`total_income`** (إجمالي إداري الصناديق) uses the day's **new uncovered transfers** (`SUM(uncovered_administrative_expense)`), not the outstanding tip, so settlement/carry is not subtracted again on later days:
 
-Separately, per day `SUM(administrative_fee)` across all projects feeds Administrative Fund
-**`total_administrative_percentage`** (إجمالي النسبة الإدارية). That column is display-only: it is never
-added to `project_administration`, never substituted for it, and never enters the Administrative Fund's
-`total_income` / `net`, so the same amount cannot be counted twice.
+```
+total_income =
+  total_administrative_percentage
+  − (uncovered_administrative_expense + cash_fund_contributions + individual_contributions)
+  + debt_recovery
+
+net = total_income − total_expenses
+```
+
+- Month **summary / totals `project_administration`** = org tip as of month-end (latest tip per project with `journal_date ≤` last day), not the sum of daily tips.
+- Summary `total_income` / `net` are **sums of daily rows**, not the formula reapplied on summary columns.
 
 ### 6. Administrative Debt (Case 1 — same-day admin percentage for deficit only)
 
@@ -374,4 +381,4 @@ repay(40, 0, 100) → (0, 0, 60)
 repay(30, 20, 50) → (0, 0, 20)  // today first, then accumulated
 ```
 
-When implementing, changing, or reviewing Daily Journal logic, preserve this exact order, these formulas, and these validations. Do not auto-repay debt on save. Do not use administrative fee to cover administrative expense or to settle prior outstanding tip. Uncovered administrative expense becomes a per-project outstanding tip (`outstanding_project_administration`) that Administrative Fund shows as `project_administration`; new daily transfers (`uncovered_administrative_expense`) feed Admin Fund income only once. The day's total administrative percentage flows to the display-only `total_administrative_percentage` column only — never merge the two or let either reach administrative income twice. Cover today's expense before settling prior tip. Case 1 uses same-day full admin fee for deficit only; unused fee does not carry forward. Contribution requires a Pass-1 fund deficit; re-saves must not compound. Do not recalculate fee/op/admin expense on Pass 2. After recalculating a date, recalculate later journal dates in order.
+When implementing, changing, or reviewing Daily Journal logic, preserve this exact order, these formulas, and these validations. Do not auto-repay debt on save. Do not use administrative fee to cover administrative expense or to settle prior outstanding tip. Uncovered administrative expense becomes a per-project outstanding tip (`outstanding_project_administration`) that Administrative Fund shows as `project_administration`; new daily transfers (`uncovered_administrative_expense`) are subtracted once in Administrative Fund `total_income`. The day's `total_administrative_percentage` is the base of that `total_income` formula — do not substitute the outstanding tip for the daily uncovered transfer. Cover today's expense before settling prior tip. Case 1 uses same-day full admin fee for deficit only; unused fee does not carry forward. Contribution requires a Pass-1 fund deficit; re-saves must not compound. Do not recalculate fee/op/admin expense on Pass 2. After recalculating a date, recalculate later journal dates in order.
