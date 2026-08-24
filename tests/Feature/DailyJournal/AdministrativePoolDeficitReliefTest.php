@@ -81,8 +81,10 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
         $this->assertEqualsWithDelta(400.0, (float) $beneficiaryEntry->administrative_debt, 0.001);
         $this->assertEqualsWithDelta(0.0, (float) $beneficiaryEntry->fund_balance, 0.001);
         $this->assertEqualsWithDelta(200.0, (float) $beneficiaryEntry->administrative_pool_relief, 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $beneficiaryEntry->administrative_pool_relief_given, 0.001);
         $this->assertEqualsWithDelta(400.0, (float) $beneficiaryEntry->accumulated_administrative_debt, 0.001);
         $this->assertEqualsWithDelta(0.0, (float) $sourceEntry->administrative_pool_relief, 0.001);
+        $this->assertEqualsWithDelta(200.0, (float) $sourceEntry->administrative_pool_relief_given, 0.001);
         $this->assertEqualsWithDelta(4200.0, (float) $sourceEntry->fund_balance, 0.001);
 
         $allocations = AdminPercentagePoolReliefAllocation::query()->forDate(self::DATE)->get();
@@ -112,6 +114,8 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
 
         $this->assertEqualsWithDelta(-700.0, (float) $beneficiaryEntry->fund_balance, 0.001);
         $this->assertEqualsWithDelta(300.0, (float) $beneficiaryEntry->administrative_pool_relief, 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $beneficiaryEntry->administrative_pool_relief_given, 0.001);
+        $this->assertEqualsWithDelta(300.0, (float) $sourceEntry->administrative_pool_relief_given, 0.001);
         $this->assertEqualsWithDelta(900.0, (float) $sourceEntry->fund_balance, 0.001);
 
         $allocations = AdminPercentagePoolReliefAllocation::query()->forDate(self::DATE)->get();
@@ -170,8 +174,17 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
 
         // Source B: fund_balance 1500-300=1200, fully drawn -> 900. Source C: fund_balance 2500-500=2000,
         // only 400 of its 500 capacity drawn -> 1600.
-        $this->assertEqualsWithDelta(900.0, (float) $this->entryFor($sourceB->id)->fund_balance, 0.001);
-        $this->assertEqualsWithDelta(1600.0, (float) $this->entryFor($sourceC->id)->fund_balance, 0.001);
+        $sourceBEntry = $this->entryFor($sourceB->id);
+        $sourceCEntry = $this->entryFor($sourceC->id);
+        $this->assertEqualsWithDelta(900.0, (float) $sourceBEntry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(300.0, (float) $sourceBEntry->administrative_pool_relief_given, 0.001);
+        $this->assertEqualsWithDelta(1600.0, (float) $sourceCEntry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(400.0, (float) $sourceCEntry->administrative_pool_relief_given, 0.001);
+        // Zero-sum: total given == total received for the day.
+        $beneficiaryEntry = $this->entryFor($beneficiary->id);
+        $this->assertEqualsWithDelta(0.0, (float) $beneficiaryEntry->administrative_pool_relief_given, 0.001);
+        $totalGiven = (float) $sourceBEntry->administrative_pool_relief_given + (float) $sourceCEntry->administrative_pool_relief_given;
+        $this->assertEqualsWithDelta((float) $beneficiaryEntry->administrative_pool_relief, $totalGiven, 0.001);
     }
 
     /** 5 & 6. Multiple deficit beneficiaries sharing one pool: total relief never exceeds the pool,
@@ -265,10 +278,13 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
 
         $beneficiaryEntry = $this->entryFor($beneficiary->id);
         $this->assertEqualsWithDelta(200.0, (float) $beneficiaryEntry->administrative_pool_relief, 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $beneficiaryEntry->administrative_pool_relief_given, 0.001);
         $this->assertEqualsWithDelta(0.0, (float) $beneficiaryEntry->fund_balance, 0.001);
 
         // Re-saving must not double-draw the source either: still exactly one draw of 200, not 400.
-        $this->assertEqualsWithDelta(4200.0, (float) $this->entryFor($source->id)->fund_balance, 0.001);
+        $sourceEntry = $this->entryFor($source->id);
+        $this->assertEqualsWithDelta(4200.0, (float) $sourceEntry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(200.0, (float) $sourceEntry->administrative_pool_relief_given, 0.001);
     }
 
     /** 9 & 10. Editing a source's income later rebuilds the allocation history, not appends to it. */
@@ -298,10 +314,13 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
 
         $beneficiaryEntry = $this->entryFor($beneficiary->id);
         $this->assertEqualsWithDelta(120.0, (float) $beneficiaryEntry->administrative_pool_relief, 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $beneficiaryEntry->administrative_pool_relief_given, 0.001);
         $this->assertEqualsWithDelta(-80.0, (float) $beneficiaryEntry->fund_balance, 0.001);
 
         // Source: income now 1000, fee 120 (12%); fund_balance 1000-120=880, fully drawn -> 760.
-        $this->assertEqualsWithDelta(760.0, (float) $this->entryFor($source->id)->fund_balance, 0.001);
+        $sourceEntry = $this->entryFor($source->id);
+        $this->assertEqualsWithDelta(760.0, (float) $sourceEntry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(120.0, (float) $sourceEntry->administrative_pool_relief_given, 0.001);
     }
 
     /**

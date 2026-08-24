@@ -319,6 +319,7 @@ class DailyJournalCalculationService
 
             $sourceCapacity[$entry->project_id] = $remainingFee;
             $entry->administrative_pool_relief = 0.0;
+            $entry->administrative_pool_relief_given = 0.0;
         }
 
         $beneficiaries = $entries
@@ -363,6 +364,10 @@ class DailyJournalCalculationService
                 );
 
                 $source->fund_balance = round((float) $source->fund_balance - $used, 2);
+                $source->administrative_pool_relief_given = round(
+                    (float) $source->administrative_pool_relief_given + $used,
+                    2
+                );
 
                 $allocations[] = [
                     'source_project_id' => $source->project_id,

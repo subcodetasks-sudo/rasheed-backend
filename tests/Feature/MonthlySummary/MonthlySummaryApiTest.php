@@ -96,7 +96,7 @@ class MonthlySummaryApiTest extends TestCase
         $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertForbidden();
     }
 
-    public function test_show_returns_card_fields_using_monthly_total(): void
+    public function test_show_returns_card_fields_using_fund_balance_tip(): void
     {
         $this->actAs('finance');
         $category = Category::factory()->create(['name' => 'إطعام']);
@@ -113,6 +113,8 @@ class MonthlySummaryApiTest extends TestCase
             'contribution' => 0,
             'daily_expense' => 200,
             'accumulated_administrative_debt' => 40,
+            // Distinct from monthly_total (800) so the card is proven to use صافي الصندوق.
+            'fund_balance' => 650,
         ]);
 
         $data = $this->getJson(self::ENDPOINT.'?month=7&year=2026')
@@ -122,15 +124,14 @@ class MonthlySummaryApiTest extends TestCase
 
         $row = $this->findProject($data, $project->id);
 
-        // Exempt → collected admin 0; monthly_total = 1000 − 0 − 0 − 200 = 800
         $this->assertSame('مشروع أ', $row['project_name']);
         $this->assertSame('إطعام', $row['project_type']);
         $this->assertSame('exempt', $row['project_status']);
-        $this->assertSame('800.00', $row['project_net_result']);
+        $this->assertSame('650', $row['project_net_result']);
         $this->assertSame('surplus', $row['net_result_state']);
-        $this->assertSame('40.00', $row['administrative_debt']);
-        $this->assertSame('0.00', $row['total_received_contributions']);
-        $this->assertSame('0.00', $row['total_deducted_contributions']);
+        $this->assertSame('40', $row['administrative_debt']);
+        $this->assertSame('0', $row['total_received_contributions']);
+        $this->assertSame('0', $row['total_deducted_contributions']);
         $this->assertArrayNotHasKey('net_cash_fund', $row);
         $this->assertArrayNotHasKey('available_surplus', $row);
     }
@@ -147,6 +148,7 @@ class MonthlySummaryApiTest extends TestCase
 
         $this->seedEntry($project->id, '2026-07-10', [
             'daily_expense' => 0.07,
+            'fund_balance' => -0.07,
         ]);
 
         $data = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
@@ -166,11 +168,13 @@ class MonthlySummaryApiTest extends TestCase
         $this->seedEntry($from->id, '2026-07-12', [
             'daily_income' => 1000,
             'daily_expense' => 0,
+            'fund_balance' => 1000,
         ]);
         $this->seedEntry($to->id, '2026-07-12', [
             'daily_income' => 0,
             'daily_expense' => 400,
             'accumulated_administrative_debt' => 0,
+            'fund_balance' => -400,
         ]);
 
         $contributors = $this->getJson(self::ENDPOINT.'/contributor-options?month=7&year=2026')
@@ -196,23 +200,23 @@ class MonthlySummaryApiTest extends TestCase
             ->assertJsonPath('message', __('messages.monthly_summary_contribution_created_successfully'))
             ->json('data');
 
-        $this->assertSame('300.00', $this->findProject($created, $to->id)['total_received_contributions']);
-        $this->assertSame('0.00', $this->findProject($created, $to->id)['total_deducted_contributions']);
-        $this->assertSame('300.00', $this->findProject($created, $from->id)['total_deducted_contributions']);
-        $this->assertSame('0.00', $this->findProject($created, $from->id)['total_received_contributions']);
-        // Net result remains monthly_total (unaffected by contribution)
-        $this->assertSame('1000.00', $this->findProject($created, $from->id)['project_net_result']);
-        $this->assertSame('-400.00', $this->findProject($created, $to->id)['project_net_result']);
+        $this->assertSame('300', $this->findProject($created, $to->id)['total_received_contributions']);
+        $this->assertSame('0', $this->findProject($created, $to->id)['total_deducted_contributions']);
+        $this->assertSame('300', $this->findProject($created, $from->id)['total_deducted_contributions']);
+        $this->assertSame('0', $this->findProject($created, $from->id)['total_received_contributions']);
+        // Contributor journal tip is unchanged; beneficiary tip receives the injection.
+        $this->assertSame('1000', $this->findProject($created, $from->id)['project_net_result']);
+        $this->assertSame('-100', $this->findProject($created, $to->id)['project_net_result']);
         $this->assertCount(1, $created['contributions']);
 
         $fromCs = $this->cashStationProject(7, 2026, $from->id);
         $toCs = $this->cashStationProject(7, 2026, $to->id);
-        $this->assertSame('300.00', $fromCs['deducted_contribution']);
-        $this->assertSame('700.00', $fromCs['net_cash_fund']);
-        $this->assertSame('300.00', $toCs['added_contribution']);
-        $this->assertSame('-100.00', $toCs['net_cash_fund']);
-        $this->assertSame('1000.00', $fromCs['monthly_total']);
-        $this->assertSame('-400.00', $toCs['monthly_total']);
+        $this->assertSame('300', $fromCs['deducted_contribution']);
+        $this->assertSame('700', $fromCs['net_cash_fund']);
+        $this->assertSame('300', $toCs['added_contribution']);
+        $this->assertSame('-100', $toCs['net_cash_fund']);
+        $this->assertSame('1000', $fromCs['monthly_total']);
+        $this->assertSame('-400', $toCs['monthly_total']);
 
         $settlementId = $created['contributions'][0]['id'];
 
@@ -220,12 +224,12 @@ class MonthlySummaryApiTest extends TestCase
             ->assertOk()
             ->json('data');
 
-        $this->assertSame('0.00', $this->findProject($afterCancel, $to->id)['total_received_contributions']);
-        $this->assertSame('0.00', $this->findProject($afterCancel, $from->id)['total_deducted_contributions']);
+        $this->assertSame('0', $this->findProject($afterCancel, $to->id)['total_received_contributions']);
+        $this->assertSame('0', $this->findProject($afterCancel, $from->id)['total_deducted_contributions']);
         $this->assertSame([], $afterCancel['contributions']);
 
-        $this->assertSame('1000.00', $this->cashStationProject(7, 2026, $from->id)['net_cash_fund']);
-        $this->assertSame('-400.00', $this->cashStationProject(7, 2026, $to->id)['net_cash_fund']);
+        $this->assertSame('1000', $this->cashStationProject(7, 2026, $from->id)['net_cash_fund']);
+        $this->assertSame('-400', $this->cashStationProject(7, 2026, $to->id)['net_cash_fund']);
 
         $this->deleteJson(self::ENDPOINT.'/contributions/'.$settlementId)
             ->assertNotFound();
@@ -241,12 +245,14 @@ class MonthlySummaryApiTest extends TestCase
         $this->seedEntry($from->id, '2026-07-12', [
             'daily_income' => 800,
             'daily_expense' => 0,
+            'fund_balance' => 800,
         ]);
         $this->seedEntry($to->id, '2026-07-12', [
             'daily_income' => 100,
             'daily_expense' => 0,
             'administrative_debt' => 50,
             'accumulated_administrative_debt' => 120,
+            'fund_balance' => 100,
         ]);
 
         $data = $this->postJson(self::ENDPOINT.'/contributions', [
@@ -258,21 +264,20 @@ class MonthlySummaryApiTest extends TestCase
             'amount' => 80,
         ])->assertCreated()->json('data');
 
-        $this->assertSame('40.00', $this->findProject($data, $to->id)['administrative_debt']);
-        $this->assertSame('80.00', $this->findProject($data, $to->id)['total_received_contributions']);
-        $this->assertSame('80.00', $this->findProject($data, $from->id)['total_deducted_contributions']);
-        $this->assertSame('800.00', $this->findProject($data, $from->id)['project_net_result']);
-        // collected admin = fee − debt + contribution = 0 − 50 + 0 = −50 → monthly_total = 100 − (−50) = 150
-        $this->assertSame('150.00', $this->findProject($data, $to->id)['project_net_result']);
+        $this->assertSame('40', $this->findProject($data, $to->id)['administrative_debt']);
+        $this->assertSame('80', $this->findProject($data, $to->id)['total_received_contributions']);
+        $this->assertSame('80', $this->findProject($data, $from->id)['total_deducted_contributions']);
+        $this->assertSame('800', $this->findProject($data, $from->id)['project_net_result']);
+        $this->assertSame('100', $this->findProject($data, $to->id)['project_net_result']);
 
         $settlementId = $data['contributions'][0]['id'];
         $restored = $this->deleteJson(self::ENDPOINT.'/contributions/'.$settlementId)
             ->assertOk()
             ->json('data');
 
-        $this->assertSame('120.00', $this->findProject($restored, $to->id)['administrative_debt']);
-        $this->assertSame('0.00', $this->findProject($restored, $to->id)['total_received_contributions']);
-        $this->assertSame('0.00', $this->findProject($restored, $from->id)['total_deducted_contributions']);
+        $this->assertSame('120', $this->findProject($restored, $to->id)['administrative_debt']);
+        $this->assertSame('0', $this->findProject($restored, $to->id)['total_received_contributions']);
+        $this->assertSame('0', $this->findProject($restored, $from->id)['total_deducted_contributions']);
     }
 
     public function test_administrative_debt_contribution_deleted_via_cash_station_restores(): void
@@ -302,7 +307,7 @@ class MonthlySummaryApiTest extends TestCase
             'amount' => 80,
         ])->assertCreated()->json('data');
 
-        $this->assertSame('40.00', $this->findProject($created, $to->id)['administrative_debt']);
+        $this->assertSame('40', $this->findProject($created, $to->id)['administrative_debt']);
 
         $settlementId = $created['contributions'][0]['id'];
 
@@ -314,9 +319,9 @@ class MonthlySummaryApiTest extends TestCase
             ->assertOk()
             ->json('data');
 
-        $this->assertSame('120.00', $this->findProject($after, $to->id)['administrative_debt']);
-        $this->assertSame('0.00', $this->findProject($after, $to->id)['total_received_contributions']);
-        $this->assertSame('0.00', $this->findProject($after, $from->id)['total_deducted_contributions']);
+        $this->assertSame('120', $this->findProject($after, $to->id)['administrative_debt']);
+        $this->assertSame('0', $this->findProject($after, $to->id)['total_received_contributions']);
+        $this->assertSame('0', $this->findProject($after, $from->id)['total_deducted_contributions']);
         $this->assertSame([], $after['contributions']);
     }
 
@@ -364,11 +369,11 @@ class MonthlySummaryApiTest extends TestCase
             $project->id,
         );
 
-        $this->assertSame('0.00', $row['project_net_result']);
+        $this->assertSame('0', $row['project_net_result']);
         $this->assertSame('neutral', $row['net_result_state']);
-        $this->assertSame('0.00', $row['administrative_debt']);
-        $this->assertSame('0.00', $row['total_received_contributions']);
-        $this->assertSame('0.00', $row['total_deducted_contributions']);
+        $this->assertSame('0', $row['administrative_debt']);
+        $this->assertSame('0', $row['total_received_contributions']);
+        $this->assertSame('0', $row['total_deducted_contributions']);
     }
 
     public function test_contributor_options_exclude_zero_negative_and_inactive(): void
@@ -393,7 +398,7 @@ class MonthlySummaryApiTest extends TestCase
 
         $byId = collect($options)->keyBy('project_id');
         $this->assertTrue($byId->has($surplus->id));
-        $this->assertSame('400.00', $byId[$surplus->id]['available_surplus']);
+        $this->assertSame('400', $byId[$surplus->id]['available_surplus']);
         $this->assertFalse($byId->has($zero->id));
         $this->assertFalse($byId->has($deficit->id));
         $this->assertFalse($byId->has($inactive->id));
@@ -427,7 +432,7 @@ class MonthlySummaryApiTest extends TestCase
         )->assertOk()->json('data'))->keyBy('project_id');
 
         $this->assertTrue($fundOpts->has($deficitSame->id));
-        $this->assertSame('300.00', $fundOpts[$deficitSame->id]['remaining_need']);
+        $this->assertSame('300', $fundOpts[$deficitSame->id]['remaining_need']);
         $this->assertFalse($fundOpts->has($from->id));
         $this->assertFalse($fundOpts->has($debtSame->id));
         $this->assertFalse($fundOpts->has($neutralSame->id));
@@ -440,7 +445,7 @@ class MonthlySummaryApiTest extends TestCase
         )->assertOk()->json('data'))->keyBy('project_id');
 
         $this->assertTrue($debtOpts->has($debtSame->id));
-        $this->assertSame('75.00', $debtOpts[$debtSame->id]['remaining_need']);
+        $this->assertSame('75', $debtOpts[$debtSame->id]['remaining_need']);
         $this->assertFalse($debtOpts->has($deficitSame->id));
         $this->assertFalse($debtOpts->has($from->id));
         $this->assertFalse($debtOpts->has($deficitOther->id));
@@ -507,8 +512,8 @@ class MonthlySummaryApiTest extends TestCase
         $from = $this->createProject(['category_id' => $category->id]);
         $to = $this->createProject(['category_id' => $category->id]);
 
-        $this->seedEntry($from->id, '2026-07-04', ['daily_income' => 200]);
-        $this->seedEntry($to->id, '2026-07-04', ['daily_expense' => 500]);
+        $this->seedEntry($from->id, '2026-07-04', ['daily_income' => 200, 'fund_balance' => 200]);
+        $this->seedEntry($to->id, '2026-07-04', ['daily_expense' => 500, 'fund_balance' => -500]);
 
         // Exact surplus (capped by surplus < remaining need)
         $exactSurplus = $this->postJson(self::ENDPOINT.'/contributions', [
@@ -520,8 +525,8 @@ class MonthlySummaryApiTest extends TestCase
             'amount' => 200,
         ])->assertCreated()->json('data');
 
-        $this->assertSame('200.00', $this->findProject($exactSurplus, $to->id)['total_received_contributions']);
-        $this->assertSame('-500.00', $this->findProject($exactSurplus, $to->id)['project_net_result']);
+        $this->assertSame('200', $this->findProject($exactSurplus, $to->id)['total_received_contributions']);
+        $this->assertSame('-300', $this->findProject($exactSurplus, $to->id)['project_net_result']);
 
         $settlementId = $exactSurplus['contributions'][0]['id'];
         $this->deleteJson(self::ENDPOINT.'/contributions/'.$settlementId)->assertOk();
@@ -545,9 +550,9 @@ class MonthlySummaryApiTest extends TestCase
             .'&contribution_type='.ContributionType::FundDeficit->value
         )->assertOk()->json('data'))->keyBy('project_id');
 
-        $this->assertSame('350.00', $beneOpts[$to->id]['remaining_need']);
-        $this->assertSame('150.00', $this->findProject($partial, $to->id)['total_received_contributions']);
-        $this->assertSame('-500.00', $this->findProject($partial, $to->id)['project_net_result']);
+        $this->assertSame('350', $beneOpts[$to->id]['remaining_need']);
+        $this->assertSame('150', $this->findProject($partial, $to->id)['total_received_contributions']);
+        $this->assertSame('-350', $this->findProject($partial, $to->id)['project_net_result']);
     }
 
     public function test_exact_administrative_debt_amount_and_partial_remaining_debt(): void
@@ -572,7 +577,7 @@ class MonthlySummaryApiTest extends TestCase
             'amount' => 100,
         ])->assertCreated()->json('data');
 
-        $this->assertSame('0.00', $this->findProject($exact, $to->id)['administrative_debt']);
+        $this->assertSame('0', $this->findProject($exact, $to->id)['administrative_debt']);
 
         $this->deleteJson(self::ENDPOINT.'/contributions/'.$exact['contributions'][0]['id'])->assertOk();
 
@@ -585,7 +590,7 @@ class MonthlySummaryApiTest extends TestCase
             'amount' => 40,
         ])->assertCreated()->json('data');
 
-        $this->assertSame('60.00', $this->findProject($partial, $to->id)['administrative_debt']);
+        $this->assertSame('60', $this->findProject($partial, $to->id)['administrative_debt']);
 
         $debtOpts = collect($this->getJson(
             self::ENDPOINT.'/beneficiary-options?month=7&year=2026'
@@ -593,7 +598,7 @@ class MonthlySummaryApiTest extends TestCase
             .'&contribution_type='.ContributionType::AdministrativeDebt->value
         )->assertOk()->json('data'))->keyBy('project_id');
 
-        $this->assertSame('60.00', $debtOpts[$to->id]['remaining_need']);
+        $this->assertSame('60', $debtOpts[$to->id]['remaining_need']);
     }
 
     public function test_rejects_amount_above_surplus_and_above_remaining_debt(): void
@@ -644,10 +649,11 @@ class MonthlySummaryApiTest extends TestCase
         $from = $this->createProject(['category_id' => $category->id]);
         $to = $this->createProject(['category_id' => $category->id]);
 
-        $this->seedEntry($from->id, '2026-07-09', ['daily_income' => 600]);
+        $this->seedEntry($from->id, '2026-07-09', ['daily_income' => 600, 'fund_balance' => 600]);
         $this->seedEntry($to->id, '2026-07-09', [
             'daily_expense' => 200,
             'accumulated_administrative_debt' => 90,
+            'fund_balance' => -200,
         ]);
 
         $data = $this->postJson(self::ENDPOINT.'/contributions', [
@@ -659,9 +665,9 @@ class MonthlySummaryApiTest extends TestCase
             'amount' => 100,
         ])->assertCreated()->json('data');
 
-        $this->assertSame('90.00', $this->findProject($data, $to->id)['administrative_debt']);
-        $this->assertSame('100.00', $this->findProject($data, $to->id)['total_received_contributions']);
-        $this->assertSame('-200.00', $this->findProject($data, $to->id)['project_net_result']);
+        $this->assertSame('90', $this->findProject($data, $to->id)['administrative_debt']);
+        $this->assertSame('100', $this->findProject($data, $to->id)['total_received_contributions']);
+        $this->assertSame('-100', $this->findProject($data, $to->id)['project_net_result']);
     }
 
     public function test_multiple_contributions_and_cancel_isolation(): void
@@ -672,9 +678,9 @@ class MonthlySummaryApiTest extends TestCase
         $fromB = $this->createProject(['name' => 'ب', 'category_id' => $category->id]);
         $to = $this->createProject(['name' => 'مستفيد', 'category_id' => $category->id]);
 
-        $this->seedEntry($fromA->id, '2026-07-11', ['daily_income' => 300]);
-        $this->seedEntry($fromB->id, '2026-07-11', ['daily_income' => 400]);
-        $this->seedEntry($to->id, '2026-07-11', ['daily_expense' => 500]);
+        $this->seedEntry($fromA->id, '2026-07-11', ['daily_income' => 300, 'fund_balance' => 300]);
+        $this->seedEntry($fromB->id, '2026-07-11', ['daily_income' => 400, 'fund_balance' => 400]);
+        $this->seedEntry($to->id, '2026-07-11', ['daily_expense' => 500, 'fund_balance' => -500]);
 
         $first = $this->postJson(self::ENDPOINT.'/contributions', [
             'month' => 7,
@@ -695,10 +701,10 @@ class MonthlySummaryApiTest extends TestCase
         ])->assertCreated()->json('data');
 
         $this->assertCount(2, $second['contributions']);
-        $this->assertSame('250.00', $this->findProject($second, $to->id)['total_received_contributions']);
-        $this->assertSame('100.00', $this->findProject($second, $fromA->id)['total_deducted_contributions']);
-        $this->assertSame('150.00', $this->findProject($second, $fromB->id)['total_deducted_contributions']);
-        $this->assertSame('-500.00', $this->findProject($second, $to->id)['project_net_result']);
+        $this->assertSame('250', $this->findProject($second, $to->id)['total_received_contributions']);
+        $this->assertSame('100', $this->findProject($second, $fromA->id)['total_deducted_contributions']);
+        $this->assertSame('150', $this->findProject($second, $fromB->id)['total_deducted_contributions']);
+        $this->assertSame('-250', $this->findProject($second, $to->id)['project_net_result']);
 
         $firstId = $first['contributions'][0]['id'];
         $secondId = collect($second['contributions'])->firstWhere('from_project_id', $fromB->id)['id'];
@@ -709,14 +715,14 @@ class MonthlySummaryApiTest extends TestCase
 
         $this->assertCount(1, $afterCancelFirst['contributions']);
         $this->assertSame($secondId, $afterCancelFirst['contributions'][0]['id']);
-        $this->assertSame('150.00', $this->findProject($afterCancelFirst, $to->id)['total_received_contributions']);
-        $this->assertSame('0.00', $this->findProject($afterCancelFirst, $fromA->id)['total_deducted_contributions']);
-        $this->assertSame('150.00', $this->findProject($afterCancelFirst, $fromB->id)['total_deducted_contributions']);
+        $this->assertSame('150', $this->findProject($afterCancelFirst, $to->id)['total_received_contributions']);
+        $this->assertSame('0', $this->findProject($afterCancelFirst, $fromA->id)['total_deducted_contributions']);
+        $this->assertSame('150', $this->findProject($afterCancelFirst, $fromB->id)['total_deducted_contributions']);
 
         $toCs = $this->cashStationProject(7, 2026, $to->id);
-        $this->assertSame('150.00', $toCs['added_contribution']);
-        $this->assertSame('-350.00', $toCs['net_cash_fund']);
-        $this->assertSame('-500.00', $toCs['monthly_total']);
+        $this->assertSame('150', $toCs['added_contribution']);
+        $this->assertSame('-350', $toCs['net_cash_fund']);
+        $this->assertSame('-500', $toCs['monthly_total']);
     }
 
     public function test_contribution_broadcasts_ads_and_daily_journal_updated(): void

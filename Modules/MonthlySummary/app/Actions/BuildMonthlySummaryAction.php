@@ -8,17 +8,19 @@ use Illuminate\Support\Collection;
 use Modules\CashStation\Actions\BuildCashStationAction;
 use Modules\CashStation\Models\CashStationMonthCarry;
 use Modules\CashStation\Models\CashStationSettlement;
+use Modules\DailyJournal\Actions\ReadFundBalanceTipAction;
 use Modules\Project\Models\Project;
 
 class BuildMonthlySummaryAction
 {
     public function __construct(
         private readonly BuildCashStationAction $buildCashStationAction,
+        private readonly ReadFundBalanceTipAction $readFundBalanceTipAction,
     ) {}
 
     public function execute(int $month, int $year): array
     {
-        [$start, $end, $calculationDate] = $this->calculationWindow($month, $year);
+        [, $end, $calculationDate] = $this->calculationWindow($month, $year);
 
         $startOfMonth = Carbon::create($year, $month, 1)->startOfDay();
         $previousMonth = $startOfMonth->copy()->subMonthNoOverflow();
@@ -38,21 +40,14 @@ class BuildMonthlySummaryAction
 
         $projectIds = $projects->pluck('id')->all();
 
-        $aggregates = $this->buildCashStationAction->monthlyAggregatesByProject(
-            $projectIds,
-            $start,
-            $end,
-        );
-
+        $fundBalances = $this->readFundBalanceTipAction->execute($projectIds, $end);
         $debts = $this->buildCashStationAction->administrativeDebtsByProject($projectIds, $end);
         $settlements = $this->buildCashStationAction->settlementsForMonth($year, $month);
         $contributions = $this->buildCashStationAction->contributionsByProject($settlements);
 
         $projectRows = [];
         foreach ($projects as $project) {
-            $monthlyTotal = $this->buildCashStationAction->monthlyTotalFromAggregate(
-                $aggregates[$project->id] ?? null
-            );
+            $fundBalance = (float) ($fundBalances[$project->id] ?? 0);
             $added = (float) ($contributions[$project->id]['added'] ?? 0);
             $deducted = (float) ($contributions[$project->id]['deducted'] ?? 0);
             $debt = (float) ($debts[$project->id] ?? 0);
@@ -64,8 +59,8 @@ class BuildMonthlySummaryAction
                 'project_status' => $project->administrative_exempt
                     ? 'exempt'
                     : 'subject',
-                'project_net_result' => FormatMoneyDecimal::formatRounded($monthlyTotal),
-                'net_result_state' => $this->netResultState($monthlyTotal),
+                'project_net_result' => FormatMoneyDecimal::formatRounded($fundBalance),
+                'net_result_state' => $this->netResultState($fundBalance),
                 'administrative_debt' => FormatMoneyDecimal::formatRounded($debt),
                 'total_received_contributions' => FormatMoneyDecimal::formatRounded($added),
                 'total_deducted_contributions' => FormatMoneyDecimal::formatRounded($deducted),
@@ -114,9 +109,9 @@ class BuildMonthlySummaryAction
      * "0" is reported as neutral rather than a surplus/deficit label the shown number
      * doesn't visibly support.
      */
-    private function netResultState(float $monthlyTotal): string
+    private function netResultState(float $fundBalance): string
     {
-        $displayed = round($monthlyTotal);
+        $displayed = round($fundBalance);
 
         if ($displayed > 0) {
             return 'surplus';

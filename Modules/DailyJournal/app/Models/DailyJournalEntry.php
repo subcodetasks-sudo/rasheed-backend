@@ -30,6 +30,7 @@ class DailyJournalEntry extends Model
         'administrative_debt',
         'accumulated_administrative_debt',
         'administrative_pool_relief',
+        'administrative_pool_relief_given',
         'created_by',
         'updated_by',
     ];
@@ -52,6 +53,7 @@ class DailyJournalEntry extends Model
             'administrative_debt' => 'decimal:2',
             'accumulated_administrative_debt' => 'decimal:2',
             'administrative_pool_relief' => 'decimal:2',
+            'administrative_pool_relief_given' => 'decimal:2',
         ];
     }
 
