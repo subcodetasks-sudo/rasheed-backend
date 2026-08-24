@@ -320,6 +320,7 @@ class DailyJournalCalculationService
             $sourceCapacity[$entry->project_id] = $remainingFee;
             $entry->administrative_pool_relief = 0.0;
             $entry->administrative_pool_relief_given = 0.0;
+            $entry->administrative_fee_remaining = 0.0;
         }
 
         $beneficiaries = $entries
@@ -376,6 +377,13 @@ class DailyJournalCalculationService
                     'amount' => $used,
                 ];
             }
+        }
+
+        foreach ($entries as $entry) {
+            $entry->administrative_fee_remaining = round(
+                max(0, (float) ($sourceCapacity[$entry->project_id] ?? 0)),
+                2
+            );
         }
 
         return ['entries' => $entries, 'allocations' => $allocations];

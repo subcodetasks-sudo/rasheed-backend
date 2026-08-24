@@ -85,6 +85,8 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
         $this->assertEqualsWithDelta(400.0, (float) $beneficiaryEntry->accumulated_administrative_debt, 0.001);
         $this->assertEqualsWithDelta(0.0, (float) $sourceEntry->administrative_pool_relief, 0.001);
         $this->assertEqualsWithDelta(200.0, (float) $sourceEntry->administrative_pool_relief_given, 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $beneficiaryEntry->administrative_fee_remaining, 0.001);
+        $this->assertEqualsWithDelta(400.0, (float) $sourceEntry->administrative_fee_remaining, 0.001);
         $this->assertEqualsWithDelta(4200.0, (float) $sourceEntry->fund_balance, 0.001);
 
         $allocations = AdminPercentagePoolReliefAllocation::query()->forDate(self::DATE)->get();
@@ -116,6 +118,8 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
         $this->assertEqualsWithDelta(300.0, (float) $beneficiaryEntry->administrative_pool_relief, 0.001);
         $this->assertEqualsWithDelta(0.0, (float) $beneficiaryEntry->administrative_pool_relief_given, 0.001);
         $this->assertEqualsWithDelta(300.0, (float) $sourceEntry->administrative_pool_relief_given, 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $beneficiaryEntry->administrative_fee_remaining, 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $sourceEntry->administrative_fee_remaining, 0.001);
         $this->assertEqualsWithDelta(900.0, (float) $sourceEntry->fund_balance, 0.001);
 
         $allocations = AdminPercentagePoolReliefAllocation::query()->forDate(self::DATE)->get();
@@ -180,6 +184,8 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
         $this->assertEqualsWithDelta(300.0, (float) $sourceBEntry->administrative_pool_relief_given, 0.001);
         $this->assertEqualsWithDelta(1600.0, (float) $sourceCEntry->fund_balance, 0.001);
         $this->assertEqualsWithDelta(400.0, (float) $sourceCEntry->administrative_pool_relief_given, 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $sourceBEntry->administrative_fee_remaining, 0.001);
+        $this->assertEqualsWithDelta(100.0, (float) $sourceCEntry->administrative_fee_remaining, 0.001);
         // Zero-sum: total given == total received for the day.
         $beneficiaryEntry = $this->entryFor($beneficiary->id);
         $this->assertEqualsWithDelta(0.0, (float) $beneficiaryEntry->administrative_pool_relief_given, 0.001);

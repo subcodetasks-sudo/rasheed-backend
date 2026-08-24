@@ -5,6 +5,7 @@ namespace Tests\Feature\OperationalRate;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Modules\DailyJournal\Models\DailyJournalEntry;
+use Modules\OperationalFund\Models\OperationalFundDay;
 use Modules\Project\Enums\OperationalDeductionType;
 use Modules\Project\Enums\ProjectStatus;
 use Modules\Project\Models\Project;
@@ -97,19 +98,25 @@ class OperationalRateApiTest extends TestCase
         $response = $this->getJson(self::ENDPOINT.'?month=8&year=2026');
         $response->assertOk()
             ->assertJsonCount(31, 'data.daily_records')
-            ->assertJsonPath('data.summary.relative_operational_deduction', '0.00')
-            ->assertJsonPath('data.summary.fixed_operational_deduction', '0.00')
-            ->assertJsonPath('data.summary.total_operational_deduction', '0.00')
-            ->assertJsonPath('data.monthly_totals.total_income', '0.00')
-            ->assertJsonPath('data.monthly_totals.total_operational_deduction', '0.00')
-            ->assertJsonPath('data.monthly_totals.total_administrative_percentage', '0.00');
+            ->assertJsonPath('data.summary.relative_operational_deduction', '0')
+            ->assertJsonPath('data.summary.fixed_operational_deduction', '0')
+            ->assertJsonPath('data.summary.total_operational_deduction', '0')
+            ->assertJsonPath('data.summary.total_operational_expense', '0')
+            ->assertJsonPath('data.summary.total_operational_net', '0')
+            ->assertJsonPath('data.monthly_totals.total_income', '0')
+            ->assertJsonPath('data.monthly_totals.total_operational_deduction', '0')
+            ->assertJsonPath('data.monthly_totals.total_operational_expense', '0')
+            ->assertJsonPath('data.monthly_totals.total_operational_net', '0')
+            ->assertJsonPath('data.monthly_totals.total_administrative_percentage', '0');
 
         $day1 = $response->json('data.daily_records.0');
         $this->assertSame('2026-08-01', $day1['date']);
         $this->assertArrayHasKey('day_name', $day1);
-        $this->assertSame('0.00', $day1['total_income']);
-        $this->assertSame('0.00', $day1['operational_deduction']);
-        $this->assertSame('0.00', $day1['administrative_percentage']);
+        $this->assertSame('0', $day1['total_income']);
+        $this->assertSame('0', $day1['operational_deduction']);
+        $this->assertSame('0', $day1['operational_expense']);
+        $this->assertSame('0', $day1['operational_net']);
+        $this->assertSame('0', $day1['administrative_percentage']);
     }
 
     public function test_relative_only_projects(): void
@@ -129,14 +136,14 @@ class OperationalRateApiTest extends TestCase
 
         $response = $this->getJson(self::ENDPOINT.'?month=8&year=2026');
         $response->assertOk()
-            ->assertJsonPath('data.summary.relative_operational_deduction', '540.50')
-            ->assertJsonPath('data.summary.fixed_operational_deduction', '0.00')
-            ->assertJsonPath('data.summary.total_operational_deduction', '540.50');
+            ->assertJsonPath('data.summary.relative_operational_deduction', '541')
+            ->assertJsonPath('data.summary.fixed_operational_deduction', '0')
+            ->assertJsonPath('data.summary.total_operational_deduction', '541');
 
         $day = collect($response->json('data.daily_records'))->firstWhere('date', '2026-08-05');
-        $this->assertSame('1000.00', $day['total_income']);
-        $this->assertSame('540.50', $day['operational_deduction']);
-        $this->assertSame('100.00', $day['administrative_percentage']);
+        $this->assertSame('1000', $day['total_income']);
+        $this->assertSame('541', $day['operational_deduction']);
+        $this->assertSame('100', $day['administrative_percentage']);
     }
 
     public function test_fixed_only_projects(): void
@@ -156,13 +163,13 @@ class OperationalRateApiTest extends TestCase
 
         $response = $this->getJson(self::ENDPOINT.'?month=8&year=2026');
         $response->assertOk()
-            ->assertJsonPath('data.summary.relative_operational_deduction', '0.00')
-            ->assertJsonPath('data.summary.fixed_operational_deduction', '200.00')
-            ->assertJsonPath('data.summary.total_operational_deduction', '200.00');
+            ->assertJsonPath('data.summary.relative_operational_deduction', '0')
+            ->assertJsonPath('data.summary.fixed_operational_deduction', '200')
+            ->assertJsonPath('data.summary.total_operational_deduction', '200');
 
         $day = collect($response->json('data.daily_records'))->firstWhere('date', '2026-08-05');
-        $this->assertSame('0.00', $day['total_income']);
-        $this->assertSame('200.00', $day['operational_deduction']);
+        $this->assertSame('0', $day['total_income']);
+        $this->assertSame('200', $day['operational_deduction']);
     }
 
     public function test_mixed_deduction_types(): void
@@ -190,17 +197,17 @@ class OperationalRateApiTest extends TestCase
 
         $response = $this->getJson(self::ENDPOINT.'?month=8&year=2026');
         $response->assertOk()
-            ->assertJsonPath('data.summary.relative_operational_deduction', '300.00')
-            ->assertJsonPath('data.summary.fixed_operational_deduction', '150.00')
-            ->assertJsonPath('data.summary.total_operational_deduction', '450.00')
-            ->assertJsonPath('data.monthly_totals.total_income', '1000.00')
-            ->assertJsonPath('data.monthly_totals.total_operational_deduction', '450.00')
-            ->assertJsonPath('data.monthly_totals.total_administrative_percentage', '120.00');
+            ->assertJsonPath('data.summary.relative_operational_deduction', '300')
+            ->assertJsonPath('data.summary.fixed_operational_deduction', '150')
+            ->assertJsonPath('data.summary.total_operational_deduction', '450')
+            ->assertJsonPath('data.monthly_totals.total_income', '1000')
+            ->assertJsonPath('data.monthly_totals.total_operational_deduction', '450')
+            ->assertJsonPath('data.monthly_totals.total_administrative_percentage', '120');
 
         $day = collect($response->json('data.daily_records'))->firstWhere('date', '2026-08-10');
-        $this->assertSame('1000.00', $day['total_income']);
-        $this->assertSame('450.00', $day['operational_deduction']);
-        $this->assertSame('120.00', $day['administrative_percentage']);
+        $this->assertSame('1000', $day['total_income']);
+        $this->assertSame('450', $day['operational_deduction']);
+        $this->assertSame('120', $day['administrative_percentage']);
     }
 
     public function test_exempt_operational_projects_do_not_contribute_to_deduction(): void
@@ -227,10 +234,10 @@ class OperationalRateApiTest extends TestCase
 
         $response = $this->getJson(self::ENDPOINT.'?month=8&year=2026');
         $response->assertOk()
-            ->assertJsonPath('data.summary.relative_operational_deduction', '400.00')
-            ->assertJsonPath('data.summary.fixed_operational_deduction', '0.00')
-            ->assertJsonPath('data.summary.total_operational_deduction', '400.00')
-            ->assertJsonPath('data.monthly_totals.total_income', '1000.00');
+            ->assertJsonPath('data.summary.relative_operational_deduction', '400')
+            ->assertJsonPath('data.summary.fixed_operational_deduction', '0')
+            ->assertJsonPath('data.summary.total_operational_deduction', '400')
+            ->assertJsonPath('data.monthly_totals.total_income', '1000');
     }
 
     public function test_admin_exempt_excluded_from_administrative_percentage_but_income_included(): void
@@ -265,13 +272,13 @@ class OperationalRateApiTest extends TestCase
         $response->assertOk();
 
         $day = collect($response->json('data.daily_records'))->firstWhere('date', '2026-08-15');
-        $this->assertSame('1500.00', $day['total_income']);
-        $this->assertSame('250.00', $day['operational_deduction']);
+        $this->assertSame('1500', $day['total_income']);
+        $this->assertSame('250', $day['operational_deduction']);
         // collected = 120 - 20 + 10 = 110 (admin-exempt ignored)
-        $this->assertSame('110.00', $day['administrative_percentage']);
+        $this->assertSame('110', $day['administrative_percentage']);
 
-        $this->assertSame('200.00', $response->json('data.summary.relative_operational_deduction'));
-        $this->assertSame('50.00', $response->json('data.summary.fixed_operational_deduction'));
+        $this->assertSame('200', $response->json('data.summary.relative_operational_deduction'));
+        $this->assertSame('50', $response->json('data.summary.fixed_operational_deduction'));
     }
 
     public function test_month_isolation(): void
@@ -294,10 +301,10 @@ class OperationalRateApiTest extends TestCase
 
         $response = $this->getJson(self::ENDPOINT.'?month=8&year=2026');
         $response->assertOk()
-            ->assertJsonPath('data.monthly_totals.total_income', '500.00')
-            ->assertJsonPath('data.monthly_totals.total_operational_deduction', '200.00')
-            ->assertJsonPath('data.monthly_totals.total_administrative_percentage', '60.00')
-            ->assertJsonPath('data.summary.total_operational_deduction', '200.00');
+            ->assertJsonPath('data.monthly_totals.total_income', '500')
+            ->assertJsonPath('data.monthly_totals.total_operational_deduction', '200')
+            ->assertJsonPath('data.monthly_totals.total_administrative_percentage', '60')
+            ->assertJsonPath('data.summary.total_operational_deduction', '200');
     }
 
     public function test_response_shape(): void
@@ -314,15 +321,69 @@ class OperationalRateApiTest extends TestCase
                         'relative_operational_deduction',
                         'fixed_operational_deduction',
                         'total_operational_deduction',
+                        'total_operational_expense',
+                        'total_operational_net',
                     ],
                     'month' => ['month', 'year'],
                     'daily_records',
                     'monthly_totals' => [
                         'total_income',
                         'total_operational_deduction',
+                        'total_operational_expense',
+                        'total_operational_net',
                         'total_administrative_percentage',
                     ],
                 ],
             ]);
+    }
+
+    public function test_operational_fund_expense_on_first_of_month_appears_as_outgoing(): void
+    {
+        $this->actAs('finance');
+
+        OperationalFundDay::query()->create([
+            'date' => '2026-08-01',
+            'operational_expense' => 200,
+        ]);
+
+        $response = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk();
+
+        $day1 = collect($response->json('data.daily_records'))->firstWhere('date', '2026-08-01');
+        $this->assertSame('0', $day1['operational_deduction']);
+        $this->assertSame('200', $day1['operational_expense']);
+        $this->assertSame('-200', $day1['operational_net']);
+
+        $response
+            ->assertJsonPath('data.summary.total_operational_expense', '200')
+            ->assertJsonPath('data.summary.total_operational_net', '-200')
+            ->assertJsonPath('data.monthly_totals.total_operational_expense', '200')
+            ->assertJsonPath('data.monthly_totals.total_operational_net', '-200');
+    }
+
+    public function test_operational_net_is_deduction_minus_expense(): void
+    {
+        $this->actAs('finance');
+
+        $relative = $this->createProject([
+            'operational_deduction_type' => OperationalDeductionType::Relative,
+        ]);
+
+        $this->seedEntry($relative->id, '2026-08-01', [
+            'daily_income' => 1000,
+            'operational_deduction' => 500,
+        ]);
+
+        OperationalFundDay::query()->create([
+            'date' => '2026-08-01',
+            'operational_expense' => 200,
+        ]);
+
+        $day1 = collect(
+            $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data.daily_records')
+        )->firstWhere('date', '2026-08-01');
+
+        $this->assertSame('500', $day1['operational_deduction']);
+        $this->assertSame('200', $day1['operational_expense']);
+        $this->assertSame('300', $day1['operational_net']);
     }
 }

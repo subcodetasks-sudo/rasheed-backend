@@ -5,6 +5,7 @@ namespace Modules\DailyJournal\Http\Resources;
 use App\Support\Money\FormatMoneyDecimal;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\DailyJournal\Support\FundBalanceStatus;
 
 class DailyJournalEntryResource extends JsonResource
 {
@@ -37,6 +38,8 @@ class DailyJournalEntryResource extends JsonResource
             'accumulated_administrative_debt' => FormatMoneyDecimal::formatRounded($this->accumulated_administrative_debt),
             'administrative_pool_relief' => FormatMoneyDecimal::formatRounded($this->administrative_pool_relief),
             'administrative_pool_relief_given' => FormatMoneyDecimal::formatRounded($this->administrative_pool_relief_given),
+            'administrative_fee_remaining' => FormatMoneyDecimal::formatRounded($this->administrative_fee_remaining),
+            'status' => FundBalanceStatus::from((float) ($this->fund_balance ?? 0)),
         ];
     }
 

@@ -70,6 +70,9 @@ class BuildDailyJournalViewAction
                 'fund_balance' => $previous[$project->id]['fund_balance'] ?? 0,
                 'administrative_debt' => 0,
                 'accumulated_administrative_debt' => $previous[$project->id]['accumulated_administrative_debt'] ?? 0,
+                'administrative_pool_relief' => 0,
+                'administrative_pool_relief_given' => 0,
+                'administrative_fee_remaining' => 0,
             ]);
             $entry->setRelation('project', $project);
 

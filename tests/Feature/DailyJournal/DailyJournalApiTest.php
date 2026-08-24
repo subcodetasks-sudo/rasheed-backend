@@ -24,7 +24,11 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
             ->assertJsonPath('data.journal_date', now()->toDateString())
             ->assertJsonCount(1, 'data.entries')
             ->assertJsonPath('data.entries.0.project.id', $project->id)
-            ->assertJsonPath('data.entries.0.daily_income', null);
+            ->assertJsonPath('data.entries.0.daily_income', null)
+            ->assertJsonPath('data.entries.0.status', 'balanced')
+            ->assertJsonPath('data.totals.status', 'balanced')
+            ->assertJsonPath('data.totals.daily_income', '0.00')
+            ->assertJsonPath('data.totals.fund_balance', '0');
     }
 
     public function test_returns_historical_journal_for_given_date(): void
@@ -45,7 +49,11 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
         $this->getJson('/api/v1/daily-journals?journal_date='.$date)
             ->assertOk()
             ->assertJsonPath('data.journal_date', $date)
-            ->assertJsonPath('data.entries.0.daily_income', '500.00');
+            ->assertJsonPath('data.entries.0.daily_income', '500.00')
+            ->assertJsonPath('data.entries.0.status', 'surplus')
+            ->assertJsonPath('data.totals.daily_income', '500.00')
+            ->assertJsonPath('data.totals.fund_balance', '440')
+            ->assertJsonPath('data.totals.status', 'surplus');
     }
 
     public function test_empty_journal_lists_active_projects_with_null_inputs(): void
@@ -84,6 +92,9 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
             ->assertJsonPath('data.entries.1.project.id', $second->id);
 
         $this->assertNotNull($pageOne->json('links.next'));
+        // Totals cover all active projects, not only the current page.
+        $this->assertSame('0.00', $pageOne->json('data.totals.daily_income'));
+        $this->assertSame('balanced', $pageOne->json('data.totals.status'));
 
         $pageTwo = $this->getJson('/api/v1/daily-journals?per_page=2&page=2');
         $pageTwo->assertOk()

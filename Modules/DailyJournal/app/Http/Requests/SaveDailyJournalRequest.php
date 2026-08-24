@@ -20,6 +20,9 @@ class SaveDailyJournalRequest extends FormRequest
         'fund_balance',
         'accumulated_administrative_debt',
         'administrative_debt',
+        'administrative_pool_relief',
+        'administrative_pool_relief_given',
+        'administrative_fee_remaining',
     ];
 
     public function authorize(): bool

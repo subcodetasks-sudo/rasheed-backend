@@ -40,6 +40,7 @@ use Modules\Notifications\Listeners\RefreshModulesOnSettingsUpdate;
 use Modules\Notifications\Listeners\RefreshMonthlySummaryOnCashStationUpdate;
 use Modules\Notifications\Listeners\RefreshMonthlySummaryOnDailyJournalUpdate;
 use Modules\Notifications\Listeners\RefreshOperationalRateOnDailyJournalUpdate;
+use Modules\Notifications\Listeners\RefreshOperationalRateOnOperationalFundUpdate;
 use Modules\Notifications\Listeners\RefreshOperationalRateOnProjectUpdate;
 use Modules\Notifications\Listeners\RefreshReportsCenterOnFinancialUpdate;
 use Modules\Notifications\Listeners\SyncAdministrativeDebtAlertOnFinancialChange;
@@ -164,6 +165,7 @@ class EventServiceProvider extends ServiceProvider
 
         OperationalFundUpdated::class => [
             RefreshAdministrativeFundOnOperationalFundUpdate::class,
+            RefreshOperationalRateOnOperationalFundUpdate::class,
             RefreshDashboardOnFinancialUpdate::class,
         ],
 

@@ -6,19 +6,28 @@ use App\Support\Money\FormatMoneyDecimal;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
+use Modules\OperationalFund\Actions\LoadOperationalExpensesByDateAction;
 use Modules\Project\Enums\OperationalDeductionType;
 
 class BuildOperationalRateAction
 {
+    public function __construct(
+        private readonly LoadOperationalExpensesByDateAction $loadOperationalExpensesByDateAction,
+    ) {}
+
     public function execute(int $month, int $year): array
     {
         $startOfMonth = Carbon::create($year, $month, 1)->startOfDay();
         $endOfMonth = $startOfMonth->copy()->endOfMonth()->startOfDay();
 
         $dailyAggregates = $this->dailyAggregates($startOfMonth, $endOfMonth);
-        $dailyRecords = $this->expandToCalendar($dailyAggregates, $startOfMonth, $endOfMonth);
-        $summary = $this->monthSummary($dailyAggregates);
-        $monthlyTotals = $this->monthlyTotals($dailyAggregates);
+        $expenses = $this->loadOperationalExpensesByDateAction->execute(
+            $startOfMonth->toDateString(),
+            $endOfMonth->toDateString(),
+        );
+        $dailyRecords = $this->expandToCalendar($dailyAggregates, $expenses, $startOfMonth, $endOfMonth);
+        $summary = $this->monthSummary($dailyAggregates, $expenses);
+        $monthlyTotals = $this->monthlyTotals($dailyAggregates, $expenses);
 
         return [
             'summary' => $summary,
@@ -80,22 +89,31 @@ class BuildOperationalRateAction
 
     /**
      * @param  array<string, object>  $aggregates
-     * @return list<array{date: string, day_name: string, total_income: string, operational_deduction: string, administrative_percentage: string}>
+     * @param  array<string, float>  $expenses
+     * @return list<array{date: string, day_name: string, total_income: string, operational_deduction: string, operational_expense: string, operational_net: string, administrative_percentage: string}>
      */
-    private function expandToCalendar(array $aggregates, CarbonInterface $start, CarbonInterface $end): array
-    {
+    private function expandToCalendar(
+        array $aggregates,
+        array $expenses,
+        CarbonInterface $start,
+        CarbonInterface $end,
+    ): array {
         $records = [];
         $cursor = $start->copy();
 
         while ($cursor->lte($end)) {
             $dateString = $cursor->toDateString();
             $row = $aggregates[$dateString] ?? null;
+            $deduction = round((float) ($row->operational_deduction ?? 0), 2);
+            $expense = round((float) ($expenses[$dateString] ?? 0), 2);
 
             $records[] = [
                 'date' => $dateString,
                 'day_name' => $cursor->format('l'),
                 'total_income' => FormatMoneyDecimal::formatRounded($row->total_income ?? 0),
-                'operational_deduction' => FormatMoneyDecimal::formatRounded($row->operational_deduction ?? 0),
+                'operational_deduction' => FormatMoneyDecimal::formatRounded($deduction),
+                'operational_expense' => FormatMoneyDecimal::formatRounded($expense),
+                'operational_net' => FormatMoneyDecimal::formatRounded(round($deduction - $expense, 2)),
                 'administrative_percentage' => FormatMoneyDecimal::formatRounded($row->administrative_percentage ?? 0),
             ];
 
@@ -107,9 +125,16 @@ class BuildOperationalRateAction
 
     /**
      * @param  array<string, object>  $aggregates
-     * @return array{relative_operational_deduction: string, fixed_operational_deduction: string, total_operational_deduction: string}
+     * @param  array<string, float>  $expenses
+     * @return array{
+     *     relative_operational_deduction: string,
+     *     fixed_operational_deduction: string,
+     *     total_operational_deduction: string,
+     *     total_operational_expense: string,
+     *     total_operational_net: string
+     * }
      */
-    private function monthSummary(array $aggregates): array
+    private function monthSummary(array $aggregates, array $expenses): array
     {
         $relative = 0.0;
         $fixed = 0.0;
@@ -121,19 +146,31 @@ class BuildOperationalRateAction
 
         $relative = round($relative, 2);
         $fixed = round($fixed, 2);
+        $totalDeduction = round($relative + $fixed, 2);
+        $totalExpense = round(array_sum($expenses), 2);
+        $totalNet = round($totalDeduction - $totalExpense, 2);
 
         return [
             'relative_operational_deduction' => FormatMoneyDecimal::formatRounded($relative),
             'fixed_operational_deduction' => FormatMoneyDecimal::formatRounded($fixed),
-            'total_operational_deduction' => FormatMoneyDecimal::formatRounded(round($relative + $fixed, 2)),
+            'total_operational_deduction' => FormatMoneyDecimal::formatRounded($totalDeduction),
+            'total_operational_expense' => FormatMoneyDecimal::formatRounded($totalExpense),
+            'total_operational_net' => FormatMoneyDecimal::formatRounded($totalNet),
         ];
     }
 
     /**
      * @param  array<string, object>  $aggregates
-     * @return array{total_income: string, total_operational_deduction: string, total_administrative_percentage: string}
+     * @param  array<string, float>  $expenses
+     * @return array{
+     *     total_income: string,
+     *     total_operational_deduction: string,
+     *     total_operational_expense: string,
+     *     total_operational_net: string,
+     *     total_administrative_percentage: string
+     * }
      */
-    private function monthlyTotals(array $aggregates): array
+    private function monthlyTotals(array $aggregates, array $expenses): array
     {
         $totalIncome = 0.0;
         $totalOd = 0.0;
@@ -145,9 +182,14 @@ class BuildOperationalRateAction
             $totalAdmin += (float) $row->administrative_percentage;
         }
 
+        $totalOd = round($totalOd, 2);
+        $totalExpense = round(array_sum($expenses), 2);
+
         return [
             'total_income' => FormatMoneyDecimal::formatRounded($totalIncome),
             'total_operational_deduction' => FormatMoneyDecimal::formatRounded($totalOd),
+            'total_operational_expense' => FormatMoneyDecimal::formatRounded($totalExpense),
+            'total_operational_net' => FormatMoneyDecimal::formatRounded(round($totalOd - $totalExpense, 2)),
             'total_administrative_percentage' => FormatMoneyDecimal::formatRounded($totalAdmin),
         ];
     }

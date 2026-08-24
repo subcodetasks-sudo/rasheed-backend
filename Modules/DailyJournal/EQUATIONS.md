@@ -23,6 +23,8 @@ You are implementing or reviewing the Daily Journal calculation engine for Rashi
 - `administrative_debt`
 - `accumulated_administrative_debt`
 - `administrative_pool_relief`
+- `administrative_pool_relief_given`
+- `administrative_fee_remaining`
 
 Unique key per row: `(project_id, journal_date)`. Only **Active** projects are allowed.
 
@@ -229,6 +231,15 @@ never be both a source and a beneficiary on the same day. As a defensive rule, a
   consequence of its fee capacity having been given away, not a bug.)
 - Any deficit that still remains after sources are exhausted stays negative, carried forward as-is — Stage 3 never
   fabricates money on either side of the transfer.
+
+After allocation, persist per project:
+
+```
+administrative_fee_remaining = leftover source capacity
+  = max(0, administrative_fee − caseOneUsed − administrative_pool_relief_given)
+```
+
+Same day only; unused remaining is **not** carried to the next journal date.
 
 **Pool scope — same day only.** The pool for date `D` is built strictly from date `D`'s own entries. It never uses a
 prior day's unused fee, never reserves capacity for a future day, and has no relationship to the historical/global
