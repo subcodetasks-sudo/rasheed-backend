@@ -3,13 +3,13 @@
 namespace Modules\MonthlySummary\Actions;
 
 use App\Support\Money\FormatMoneyDecimal;
-use Modules\CashStation\Actions\BuildCashStationAction;
+use Modules\DailyJournal\Actions\ReadFundBalanceTipAction;
 use Modules\Project\Models\Project;
 
 class ListContributorOptionsAction
 {
     public function __construct(
-        private readonly BuildCashStationAction $buildCashStationAction,
+        private readonly ReadFundBalanceTipAction $readFundBalanceTipAction,
     ) {}
 
     /**
@@ -22,9 +22,12 @@ class ListContributorOptionsAction
             ->orderBy('id')
             ->get(['id', 'name']);
 
+        $end = $this->monthEnd($year, $month);
+        $balances = $this->readFundBalanceTipAction->execute($projects->pluck('id')->all(), $end);
+
         $options = [];
         foreach ($projects as $project) {
-            $surplus = $this->buildCashStationAction->transferableBalance($project->id, $month, $year);
+            $surplus = round(max(0.0, (float) ($balances[$project->id] ?? 0)), 2);
             if ($surplus <= 0) {
                 continue;
             }
@@ -37,5 +40,15 @@ class ListContributorOptionsAction
         }
 
         return $options;
+    }
+
+    private function monthEnd(int $year, int $month): string
+    {
+        return sprintf(
+            '%04d-%02d-%02d',
+            $year,
+            $month,
+            (int) date('t', mktime(0, 0, 0, $month, 1, $year)),
+        );
     }
 }

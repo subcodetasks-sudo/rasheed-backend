@@ -10,7 +10,7 @@ use Modules\DailyJournal\Models\DailyJournalEntry;
 class BroadcastContributionJournalTipAction
 {
     /**
-     * Push DailyJournalUpdated for the beneficiary tip day so open DJ sessions refresh.
+     * Push DailyJournalUpdated for a project's month tip so open DJ sessions refresh.
      */
     public function execute(int $projectId, int $year, int $month): void
     {

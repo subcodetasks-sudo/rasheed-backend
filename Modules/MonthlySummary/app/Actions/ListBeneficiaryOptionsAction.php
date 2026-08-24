@@ -4,6 +4,7 @@ namespace Modules\MonthlySummary\Actions;
 
 use App\Support\Money\FormatMoneyDecimal;
 use Modules\CashStation\Actions\BuildCashStationAction;
+use Modules\DailyJournal\Actions\ReadFundBalanceTipAction;
 use Modules\MonthlySummary\Enums\ContributionType;
 use Modules\Project\Exceptions\BusinessException;
 use Modules\Project\Models\Project;
@@ -12,6 +13,7 @@ class ListBeneficiaryOptionsAction
 {
     public function __construct(
         private readonly BuildCashStationAction $buildCashStationAction,
+        private readonly ReadFundBalanceTipAction $readFundBalanceTipAction,
     ) {}
 
     /**
@@ -58,16 +60,27 @@ class ListBeneficiaryOptionsAction
         int $year,
         ContributionType $contributionType,
     ): float {
+        $end = $this->monthEnd($year, $month);
+
         if ($contributionType === ContributionType::FundDeficit) {
-            $netCash = $this->buildCashStationAction->netCashFundForProject($projectId, $month, $year);
+            $balances = $this->readFundBalanceTipAction->execute([$projectId], $end);
+            $fundBalance = (float) ($balances[$projectId] ?? 0);
 
-            return round(abs(min(0.0, $netCash)), 2);
+            return round(abs(min(0.0, $fundBalance)), 2);
         }
-
-        $end = sprintf('%04d-%02d-%02d', $year, $month, (int) date('t', mktime(0, 0, 0, $month, 1, $year)));
 
         $debts = $this->buildCashStationAction->administrativeDebtsByProject([$projectId], $end);
 
         return round(max(0.0, (float) ($debts[$projectId] ?? 0)), 2);
+    }
+
+    private function monthEnd(int $year, int $month): string
+    {
+        return sprintf(
+            '%04d-%02d-%02d',
+            $year,
+            $month,
+            (int) date('t', mktime(0, 0, 0, $month, 1, $year)),
+        );
     }
 }

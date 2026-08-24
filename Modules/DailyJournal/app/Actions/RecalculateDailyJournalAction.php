@@ -20,6 +20,7 @@ class RecalculateDailyJournalAction
         private readonly ApplyAdministrativePoolReliefAction $applyAdministrativePoolReliefAction,
         private readonly UpdateAccumulatedAdministrativeDebtAction $updateAccumulatedAdministrativeDebtAction,
         private readonly PersistCalculatedDailyJournalFieldsAction $persistCalculatedFieldsAction,
+        private readonly ReapplyDailyJournalOverlaysAction $reapplyDailyJournalOverlaysAction,
         private readonly UpdateDailyJournalSummariesAction $updateSummariesAction,
         private readonly UpdateDailyJournalReportsAction $updateReportsAction,
     ) {}
@@ -56,6 +57,7 @@ class RecalculateDailyJournalAction
         $entries = $this->applyAdministrativePoolReliefAction->execute($entries, $date);
         $entries = $this->updateAccumulatedAdministrativeDebtAction->execute($entries, $date);
         $entries = $this->persistCalculatedFieldsAction->execute($entries);
+        $entries = $this->reapplyDailyJournalOverlaysAction->execute($entries, $date);
 
         $this->updateSummariesAction->execute($date);
         $this->updateReportsAction->execute($date);

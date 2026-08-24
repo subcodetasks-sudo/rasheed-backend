@@ -49,7 +49,7 @@ class MonthlySummaryApiTest extends TestCase
 
     private function seedEntry(int $projectId, string $date, array $attrs = []): DailyJournalEntry
     {
-        return DailyJournalEntry::factory()->create(array_merge([
+        $defaults = [
             'project_id' => $projectId,
             'journal_date' => $date,
             'daily_income' => 0,
@@ -62,7 +62,17 @@ class MonthlySummaryApiTest extends TestCase
             'fund_balance' => 0,
             'administrative_debt' => 0,
             'accumulated_administrative_debt' => 0,
-        ], $attrs));
+        ];
+
+        $merged = array_merge($defaults, $attrs);
+
+        // Match Daily Journal / Monthly Summary tip when tests only seed income/expense.
+        if (! array_key_exists('fund_balance', $attrs)) {
+            $merged['fund_balance'] = (float) ($merged['daily_income'] ?? 0)
+                - (float) ($merged['daily_expense'] ?? 0);
+        }
+
+        return DailyJournalEntry::factory()->create($merged);
     }
 
     private function findProject(array $payload, int $projectId): array
@@ -204,8 +214,8 @@ class MonthlySummaryApiTest extends TestCase
         $this->assertSame('0', $this->findProject($created, $to->id)['total_deducted_contributions']);
         $this->assertSame('300', $this->findProject($created, $from->id)['total_deducted_contributions']);
         $this->assertSame('0', $this->findProject($created, $from->id)['total_received_contributions']);
-        // Contributor journal tip is unchanged; beneficiary tip receives the injection.
-        $this->assertSame('1000', $this->findProject($created, $from->id)['project_net_result']);
+        // Contributor journal tip is debited; beneficiary tip receives the injection.
+        $this->assertSame('700', $this->findProject($created, $from->id)['project_net_result']);
         $this->assertSame('-100', $this->findProject($created, $to->id)['project_net_result']);
         $this->assertCount(1, $created['contributions']);
 
@@ -226,6 +236,8 @@ class MonthlySummaryApiTest extends TestCase
 
         $this->assertSame('0', $this->findProject($afterCancel, $to->id)['total_received_contributions']);
         $this->assertSame('0', $this->findProject($afterCancel, $from->id)['total_deducted_contributions']);
+        $this->assertSame('1000', $this->findProject($afterCancel, $from->id)['project_net_result']);
+        $this->assertSame('-400', $this->findProject($afterCancel, $to->id)['project_net_result']);
         $this->assertSame([], $afterCancel['contributions']);
 
         $this->assertSame('1000', $this->cashStationProject(7, 2026, $from->id)['net_cash_fund']);
@@ -233,6 +245,160 @@ class MonthlySummaryApiTest extends TestCase
 
         $this->deleteJson(self::ENDPOINT.'/contributions/'.$settlementId)
             ->assertNotFound();
+    }
+
+    public function test_fund_deficit_contribution_survives_earlier_day_journal_recalc(): void
+    {
+        $this->actAs('finance');
+        $category = Category::factory()->create();
+        $from = $this->createProject([
+            'category_id' => $category->id,
+            'administrative_exempt' => true,
+        ]);
+        $to = $this->createProject([
+            'category_id' => $category->id,
+            'administrative_exempt' => true,
+        ]);
+
+        $this->putJson('/api/v1/daily-journals', [
+            'journal_date' => '2026-07-10',
+            'entries' => [
+                ['project_id' => $from->id, 'daily_income' => 1000],
+                ['project_id' => $to->id, 'daily_expense' => 400],
+            ],
+        ])->assertOk();
+
+        $this->putJson('/api/v1/daily-journals', [
+            'journal_date' => '2026-07-20',
+            'entries' => [
+                ['project_id' => $to->id, 'daily_income' => 0],
+            ],
+        ])->assertOk();
+
+        $created = $this->postJson(self::ENDPOINT.'/contributions', [
+            'month' => 7,
+            'year' => 2026,
+            'from_project_id' => $from->id,
+            'to_project_id' => $to->id,
+            'contribution_type' => ContributionType::FundDeficit->value,
+            'amount' => 300,
+        ])->assertCreated()->json('data');
+
+        $this->assertSame('-100', $this->findProject($created, $to->id)['project_net_result']);
+        $this->assertSame('700', $this->findProject($created, $from->id)['project_net_result']);
+        $this->assertEqualsWithDelta(
+            -100.0,
+            (float) DailyJournalEntry::query()
+                ->where('project_id', $to->id)
+                ->whereDate('journal_date', '2026-07-20')
+                ->value('fund_balance'),
+            0.001,
+        );
+        // Ensure-on-save creates a from-project row on 07-20, so the contributor tip (and debit) is that day.
+        $this->assertEqualsWithDelta(
+            700.0,
+            (float) DailyJournalEntry::query()
+                ->where('project_id', $from->id)
+                ->whereDate('journal_date', '2026-07-20')
+                ->value('fund_balance'),
+            0.001,
+        );
+
+        $this->putJson('/api/v1/daily-journals', [
+            'journal_date' => '2026-07-10',
+            'entries' => [
+                ['project_id' => $from->id, 'daily_income' => 1000],
+                ['project_id' => $to->id, 'daily_expense' => 400],
+            ],
+        ])->assertOk();
+
+        $this->assertEqualsWithDelta(
+            -100.0,
+            (float) DailyJournalEntry::query()
+                ->where('project_id', $to->id)
+                ->whereDate('journal_date', '2026-07-20')
+                ->value('fund_balance'),
+            0.001,
+        );
+        $this->assertEqualsWithDelta(
+            700.0,
+            (float) DailyJournalEntry::query()
+                ->where('project_id', $from->id)
+                ->whereDate('journal_date', '2026-07-20')
+                ->value('fund_balance'),
+            0.001,
+        );
+
+        $afterRecalc = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
+        $this->assertSame('-100', $this->findProject($afterRecalc, $to->id)['project_net_result']);
+        $this->assertSame('700', $this->findProject($afterRecalc, $from->id)['project_net_result']);
+        $this->assertSame('300', $this->findProject($afterRecalc, $to->id)['total_received_contributions']);
+    }
+
+    public function test_administrative_debt_contribution_survives_earlier_day_journal_recalc(): void
+    {
+        $this->actAs('finance');
+        $category = Category::factory()->create();
+        $from = $this->createProject([
+            'category_id' => $category->id,
+            'administrative_exempt' => true,
+        ]);
+        $to = $this->createProject(['category_id' => $category->id]);
+
+        $this->putJson('/api/v1/daily-journals', [
+            'journal_date' => '2026-07-10',
+            'entries' => [
+                ['project_id' => $from->id, 'daily_income' => 800],
+                [
+                    'project_id' => $to->id,
+                    'daily_income' => 1000,
+                    'daily_expense' => 2000,
+                ],
+            ],
+        ])->assertOk();
+
+        $this->putJson('/api/v1/daily-journals', [
+            'journal_date' => '2026-07-20',
+            'entries' => [
+                ['project_id' => $to->id, 'daily_income' => 0],
+            ],
+        ])->assertOk();
+
+        $debtBefore = (float) DailyJournalEntry::query()
+            ->where('project_id', $to->id)
+            ->whereDate('journal_date', '2026-07-20')
+            ->value('accumulated_administrative_debt');
+        $this->assertGreaterThan(0, $debtBefore);
+
+        $created = $this->postJson(self::ENDPOINT.'/contributions', [
+            'month' => 7,
+            'year' => 2026,
+            'from_project_id' => $from->id,
+            'to_project_id' => $to->id,
+            'contribution_type' => ContributionType::AdministrativeDebt->value,
+            'amount' => 50,
+        ])->assertCreated()->json('data');
+
+        $expectedDebt = (string) (int) round($debtBefore - 50);
+        $this->assertSame($expectedDebt, $this->findProject($created, $to->id)['administrative_debt']);
+        $this->assertSame('750', $this->findProject($created, $from->id)['project_net_result']);
+
+        $this->putJson('/api/v1/daily-journals', [
+            'journal_date' => '2026-07-10',
+            'entries' => [
+                ['project_id' => $from->id, 'daily_income' => 800],
+                [
+                    'project_id' => $to->id,
+                    'daily_income' => 1000,
+                    'daily_expense' => 2000,
+                ],
+            ],
+        ])->assertOk();
+
+        $afterRecalc = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
+        $this->assertSame($expectedDebt, $this->findProject($afterRecalc, $to->id)['administrative_debt']);
+        $this->assertSame('750', $this->findProject($afterRecalc, $from->id)['project_net_result']);
+        $this->assertSame('50', $this->findProject($afterRecalc, $to->id)['total_received_contributions']);
     }
 
     public function test_administrative_debt_contribution_reduces_debt_and_cancel_restores(): void
@@ -267,7 +433,7 @@ class MonthlySummaryApiTest extends TestCase
         $this->assertSame('40', $this->findProject($data, $to->id)['administrative_debt']);
         $this->assertSame('80', $this->findProject($data, $to->id)['total_received_contributions']);
         $this->assertSame('80', $this->findProject($data, $from->id)['total_deducted_contributions']);
-        $this->assertSame('800', $this->findProject($data, $from->id)['project_net_result']);
+        $this->assertSame('720', $this->findProject($data, $from->id)['project_net_result']);
         $this->assertSame('100', $this->findProject($data, $to->id)['project_net_result']);
 
         $settlementId = $data['contributions'][0]['id'];
@@ -276,6 +442,7 @@ class MonthlySummaryApiTest extends TestCase
             ->json('data');
 
         $this->assertSame('120', $this->findProject($restored, $to->id)['administrative_debt']);
+        $this->assertSame('800', $this->findProject($restored, $from->id)['project_net_result']);
         $this->assertSame('0', $this->findProject($restored, $to->id)['total_received_contributions']);
         $this->assertSame('0', $this->findProject($restored, $from->id)['total_deducted_contributions']);
     }
@@ -402,6 +569,73 @@ class MonthlySummaryApiTest extends TestCase
         $this->assertFalse($byId->has($zero->id));
         $this->assertFalse($byId->has($deficit->id));
         $this->assertFalse($byId->has($inactive->id));
+    }
+
+    public function test_contributor_options_use_fund_balance_tip_not_cash_station_monthly_total(): void
+    {
+        $this->actAs('finance');
+        $project = $this->createProject(['name' => 'صافي مختلف', 'administrative_exempt' => true]);
+
+        // Cash Station monthly_total ≈ 1000; journal صافي الصندوق tip is 650.
+        $this->seedEntry($project->id, '2026-07-10', [
+            'daily_income' => 1000,
+            'daily_expense' => 0,
+            'fund_balance' => 650,
+        ]);
+
+        $summary = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
+        $this->assertSame('650', $this->findProject($summary, $project->id)['project_net_result']);
+
+        $cashStation = $this->cashStationProject(7, 2026, $project->id);
+        $this->assertSame('1000', $cashStation['monthly_total']);
+        $this->assertSame('1000', $cashStation['net_cash_fund']);
+
+        $options = collect($this->getJson(self::ENDPOINT.'/contributor-options?month=7&year=2026')
+            ->assertOk()
+            ->json('data'))->keyBy('project_id');
+
+        $this->assertTrue($options->has($project->id));
+        $this->assertSame('650', $options[$project->id]['available_surplus']);
+    }
+
+    public function test_contributor_available_surplus_drops_after_contribution(): void
+    {
+        $this->actAs('finance');
+        $category = Category::factory()->create();
+        $from = $this->createProject(['category_id' => $category->id, 'administrative_exempt' => true]);
+        $to = $this->createProject(['category_id' => $category->id, 'administrative_exempt' => true]);
+
+        $this->seedEntry($from->id, '2026-07-12', [
+            'daily_income' => 3320,
+            'fund_balance' => 3320,
+        ]);
+        $this->seedEntry($to->id, '2026-07-12', [
+            'daily_expense' => 500,
+            'fund_balance' => -500,
+        ]);
+
+        $before = collect($this->getJson(self::ENDPOINT.'/contributor-options?month=7&year=2026')
+            ->assertOk()
+            ->json('data'))->keyBy('project_id');
+        $this->assertSame('3320', $before[$from->id]['available_surplus']);
+
+        $this->postJson(self::ENDPOINT.'/contributions', [
+            'month' => 7,
+            'year' => 2026,
+            'from_project_id' => $from->id,
+            'to_project_id' => $to->id,
+            'contribution_type' => ContributionType::FundDeficit->value,
+            'amount' => 320,
+        ])->assertCreated();
+
+        $summary = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
+        $this->assertSame('3000', $this->findProject($summary, $from->id)['project_net_result']);
+        $this->assertSame('-180', $this->findProject($summary, $to->id)['project_net_result']);
+
+        $after = collect($this->getJson(self::ENDPOINT.'/contributor-options?month=7&year=2026')
+            ->assertOk()
+            ->json('data'))->keyBy('project_id');
+        $this->assertSame('3000', $after[$from->id]['available_surplus']);
     }
 
     public function test_beneficiary_options_filter_by_type_category_and_exclude_contributor(): void
@@ -668,6 +902,7 @@ class MonthlySummaryApiTest extends TestCase
         $this->assertSame('90', $this->findProject($data, $to->id)['administrative_debt']);
         $this->assertSame('100', $this->findProject($data, $to->id)['total_received_contributions']);
         $this->assertSame('-100', $this->findProject($data, $to->id)['project_net_result']);
+        $this->assertSame('500', $this->findProject($data, $from->id)['project_net_result']);
     }
 
     public function test_multiple_contributions_and_cancel_isolation(): void

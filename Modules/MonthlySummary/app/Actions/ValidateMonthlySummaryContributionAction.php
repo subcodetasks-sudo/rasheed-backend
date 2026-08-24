@@ -2,7 +2,7 @@
 
 namespace Modules\MonthlySummary\Actions;
 
-use Modules\CashStation\Actions\BuildCashStationAction;
+use Modules\DailyJournal\Actions\ReadFundBalanceTipAction;
 use Modules\DailyJournal\Models\DailyJournalEntry;
 use Modules\MonthlySummary\Enums\ContributionType;
 use Modules\Project\Exceptions\BusinessException;
@@ -11,7 +11,7 @@ use Modules\Project\Models\Project;
 class ValidateMonthlySummaryContributionAction
 {
     public function __construct(
-        private readonly BuildCashStationAction $buildCashStationAction,
+        private readonly ReadFundBalanceTipAction $readFundBalanceTipAction,
         private readonly ListBeneficiaryOptionsAction $listBeneficiaryOptionsAction,
     ) {}
 
@@ -49,7 +49,14 @@ class ValidateMonthlySummaryContributionAction
             throw new BusinessException(__('messages.monthly_summary_contribution_different_category'));
         }
 
-        $surplus = round($this->buildCashStationAction->transferableBalance($fromProjectId, $month, $year), 2);
+        $endOfMonth = sprintf(
+            '%04d-%02d-%02d',
+            $year,
+            $month,
+            (int) date('t', mktime(0, 0, 0, $month, 1, $year)),
+        );
+        $balances = $this->readFundBalanceTipAction->execute([$fromProjectId], $endOfMonth);
+        $surplus = round(max(0.0, (float) ($balances[$fromProjectId] ?? 0)), 2);
         if ($surplus <= 0) {
             throw new BusinessException(__('messages.monthly_summary_contributor_requires_surplus'));
         }
@@ -84,12 +91,7 @@ class ValidateMonthlySummaryContributionAction
         foreach ([$fromProjectId, $toProjectId] as $projectId) {
             DailyJournalEntry::query()
                 ->where('project_id', $projectId)
-                ->whereDate('journal_date', '<=', sprintf(
-                    '%04d-%02d-%02d',
-                    $year,
-                    $month,
-                    (int) date('t', mktime(0, 0, 0, $month, 1, $year)),
-                ))
+                ->whereDate('journal_date', '<=', $endOfMonth)
                 ->orderByDesc('journal_date')
                 ->orderByDesc('id')
                 ->lockForUpdate()

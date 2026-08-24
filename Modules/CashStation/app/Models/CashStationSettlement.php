@@ -20,6 +20,7 @@ class CashStationSettlement extends Model
         'amount',
         'contribution_type',
         'journal_anchor_date',
+        'from_journal_anchor_date',
         'created_by',
     ];
 
@@ -31,6 +32,7 @@ class CashStationSettlement extends Model
             'amount' => 'decimal:2',
             'contribution_type' => ContributionType::class,
             'journal_anchor_date' => 'date',
+            'from_journal_anchor_date' => 'date',
         ];
     }
 

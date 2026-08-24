@@ -7,25 +7,33 @@ use Modules\DailyJournal\Models\DailyJournalEntry;
 
 class ApplyContributionAdministrativeDebtAction
 {
+    public function __construct(
+        private readonly ApplyContributionContributorFundDebitAction $applyContributionContributorFundDebitAction,
+    ) {}
+
     /**
-     * Reduce beneficiary accumulated administrative debt by the settlement amount.
+     * Reduce beneficiary accumulated administrative debt and debit contributor fund_balance.
      *
-     * Never touches journal entries dated before the settlement was recorded — history stays
-     * intact. Only entries on/after that date (existing at call time) are reduced. If none exist
-     * yet, the settlement is left pending (`journal_anchor_date` stays null) and is picked up
-     * later by `ApplyPendingContributionAdministrativeDebtOnDailyJournalUpdate` once a qualifying
-     * entry is created.
+     * Each side applies independently. Missing journal tips leave the matching
+     * anchor null for pending retry listeners.
      */
     public function execute(CashStationSettlement $settlement): void
     {
         $amount = round(max(0, (float) $settlement->amount), 2);
-        if ($amount <= 0 || $settlement->journal_anchor_date !== null) {
+        if ($amount <= 0) {
             return;
         }
 
-        // Contribution effects are applied to the beneficiary journal state for the
-        // selected month (same month tip logic as BroadcastContributionJournalTipAction),
-        // not based on when the settlement row was created in the DB.
+        $this->applyBeneficiaryDebtReduction($settlement, $amount);
+        $this->applyContributionContributorFundDebitAction->execute($settlement);
+    }
+
+    private function applyBeneficiaryDebtReduction(CashStationSettlement $settlement, float $amount): void
+    {
+        if ($settlement->journal_anchor_date !== null) {
+            return;
+        }
+
         $endOfMonth = sprintf(
             '%04d-%02d-%02d',
             $settlement->year,

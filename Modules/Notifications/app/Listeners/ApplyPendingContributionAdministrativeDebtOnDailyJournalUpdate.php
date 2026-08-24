@@ -14,11 +14,8 @@ use Modules\MonthlySummary\Enums\ContributionType;
 use Modules\MonthlySummary\Events\MonthlySummaryUpdated;
 
 /**
- * A contribution that reduces administrative debt only ever touches journal entries dated
- * on/after the day it was recorded (see ApplyContributionAdministrativeDebtAction). If none
- * existed yet at that time, the settlement is left pending (`journal_anchor_date` null). Once a
- * qualifying entry shows up — i.e. this event fires for one of the pending beneficiary projects —
- * retry applying it here so the reduction is never silently lost.
+ * Administrative-debt contributions reduce beneficiary debt and debit contributor
+ * fund_balance. Either side may stay pending until a qualifying tip exists.
  */
 class ApplyPendingContributionAdministrativeDebtOnDailyJournalUpdate
 {
@@ -39,14 +36,28 @@ class ApplyPendingContributionAdministrativeDebtOnDailyJournalUpdate
 
         $pending = CashStationSettlement::query()
             ->where('contribution_type', ContributionType::AdministrativeDebt)
-            ->whereNull('journal_anchor_date')
-            ->whereIn('to_project_id', $projectIds)
+            ->where(function ($query) use ($projectIds) {
+                $query->where(function ($toSide) use ($projectIds) {
+                    $toSide->whereNull('journal_anchor_date')
+                        ->whereIn('to_project_id', $projectIds);
+                })->orWhere(function ($fromSide) use ($projectIds) {
+                    $fromSide->whereNull('from_journal_anchor_date')
+                        ->whereIn('from_project_id', $projectIds);
+                });
+            })
             ->get();
 
         foreach ($pending as $settlement) {
-            $this->applyContributionAdministrativeDebtAction->execute($settlement);
+            $hadToAnchor = $settlement->journal_anchor_date !== null;
+            $hadFromAnchor = $settlement->from_journal_anchor_date !== null;
 
-            if ($settlement->journal_anchor_date !== null) {
+            $this->applyContributionAdministrativeDebtAction->execute($settlement);
+            $settlement->refresh();
+
+            if (
+                (! $hadToAnchor && $settlement->journal_anchor_date !== null)
+                || (! $hadFromAnchor && $settlement->from_journal_anchor_date !== null)
+            ) {
                 $this->broadcastMonth((int) $settlement->year, (int) $settlement->month);
             }
         }

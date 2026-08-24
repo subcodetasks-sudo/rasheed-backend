@@ -45,8 +45,8 @@ class CancelMonthlySummaryContributionWorkflow
 
             $year = $settlement->year;
             $month = $settlement->month;
-            $amount = (float) $settlement->amount;
             $toProjectId = $settlement->to_project_id;
+            $fromProjectId = $settlement->from_project_id;
             $type = $settlement->contribution_type;
 
             if ($type === ContributionType::AdministrativeDebt) {
@@ -62,6 +62,7 @@ class CancelMonthlySummaryContributionWorkflow
                 'year' => $year,
                 'month' => $month,
                 'to_project_id' => $toProjectId,
+                'from_project_id' => $fromProjectId,
                 'contribution_type' => $type,
             ];
         });
@@ -96,7 +97,12 @@ class CancelMonthlySummaryContributionWorkflow
             ContributionType::FundDeficit,
         ], true)) {
             $this->broadcastContributionJournalTipAction->execute(
-                $result['to_project_id'],
+                (int) $result['to_project_id'],
+                $result['year'],
+                $result['month'],
+            );
+            $this->broadcastContributionJournalTipAction->execute(
+                (int) $result['from_project_id'],
                 $result['year'],
                 $result['month'],
             );

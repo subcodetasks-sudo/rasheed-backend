@@ -7,11 +7,13 @@ use Modules\DailyJournal\Models\DailyJournalEntry;
 
 class ReverseContributionFundBalanceAction
 {
+    public function __construct(
+        private readonly ReverseContributionContributorFundDebitAction $reverseContributionContributorFundDebitAction,
+    ) {}
+
     /**
-     * Withdraw the settlement amount from beneficiary `fund_balance`.
-     *
-     * Uses `journal_anchor_date` as the month-tip anchor so cancel/reversal
-     * stays stable even if the journal is later edited or re-created.
+     * Withdraw the settlement amount from beneficiary fund_balance and restore
+     * the contributor debit. Each side is independent based on its anchor date.
      */
     public function execute(CashStationSettlement $settlement): void
     {
@@ -20,8 +22,13 @@ class ReverseContributionFundBalanceAction
             return;
         }
 
+        $this->reverseBeneficiaryCredit($settlement, $amount);
+        $this->reverseContributionContributorFundDebitAction->execute($settlement);
+    }
+
+    private function reverseBeneficiaryCredit(CashStationSettlement $settlement, float $amount): void
+    {
         if ($settlement->journal_anchor_date === null) {
-            // Pending (never applied to the journal).
             return;
         }
 

@@ -7,13 +7,14 @@ use Modules\DailyJournal\Models\DailyJournalEntry;
 
 class ApplyContributionFundBalanceAction
 {
+    public function __construct(
+        private readonly ApplyContributionContributorFundDebitAction $applyContributionContributorFundDebitAction,
+    ) {}
+
     /**
-     * Inject the settlement amount into beneficiary `fund_balance` starting
-     * from the month tip that exists at apply-time.
-     *
-     * If the qualifying journal tip doesn't exist yet, the settlement stays
-     * pending (`journal_anchor_date` remains null) and will be retried on the
-     * next matching `DailyJournalUpdated` event.
+     * Credit beneficiary fund_balance and debit contributor fund_balance from each
+     * project's month tip. Sides apply independently; missing tips stay pending
+     * (`journal_anchor_date` / `from_journal_anchor_date` null) for retry.
      */
     public function execute(CashStationSettlement $settlement): void
     {
@@ -22,19 +23,22 @@ class ApplyContributionFundBalanceAction
             return;
         }
 
+        $this->applyBeneficiaryCredit($settlement, $amount);
+        $this->applyContributionContributorFundDebitAction->execute($settlement);
+    }
+
+    private function applyBeneficiaryCredit(CashStationSettlement $settlement, float $amount): void
+    {
         if ($settlement->journal_anchor_date !== null) {
             return;
         }
 
         $projectId = $settlement->to_project_id;
-        $year = $settlement->year;
-        $month = $settlement->month;
-
         $endOfMonth = sprintf(
             '%04d-%02d-%02d',
-            $year,
-            $month,
-            (int) date('t', mktime(0, 0, 0, $month, 1, $year)),
+            $settlement->year,
+            $settlement->month,
+            (int) date('t', mktime(0, 0, 0, $settlement->month, 1, $settlement->year)),
         );
 
         $anchor = DailyJournalEntry::query()

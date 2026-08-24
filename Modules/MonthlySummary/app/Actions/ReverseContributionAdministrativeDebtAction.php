@@ -7,17 +7,27 @@ use Modules\DailyJournal\Models\DailyJournalEntry;
 
 class ReverseContributionAdministrativeDebtAction
 {
+    public function __construct(
+        private readonly ReverseContributionContributorFundDebitAction $reverseContributionContributorFundDebitAction,
+    ) {}
+
     /**
-     * Restore beneficiary accumulated administrative debt previously reduced by this settlement.
-     *
-     * No-op if the settlement was never applied to the journal (`journal_anchor_date` is still
-     * null) — nothing to undo. Otherwise restores every entry from the recorded anchor date
-     * forward, mirroring exactly what was reduced.
+     * Restore beneficiary accumulated administrative debt and contributor fund debit.
      */
     public function execute(CashStationSettlement $settlement): void
     {
         $amount = round(max(0, (float) $settlement->amount), 2);
-        if ($amount <= 0 || $settlement->journal_anchor_date === null) {
+        if ($amount <= 0) {
+            return;
+        }
+
+        $this->reverseBeneficiaryDebtReduction($settlement, $amount);
+        $this->reverseContributionContributorFundDebitAction->execute($settlement);
+    }
+
+    private function reverseBeneficiaryDebtReduction(CashStationSettlement $settlement, float $amount): void
+    {
+        if ($settlement->journal_anchor_date === null) {
             return;
         }
 

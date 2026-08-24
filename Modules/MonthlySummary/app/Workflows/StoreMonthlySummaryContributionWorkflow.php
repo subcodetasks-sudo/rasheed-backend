@@ -102,6 +102,11 @@ class StoreMonthlySummaryContributionWorkflow
                 $settlement->year,
                 $settlement->month,
             );
+            $this->broadcastContributionJournalTipAction->execute(
+                $fromProjectId,
+                $settlement->year,
+                $settlement->month,
+            );
         }
 
         return $settlement;

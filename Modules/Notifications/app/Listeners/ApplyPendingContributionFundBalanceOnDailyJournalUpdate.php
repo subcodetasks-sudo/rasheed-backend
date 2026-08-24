@@ -14,12 +14,11 @@ use Modules\MonthlySummary\Enums\ContributionType;
 use Modules\MonthlySummary\Events\MonthlySummaryUpdated;
 
 /**
- * A fund-deficit contribution injects `fund_balance` only once the beneficiary's
- * month tip journal row exists (so it can anchor a stable undo range).
+ * A fund-deficit contribution credits the beneficiary and debits the contributor
+ * once each project's month tip exists.
  *
- * If the qualifying entry didn't exist yet at settlement creation time, the settlement
- * stays pending (`journal_anchor_date` null) and gets retried whenever DailyJournalUpdated
- * fires for a matching beneficiary project.
+ * Either side may stay pending (`journal_anchor_date` / `from_journal_anchor_date`
+ * null) and is retried whenever DailyJournalUpdated fires for a matching project.
  */
 class ApplyPendingContributionFundBalanceOnDailyJournalUpdate
 {
@@ -40,14 +39,28 @@ class ApplyPendingContributionFundBalanceOnDailyJournalUpdate
 
         $pending = CashStationSettlement::query()
             ->where('contribution_type', ContributionType::FundDeficit)
-            ->whereNull('journal_anchor_date')
-            ->whereIn('to_project_id', $projectIds)
+            ->where(function ($query) use ($projectIds) {
+                $query->where(function ($toSide) use ($projectIds) {
+                    $toSide->whereNull('journal_anchor_date')
+                        ->whereIn('to_project_id', $projectIds);
+                })->orWhere(function ($fromSide) use ($projectIds) {
+                    $fromSide->whereNull('from_journal_anchor_date')
+                        ->whereIn('from_project_id', $projectIds);
+                });
+            })
             ->get();
 
         foreach ($pending as $settlement) {
-            $this->applyContributionFundBalanceAction->execute($settlement);
+            $hadToAnchor = $settlement->journal_anchor_date !== null;
+            $hadFromAnchor = $settlement->from_journal_anchor_date !== null;
 
-            if ($settlement->journal_anchor_date !== null) {
+            $this->applyContributionFundBalanceAction->execute($settlement);
+            $settlement->refresh();
+
+            if (
+                (! $hadToAnchor && $settlement->journal_anchor_date !== null)
+                || (! $hadFromAnchor && $settlement->from_journal_anchor_date !== null)
+            ) {
                 $this->broadcastMonth((int) $settlement->year, (int) $settlement->month);
             }
         }

@@ -155,14 +155,20 @@ Label `project_net_result` as **صافي الصندوق**, not إجمالي ال
 
 Envelope still includes `month`, `calculation_date`, `carried_forward_from_previous`, `contributions`.
 
-### Contributions (API unchanged)
+### Contributions
 
-Options and max amount still use Cash Station `net_cash_fund` / transferable surplus, **not** `project_net_result`.
+Contributor / beneficiary option lists and the store max amount use the same journal **`fund_balance` tip** as Monthly Summary `project_net_result` / Daily Journal صافي الصندوق (as of month end). They do **not** use Cash Station `net_cash_fund`.
+
+| Endpoint field | Meaning |
+|----------------|---------|
+| `available_surplus` | `max(0, fund_balance tip)` |
+| `remaining_need` (`fund_deficit`) | `abs(min(0, fund_balance tip))` |
+| `remaining_need` (`administrative_debt`) | outstanding accumulated admin debt (unchanged) |
 
 | Type | Card effect |
 |------|-------------|
-| `fund_deficit` | Beneficiary journal `fund_balance` (and thus `project_net_result`) increases. Contributor journal cash is **not** reduced; show `total_deducted_contributions`. |
-| `administrative_debt` | Reduces `administrative_debt`. Does not change net cash. |
+| `fund_deficit` | Beneficiary journal `fund_balance` (and thus `project_net_result`) **increases**. Contributor journal `fund_balance` / `project_net_result` **decreases** by the same amount. Also show `total_deducted_contributions` / `total_received_contributions`. |
+| `administrative_debt` | Reduces beneficiary `administrative_debt`. Contributor journal `fund_balance` / `project_net_result` **decreases**. Does not change beneficiary cash. |
 
 ---
 
@@ -281,6 +287,6 @@ Realtime: saving operational expense on الصندوق التشغيلي now also
 2. Monthly summary cards show month-end **صافي الصندوق** (`project_net_result` = `fund_balance` tip), including Stage 3 on the source.
 3. No client formula that rebuilds `daily_total` after pool relief.
 4. Cash Station: debt-type contributions do not increase beneficiary `added_contribution` / `net_cash_fund`.
-5. Contribution option lists still use Cash Station surplus/need, not Monthly Summary `project_net_result`.
+5. Contribution option lists use journal `fund_balance` tip (same as `project_net_result`), not Cash Station `net_cash_fund`. Contributor tip drops after a contribution by that amount.
 6. Administrative Fund: إداري المشروعات، مساهمة الصناديق، مساهمة أفراد are **صادر**, not **وارد**.
 7. Operational Rate: hide `total_income`. Show daily `operational_deduction` / `operational_expense` / `operational_net`. Top card `summary.total_operational_expense` = إجمالي الصادر التشغيلي.
