@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Schema;
 use Modules\CashStation\Models\CashStationMonthCarry;
 use Modules\CashStation\Models\CashStationSettlement;
 use Modules\DailyJournal\Actions\ReadAccumulatedAdministrativeDebtTipAction;
+use Modules\MonthlySummary\Enums\ContributionType;
 use Modules\Project\Models\Project;
 
 class BuildCashStationAction
@@ -60,7 +61,7 @@ class BuildCashStationAction
         $debts = $this->administrativeDebtsByProject($projectIds, $endOfMonth->toDateString());
         $adsDebtSettledThisMonth = $this->administrativeDebtSettledInMonthByProject($projectIds, $year, $month);
         $settlements = $this->settlementsForMonth($year, $month);
-        $contributions = $this->contributionsByProject($settlements);
+        $contributions = $this->cashContributionsByProject($settlements);
 
         $projectRows = [];
         $totalSurplus = 0.0;
@@ -275,13 +276,21 @@ class BuildCashStationAction
         return $keyed;
     }
 
+    /**
+     * Status is derived from the same whole-currency-unit precision the UI displays
+     * (FormatMoneyDecimal::formatRounded()), so a sub-unit residual (e.g. -0.07) that
+     * renders as "0" is reported as balanced rather than a deficit label the shown
+     * number doesn't visibly support.
+     */
     private function cashBoxStatus(float $netCashFund): string
     {
-        if ($netCashFund > 0) {
+        $displayed = round($netCashFund);
+
+        if ($displayed > 0) {
             return 'surplus';
         }
 
-        if ($netCashFund < 0) {
+        if ($displayed < 0) {
             return 'deficit';
         }
 
@@ -354,7 +363,7 @@ class BuildCashStationAction
             );
         }
 
-        $contributions = $this->contributionsByProject(
+        $contributions = $this->cashContributionsByProject(
             $this->settlementsForMonth($year, $month)
         );
 
@@ -421,6 +430,41 @@ class BuildCashStationAction
             ->where('month', $month)
             ->orderBy('id')
             ->get();
+    }
+
+    /**
+     * For net_cash_fund purposes only. The contributor's surplus is genuinely spent regardless
+     * of contribution type - real money leaves their cash position either way - but only manual
+     * settlements (contribution_type null) and fund_deficit contributions actually deliver cash
+     * to the beneficiary. An administrative_debt contribution instead settles the beneficiary's
+     * accumulated_administrative_debt (ApplyContributionAdministrativeDebtAction), so it must not
+     * also inflate their cash position: added is skipped, deducted still applies.
+     *
+     * @param  Collection<int, CashStationSettlement>  $settlements
+     * @return array<int, array{added: float, deducted: float}>
+     */
+    private function cashContributionsByProject(Collection $settlements): array
+    {
+        $contributions = [];
+
+        foreach ($settlements as $settlement) {
+            $amount = (float) $settlement->amount;
+
+            if (! isset($contributions[$settlement->to_project_id])) {
+                $contributions[$settlement->to_project_id] = ['added' => 0.0, 'deducted' => 0.0];
+            }
+            if (! isset($contributions[$settlement->from_project_id])) {
+                $contributions[$settlement->from_project_id] = ['added' => 0.0, 'deducted' => 0.0];
+            }
+
+            if ($settlement->contribution_type !== ContributionType::AdministrativeDebt) {
+                $contributions[$settlement->to_project_id]['added'] += $amount;
+            }
+
+            $contributions[$settlement->from_project_id]['deducted'] += $amount;
+        }
+
+        return $contributions;
     }
 
     /**

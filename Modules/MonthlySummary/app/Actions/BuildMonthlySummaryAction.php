@@ -108,13 +108,21 @@ class BuildMonthlySummaryAction
         ];
     }
 
+    /**
+     * Derived from the same whole-currency-unit precision project_net_result is displayed
+     * with (FormatMoneyDecimal::formatRounded()), so a sub-unit residual that renders as
+     * "0" is reported as neutral rather than a surplus/deficit label the shown number
+     * doesn't visibly support.
+     */
     private function netResultState(float $monthlyTotal): string
     {
-        if ($monthlyTotal > 0) {
+        $displayed = round($monthlyTotal);
+
+        if ($displayed > 0) {
             return 'surplus';
         }
 
-        if ($monthlyTotal < 0) {
+        if ($displayed < 0) {
             return 'deficit';
         }
 

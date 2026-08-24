@@ -290,6 +290,93 @@ class DailyJournalCalculationService
     }
 
     /**
+     * Same-day Administrative Percentage Pool relief (Stage 3).
+     *
+     * For each entry, the source capacity it can offer to OTHER projects' deficits that day is the
+     * portion of its own administrative_fee that Case 1 (Stage 2) did not already consume for its own
+     * deficit. A project still in deficit after Case 1 has, by construction, remainingFee = 0 (Case 1
+     * would have consumed its entire fee), so a project can never be both a source and a beneficiary.
+     *
+     * Beneficiaries (fund_balance < 0) are covered in project_id ascending order, each drawing from
+     * sources (remaining fee > 0) in project_id ascending order, greedily, until its deficit is met or
+     * sources run out. Exactly like Case 1, the amount drawn is recorded as administrative_debt on the
+     * beneficiary (not left as an untracked fund top-up) and added onto its fund_balance — the only
+     * difference from Case 1 is the funding source (another project's unused same-day fee instead of the
+     * project's own). This is a real, zero-sum cash transfer: the source's fund_balance is reduced by the
+     * exact same amount the beneficiary's is increased by, so the org-wide total is never inflated —
+     * money moves from the source's cash position into the beneficiary's, it is not fabricated.
+     *
+     * @param  Collection<int, DailyJournalEntry>  $entries
+     * @return array{entries: Collection<int, DailyJournalEntry>, allocations: list<array{source_project_id: int, beneficiary_project_id: int, relief_entry_id: int, amount: float}>}
+     */
+    public function applyAdministrativePoolRelief(Collection $entries): array
+    {
+        $sourceCapacity = [];
+
+        foreach ($entries as $entry) {
+            $caseOneUsed = round((float) $entry->administrative_debt - $entry->contributionAmount(), 2);
+            $remainingFee = round(max(0, (float) $entry->administrative_fee - $caseOneUsed), 2);
+
+            $sourceCapacity[$entry->project_id] = $remainingFee;
+            $entry->administrative_pool_relief = 0.0;
+        }
+
+        $beneficiaries = $entries
+            ->filter(fn (DailyJournalEntry $entry) => (float) $entry->fund_balance < 0)
+            ->sortBy('project_id')
+            ->values();
+
+        $sources = $entries
+            ->filter(fn (DailyJournalEntry $entry) => ($sourceCapacity[$entry->project_id] ?? 0) > 0)
+            ->sortBy('project_id')
+            ->values();
+
+        $allocations = [];
+
+        foreach ($beneficiaries as $beneficiary) {
+            $need = round(abs((float) $beneficiary->fund_balance), 2);
+
+            foreach ($sources as $source) {
+                if ($need <= 0) {
+                    break;
+                }
+
+                if ($source->project_id === $beneficiary->project_id) {
+                    continue;
+                }
+
+                $available = $sourceCapacity[$source->project_id] ?? 0.0;
+                $used = round(min($available, $need), 2);
+
+                if ($used <= 0) {
+                    continue;
+                }
+
+                $sourceCapacity[$source->project_id] = round($available - $used, 2);
+                $need = round($need - $used, 2);
+
+                $beneficiary->fund_balance = round((float) $beneficiary->fund_balance + $used, 2);
+                $beneficiary->administrative_debt = round((float) $beneficiary->administrative_debt + $used, 2);
+                $beneficiary->administrative_pool_relief = round(
+                    (float) $beneficiary->administrative_pool_relief + $used,
+                    2
+                );
+
+                $source->fund_balance = round((float) $source->fund_balance - $used, 2);
+
+                $allocations[] = [
+                    'source_project_id' => $source->project_id,
+                    'beneficiary_project_id' => $beneficiary->project_id,
+                    'relief_entry_id' => $beneficiary->id,
+                    'amount' => $used,
+                ];
+            }
+        }
+
+        return ['entries' => $entries, 'allocations' => $allocations];
+    }
+
+    /**
      * @param  Collection<int, DailyJournalEntry>  $entries
      * @param  array<int, array{fund_balance: float, accumulated_administrative_debt: float}>  $previousBalances
      * @return Collection<int, DailyJournalEntry>

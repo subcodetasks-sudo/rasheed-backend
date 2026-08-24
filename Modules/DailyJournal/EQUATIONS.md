@@ -22,6 +22,7 @@ You are implementing or reviewing the Daily Journal calculation engine for Rashi
 - `fund_balance`
 - `administrative_debt`
 - `accumulated_administrative_debt`
+- `administrative_pool_relief`
 
 Unique key per row: `(project_id, journal_date)`. Only **Active** projects are allowed.
 
@@ -190,6 +191,60 @@ fund_balance = round(fund_balance + fund_consumption_debt, 2)
 
 **Not a debt source:** uncovered administrative expense; negative balance with fee 0 and no contribution.
 
+### 6a. Same-day Administrative Percentage Pool relief (Stage 3)
+
+If a project's `fund_balance` is still negative **after** Case 1 (§6) has run, automatically cover as much of the
+remaining deficit as possible from the **unused administrative-fee capacity of other projects on the same journal
+date** — Stage 3. This is a separate, self-contained mechanism from the org-wide, historical Administrative
+Percentage Balance pool used by contributions (§ "Administrative Percentage Balance (org pool)"); it never reads or
+writes `AdministrativePercentageBalanceService`, `admin_percentage_balance_debits`, or `admin_percentage_balance_credits`.
+
+**Source capacity (per project, that day only):**
+```
+caseOneUsed = administrative_debt − contribution   // the fee actually consumed by Case 1
+remainingFee = round(max(0, administrative_fee − caseOneUsed), 2)
+```
+A project still in deficit after Case 1 always has `remainingFee = 0` (Case 1 would have consumed its entire fee to
+get there), and a project with `remainingFee > 0` always has `fund_balance ≥ 0` (no deficit) — so a project can
+never be both a source and a beneficiary on the same day. As a defensive rule, an allocation is never created where
+`source_project_id === beneficiary_project_id`.
+
+**Allocation (deterministic, greedy):**
+- Beneficiaries (`fund_balance < 0` after Case 1) are processed in `project_id` ascending order.
+- For each beneficiary, sources (`remainingFee > 0`) are consumed in `project_id` ascending order:
+  `used = min(source's remaining capacity, beneficiary's remaining need)`; both are reduced by `used`; continue
+  until the beneficiary's need reaches 0 or all sources are exhausted.
+- Exactly like Case 1, the amount drawn is **recorded as `administrative_debt`, not left as an untracked fund
+  top-up**: `administrative_debt += used` and `fund_balance += used` on the beneficiary. The only difference from
+  Case 1 is the funding source — another project's unused same-day fee instead of the project's own. This means
+  Stage 3's relief flows into `accumulated_administrative_debt` for that day (§7) exactly as Case 1's does; it is
+  not a separate, undebted "top-up". `administrative_pool_relief` additionally accumulates the total received, purely
+  as an audit breakdown of how much of today's `administrative_debt` came from the pool versus from Case 1.
+- The source's `fund_balance` is **decreased by the same `used` amount** (`fund_balance −= used`). This is a real,
+  zero-sum cash transfer — the source's fee-derived capacity that gets redirected to another project's deficit is no
+  longer available in the source's own cash position, exactly as if the money physically moved from one project's
+  fund to the other's. The org-wide sum of `fund_balance` across all projects is therefore unchanged by Stage 3
+  alone: whatever a beneficiary gains, a source loses. (Note this can, in principle, leave a source project's own
+  `fund_balance` negative even though it had no deficit of its own before Stage 3 ran — that reflects a real
+  consequence of its fee capacity having been given away, not a bug.)
+- Any deficit that still remains after sources are exhausted stays negative, carried forward as-is — Stage 3 never
+  fabricates money on either side of the transfer.
+
+**Pool scope — same day only.** The pool for date `D` is built strictly from date `D`'s own entries. It never uses a
+prior day's unused fee, never reserves capacity for a future day, and has no relationship to the historical/global
+Administrative Percentage Balance pool.
+
+**Persistence and idempotency.** Every individual source→beneficiary transfer is recorded in
+`admin_percentage_pool_relief_allocations` (`relief_entry_id` = the beneficiary's `daily_journal_entries.id`,
+`source_project_id`, `beneficiary_project_id`, `journal_date`, `amount`). Before reallocating, all existing rows for
+that `journal_date` are deleted, then rebuilt from scratch from the current entries — so recalculating the same date
+any number of times (including via the forward chain) never doubles relief or leaks stale allocation rows.
+
+**Fully automatic; never auto-repays prior debt.** No approval/contribution/settlement request is involved. Stage 3
+only ever adds to **today's** `administrative_debt`/`accumulated_administrative_debt` (via the pool relief it
+creates today, same as Case 1) — it never reduces or repays `accumulated_administrative_debt` carried in from prior
+days; that stays exclusively manual via `POST /daily-journals/repay-debt`, exactly as documented in §8.
+
 ### 7. Accumulated debt
 ```
 accumulated_administrative_debt = round(
@@ -229,6 +284,9 @@ fund_balance = surplus
 7. Apply administrative expense coverage from surplus → settle prior project_administration tip → final `fund_balance`, `uncovered_administrative_expense`, `project_administration_settled`, `outstanding_project_administration`
 8. Capture `remainingDeficits = |fund_balance| if < 0 else 0` (for contribution validation; **before** Case 1 fund restore)
 9. Calculate administrative debt (Case 1 fund consumption + contribution) and restore Case 1 onto `fund_balance`
+9a. Apply same-day Administrative Percentage Pool relief (Stage 3, §6a) — delete that date's prior allocation rows,
+    recompute source/beneficiary capacity from the current entries, reallocate, and add the relief onto both
+    `administrative_debt` and `fund_balance` (same treatment as Case 1, different funding source)
 10. Update accumulated administrative debt
 11. Persist calculated fields
 
@@ -356,6 +414,8 @@ Action rejections:
 | Contribution re-save | Recomputes from same fund-consumption base (never compounds); additional pool debit only for increases |
 | Surplus day after prior debt | Surplus kept; accumulated unchanged until repay endpoint |
 | Pass-2 preserve | Fee / op / admin expense frozen from Pass 1 |
+| Deficit remains after Case 1, same-day pool has capacity | Stage 3 relieves `min(remainingFee sources, deficit)`, adding it to `administrative_debt` (like Case 1) and `fund_balance`; allocation rows record source→beneficiary breakdown |
+| Deficit remains after Case 1, same-day pool exhausted/zero | No relief; deficit stays negative; no allocation rows created |
 | Non-active projects | Rejected on save |
 | Editing one date | Recalculates that date then later journal dates in order (fund + tip chain) |
 | Project delete | Blocked if any journal entries exist |

@@ -135,6 +135,27 @@ class MonthlySummaryApiTest extends TestCase
         $this->assertArrayNotHasKey('available_surplus', $row);
     }
 
+    /**
+     * A sub-whole-unit residual (e.g. -0.07) must not report net_result_state "deficit" while
+     * project_net_result displays as "0" - the state is derived from the same whole-unit
+     * precision that is shown, so the two never visibly contradict each other.
+     */
+    public function test_net_result_state_matches_whole_unit_display_for_sub_unit_residual(): void
+    {
+        $this->actAs('finance');
+        $project = $this->createProject();
+
+        $this->seedEntry($project->id, '2026-07-10', [
+            'daily_expense' => 0.07,
+        ]);
+
+        $data = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
+        $row = $this->findProject($data, $project->id);
+
+        $this->assertSame('0', $row['project_net_result']);
+        $this->assertSame('neutral', $row['net_result_state']);
+    }
+
     public function test_fund_deficit_contribution_and_cancel(): void
     {
         $this->actAs('finance');

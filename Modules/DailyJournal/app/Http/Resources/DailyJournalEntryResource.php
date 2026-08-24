@@ -35,6 +35,7 @@ class DailyJournalEntryResource extends JsonResource
             'fund_balance' => FormatMoneyDecimal::formatRounded($this->fund_balance),
             'administrative_debt' => FormatMoneyDecimal::formatRounded($this->administrative_debt),
             'accumulated_administrative_debt' => FormatMoneyDecimal::formatRounded($this->accumulated_administrative_debt),
+            'administrative_pool_relief' => FormatMoneyDecimal::formatRounded($this->administrative_pool_relief),
         ];
     }
 

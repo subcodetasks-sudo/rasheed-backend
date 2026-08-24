@@ -5,8 +5,10 @@ namespace Tests\Feature\CashStation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Modules\DailyJournal\Models\DailyJournalEntry;
+use Modules\MonthlySummary\Enums\ContributionType;
 use Modules\Project\Enums\OperationalDeductionType;
 use Modules\Project\Enums\ProjectStatus;
+use Modules\Project\Models\Category;
 use Modules\Project\Models\Project;
 use Modules\User\app\Models\User;
 use Spatie\Permission\Models\Role;
@@ -568,6 +570,81 @@ class CashStationApiTest extends TestCase
         $this->assertSame('surplus', $this->findProject($data, $surplus->id)['status']);
         $this->assertSame('deficit', $this->findProject($data, $deficit->id)['status']);
         $this->assertSame('balanced', $this->findProject($data, $balanced->id)['status']);
+    }
+
+    /**
+     * A sub-whole-unit residual (e.g. -0.07, left over when Stage 3's relief pool falls a few
+     * fils short of a project's full deficit) must not report as "deficit" while the displayed
+     * net_cash_fund rounds to "0" - status is derived from the same whole-unit precision that is
+     * displayed, so the two never visibly contradict each other.
+     */
+    public function test_status_matches_whole_unit_display_for_sub_unit_residual(): void
+    {
+        $this->actAs('finance');
+        $project = $this->createProject();
+
+        $this->seedEntry($project->id, '2026-07-01', [
+            'daily_expense' => 0.07,
+        ]);
+
+        $data = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
+        $row = $this->findProject($data, $project->id);
+
+        $this->assertSame('0', $row['net_cash_fund']);
+        $this->assertSame('balanced', $row['status']);
+    }
+
+    /**
+     * An administrative_debt-type Monthly Summary contribution settles the beneficiary's
+     * accumulated_administrative_debt (ApplyContributionAdministrativeDebtAction), not their cash
+     * position - so the beneficiary's net_cash_fund must not increase. The contributor's surplus,
+     * however, is genuinely given away either way, exactly like a fund_deficit contribution: their
+     * net_cash_fund must still decrease by the full amount.
+     */
+    public function test_administrative_debt_contribution_deducts_contributor_but_not_beneficiary_cash(): void
+    {
+        $this->actAs('finance');
+        $category = Category::factory()->create();
+        $from = $this->createProject(['name' => 'مساهم', 'category_id' => $category->id]);
+        $to = $this->createProject(['name' => 'مدين', 'category_id' => $category->id]);
+
+        $this->seedEntry($from->id, '2026-07-12', [
+            'daily_income' => 800,
+        ]);
+        $this->seedEntry($to->id, '2026-07-12', [
+            'daily_income' => 100,
+            'administrative_debt' => 50,
+            'accumulated_administrative_debt' => 120,
+        ]);
+
+        $before = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
+        $fromBefore = $this->findProject($before, $from->id);
+        $toBefore = $this->findProject($before, $to->id);
+
+        $this->postJson('/api/v1/monthly-summary/contributions', [
+            'month' => 7,
+            'year' => 2026,
+            'from_project_id' => $from->id,
+            'to_project_id' => $to->id,
+            'contribution_type' => ContributionType::AdministrativeDebt->value,
+            'amount' => 80,
+        ])->assertCreated();
+
+        $after = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
+        $fromAfter = $this->findProject($after, $from->id);
+        $toAfter = $this->findProject($after, $to->id);
+
+        // The debt relief did happen, on the debt ledger.
+        $this->assertSame('120', $toBefore['remaining_administrative_debt']);
+        $this->assertSame('40', $toAfter['remaining_administrative_debt']);
+
+        // Contributor: real money given away, same as a fund_deficit contribution would.
+        $this->assertSame((string) round((float) $fromBefore['net_cash_fund'] - 80, 2), $fromAfter['net_cash_fund']);
+        $this->assertSame('80', $fromAfter['deducted_contribution']);
+
+        // Beneficiary: cash position unaffected - only the debt ledger moved.
+        $this->assertSame($toBefore['net_cash_fund'], $toAfter['net_cash_fund']);
+        $this->assertSame('0', $toAfter['added_contribution']);
     }
 
     public function test_settlement_validation_rejects_same_project_and_non_positive_amount(): void
