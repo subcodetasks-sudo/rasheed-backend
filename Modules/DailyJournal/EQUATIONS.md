@@ -212,7 +212,9 @@ never be both a source and a beneficiary on the same day. As a defensive rule, a
 `source_project_id === beneficiary_project_id`.
 
 **Allocation (deterministic, greedy):**
-- Beneficiaries (`fund_balance < 0` after Case 1) are processed in `project_id` ascending order.
+- Beneficiaries (`fund_balance < 0` after Case 1) are processed with **today's operating deficit first**
+  (`daily_total < 0`), then **carried-only** deficits (`daily_total >= 0`, e.g. zero activity with a negative
+  tip from a prior day). Within each group, order is `project_id` ascending.
 - For each beneficiary, sources (`remainingFee > 0`) are consumed in `project_id` ascending order:
   `used = min(source's remaining capacity, beneficiary's remaining need)`; both are reduced by `used`; continue
   until the beneficiary's need reaches 0 or all sources are exhausted.

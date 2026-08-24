@@ -109,17 +109,18 @@ class ExpectedDailyJournalCalculator
 
     /**
      * Same-day Administrative Percentage Pool relief (Stage 3, EQUATIONS.md §6a): a project still in
-     * deficit after Case 1 draws from OTHER projects' unused same-day fee only. Beneficiaries and
-     * sources are both walked in $projectDefs iteration order, which mirrors the app's project_id
-     * ascending order because WorkbookScenarioBuilder::seedProjects() creates projects in that same
-     * array order. Exactly like Case 1, the amount drawn is recorded as administrative_debt (which then
-     * flows into accumulated_administrative_debt) and added onto the beneficiary's fund_balance - the
-     * only difference from Case 1 is the funding source (another project's unused same-day fee, not the
-     * project's own). It is a real, zero-sum transfer: the source's fund_balance is reduced by the same
-     * amount, so the org-wide total is unaffected.
+     * deficit after Case 1 draws from OTHER projects' unused same-day fee only. Beneficiaries are
+     * walked with today's operating deficit first (`daily_total < 0`), then carried-only deficits,
+     * and within each group in $projectDefs iteration order (mirrors app project_id ascending because
+     * WorkbookScenarioBuilder::seedProjects() creates projects in that array order). Sources are walked
+     * in the same definition order. Exactly like Case 1, the amount drawn is recorded as
+     * administrative_debt (which then flows into accumulated_administrative_debt) and added onto the
+     * beneficiary's fund_balance - the only difference from Case 1 is the funding source (another
+     * project's unused same-day fee, not the project's own). It is a real, zero-sum transfer: the
+     * source's fund_balance is reduced by the same amount, so the org-wide total is unaffected.
      *
-     * @param  array<string, array{fund_balance: float, administrative_debt: float, remaining_fee: float}>  $result
-     * @return array<string, array{fund_balance: float, administrative_debt: float, remaining_fee: float}>
+     * @param  array<string, array{fund_balance: float, administrative_debt: float, remaining_fee: float, daily_total: float}>  $result
+     * @return array<string, array{fund_balance: float, administrative_debt: float, remaining_fee: float, daily_total: float}>
      */
     private function applyAdministrativePoolRelief(array $result): array
     {
@@ -128,14 +129,35 @@ class ExpectedDailyJournalCalculator
             $sourceCapacity[$name] = $row['remaining_fee'];
         }
 
-        foreach ($result as $beneficiaryName => $beneficiaryRow) {
-            $need = round(abs(min(0, $beneficiaryRow['fund_balance'])), 2);
+        $beneficiaryNames = array_keys(array_filter(
+            $result,
+            fn (array $row) => $row['fund_balance'] < 0,
+        ));
+
+        usort($beneficiaryNames, function (string $a, string $b) use ($result) {
+            $priorityA = $result[$a]['daily_total'] < 0 ? 0 : 1;
+            $priorityB = $result[$b]['daily_total'] < 0 ? 0 : 1;
+
+            if ($priorityA !== $priorityB) {
+                return $priorityA <=> $priorityB;
+            }
+
+            // Preserve definition order (insertion order of $result) as project_id proxy.
+            $order = array_flip(array_keys($result));
+
+            return $order[$a] <=> $order[$b];
+        });
+
+        $sourceNames = array_keys($result);
+
+        foreach ($beneficiaryNames as $beneficiaryName) {
+            $need = round(abs(min(0, $result[$beneficiaryName]['fund_balance'])), 2);
 
             if ($need <= 0) {
                 continue;
             }
 
-            foreach ($result as $sourceName => $sourceRow) {
+            foreach ($sourceNames as $sourceName) {
                 if ($need <= 0) {
                     break;
                 }

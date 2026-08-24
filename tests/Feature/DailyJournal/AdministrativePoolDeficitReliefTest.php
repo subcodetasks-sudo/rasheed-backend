@@ -11,8 +11,9 @@ use Modules\Project\Models\Project;
 /**
  * Stage 3: same-day Administrative Percentage Pool relief. Verifies deficits still
  * open after Case 1 (§6) are covered from OTHER projects' unused same-day
- * administrative_fee only, with a deterministic project_id-ordered allocation and
- * a full source->beneficiary allocation history.
+ * administrative_fee only, with today's operating deficits (`daily_total < 0`)
+ * before carried-only deficits, then project_id order within each group, and a
+ * full source->beneficiary allocation history.
  */
 class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
 {
@@ -235,6 +236,55 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
         // fully drawn (200 to A + 100 to B) -> 900.
         $this->assertEqualsWithDelta(1200.0, (float) $this->entryFor($sourceC->id)->fund_balance, 0.001);
         $this->assertEqualsWithDelta(900.0, (float) $this->entryFor($sourceD->id)->fund_balance, 0.001);
+    }
+
+    /**
+     * Today's operating deficit (`daily_total < 0`) is relieved before a carried-only deficit,
+     * even when the carried project has the lower project_id (old sort would have preferred it).
+     */
+    public function test_today_deficit_is_relieved_before_carried_only_deficit(): void
+    {
+        $this->actAsFinanceUser();
+
+        // Lower id = carried; higher id = today's deficit (proves priority is not project_id-only).
+        $carried = $this->subjectProject(['administrative_exempt' => true]);
+        $todayDeficit = $this->subjectProject(['administrative_exempt' => true]);
+        $source = $this->subjectProject(['administrative_fee_percentage' => 20]);
+
+        $this->assertLessThan($todayDeficit->id, $carried->id);
+
+        // Day 1: carried project builds a tip deficit; no pool source that day.
+        $this->saveJournal(self::DATE, [
+            ['project_id' => $carried->id, 'daily_expense' => 400],
+        ]);
+        $this->assertEqualsWithDelta(-400.0, (float) $this->entryFor($carried->id)->fund_balance, 0.001);
+
+        // Day 2: carried has no worsening activity (daily_total ~ 0, tip still negative).
+        // Today-deficit project spends 300. Source fee = 200 — enough for only one full cover.
+        $this->saveJournal(self::OTHER_DATE, [
+            ['project_id' => $carried->id, 'daily_income' => 0, 'daily_expense' => 0],
+            ['project_id' => $todayDeficit->id, 'daily_expense' => 300],
+            ['project_id' => $source->id, 'daily_income' => 1000],
+        ]);
+
+        $carriedEntry = $this->entryFor($carried->id, self::OTHER_DATE);
+        $todayEntry = $this->entryFor($todayDeficit->id, self::OTHER_DATE);
+        $sourceEntry = $this->entryFor($source->id, self::OTHER_DATE);
+
+        $this->assertEqualsWithDelta(0.0, (float) $carriedEntry->daily_total, 0.001);
+        $this->assertLessThan(0.0, (float) $todayEntry->daily_total);
+
+        // Pool remainingFee = 200 goes entirely to today's deficit first.
+        $this->assertEqualsWithDelta(200.0, (float) $todayEntry->administrative_pool_relief, 0.001);
+        $this->assertEqualsWithDelta(-100.0, (float) $todayEntry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $carriedEntry->administrative_pool_relief, 0.001);
+        $this->assertEqualsWithDelta(-400.0, (float) $carriedEntry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(200.0, (float) $sourceEntry->administrative_pool_relief_given, 0.001);
+
+        $allocations = AdminPercentagePoolReliefAllocation::query()->forDate(self::OTHER_DATE)->get();
+        $this->assertCount(1, $allocations);
+        $this->assertSame($todayDeficit->id, $allocations->first()->beneficiary_project_id);
+        $this->assertEqualsWithDelta(200.0, (float) $allocations->first()->amount, 0.001);
     }
 
     /** 7. Same-day isolation: a prior day's unused fee never relieves a later day's deficit. */

@@ -297,14 +297,16 @@ class DailyJournalCalculationService
      * deficit. A project still in deficit after Case 1 has, by construction, remainingFee = 0 (Case 1
      * would have consumed its entire fee), so a project can never be both a source and a beneficiary.
      *
-     * Beneficiaries (fund_balance < 0) are covered in project_id ascending order, each drawing from
-     * sources (remaining fee > 0) in project_id ascending order, greedily, until its deficit is met or
-     * sources run out. Exactly like Case 1, the amount drawn is recorded as administrative_debt on the
-     * beneficiary (not left as an untracked fund top-up) and added onto its fund_balance — the only
-     * difference from Case 1 is the funding source (another project's unused same-day fee instead of the
-     * project's own). This is a real, zero-sum cash transfer: the source's fund_balance is reduced by the
-     * exact same amount the beneficiary's is increased by, so the org-wide total is never inflated —
-     * money moves from the source's cash position into the beneficiary's, it is not fabricated.
+     * Beneficiaries (fund_balance < 0) are covered with today's operating deficit first
+     * (`daily_total < 0`), then carried-only deficits (`daily_total >= 0`), and within each group by
+     * project_id ascending. Each draws from sources (remaining fee > 0) in project_id ascending order,
+     * greedily, until its deficit is met or sources run out. Exactly like Case 1, the amount drawn is
+     * recorded as administrative_debt on the beneficiary (not left as an untracked fund top-up) and
+     * added onto its fund_balance — the only difference from Case 1 is the funding source (another
+     * project's unused same-day fee instead of the project's own). This is a real, zero-sum cash
+     * transfer: the source's fund_balance is reduced by the exact same amount the beneficiary's is
+     * increased by, so the org-wide total is never inflated — money moves from the source's cash
+     * position into the beneficiary's, it is not fabricated.
      *
      * @param  Collection<int, DailyJournalEntry>  $entries
      * @return array{entries: Collection<int, DailyJournalEntry>, allocations: list<array{source_project_id: int, beneficiary_project_id: int, relief_entry_id: int, amount: float}>}
@@ -325,7 +327,10 @@ class DailyJournalCalculationService
 
         $beneficiaries = $entries
             ->filter(fn (DailyJournalEntry $entry) => (float) $entry->fund_balance < 0)
-            ->sortBy('project_id')
+            ->sortBy(fn (DailyJournalEntry $entry) => [
+                (float) $entry->daily_total < 0 ? 0 : 1,
+                (int) $entry->project_id,
+            ])
             ->values();
 
         $sources = $entries

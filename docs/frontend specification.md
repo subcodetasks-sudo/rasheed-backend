@@ -114,6 +114,8 @@ Sibling of `entries` on `DailyJournalResource`. Sums **all active projects for t
 ### Behaviour vs `main`
 
 - Stage 3 (same-day admin-percentage pool) runs **after** `daily_total` and Case 1.
+- Beneficiary order when the pool is scarce: projects with **today's** deficit (`daily_total < 0`) before
+  **carried-only** deficits (`daily_total >= 0`); then `project_id` ascending within each group.
 - `daily_total` is **not** recalculated. Admin fee is already inside `daily_total`.
 - Stage 3 only moves **صافي الصندوق**:
   - beneficiary: `fund_balance` ↑, `administrative_debt` ↑, `administrative_pool_relief` ↑
