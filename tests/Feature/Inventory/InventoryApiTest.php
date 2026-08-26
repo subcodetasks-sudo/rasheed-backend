@@ -216,8 +216,14 @@ class InventoryApiTest extends InventoryFeatureTestCase
         $this->assertCount(2, $consumptions);
         $this->assertSame('10.00', $consumptions[0]['quantity']);
         $this->assertSame('2.00', $consumptions[0]['unit_cost']);
+        $this->assertSame('opening', $consumptions[0]['source_type']);
+        $this->assertNull($consumptions[0]['source_movement_id']);
+        $this->assertNotEmpty($consumptions[0]['received_at']);
         $this->assertSame('2.00', $consumptions[1]['quantity']);
         $this->assertSame('5.00', $consumptions[1]['unit_cost']);
+        $this->assertSame('incoming', $consumptions[1]['source_type']);
+        $this->assertNotNull($consumptions[1]['source_movement_id']);
+        $this->assertNotEmpty($consumptions[1]['received_at']);
 
         $item = InventoryItem::query()->findOrFail($itemId);
         $this->assertSame('8.00', $item->current_balance);

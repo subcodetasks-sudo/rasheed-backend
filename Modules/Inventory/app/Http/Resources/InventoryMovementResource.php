@@ -30,6 +30,9 @@ class InventoryMovementResource extends JsonResource
                 'quantity' => $c->quantity,
                 'unit_cost' => $c->unit_cost,
                 'line_cost' => $c->line_cost,
+                'source_type' => $c->batch?->source_type?->value,
+                'received_at' => $c->batch?->received_at?->toISOString(),
+                'source_movement_id' => $c->batch?->source_movement_id,
             ])),
             'created_at' => $this->created_at?->toISOString(),
         ];

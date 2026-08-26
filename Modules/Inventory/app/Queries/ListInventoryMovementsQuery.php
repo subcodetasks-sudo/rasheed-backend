@@ -25,7 +25,7 @@ class ListInventoryMovementsQuery
      */
     public function filteredQuery(Request $request): Builder
     {
-        $query = InventoryMovement::query()->with(['item', 'beneficiaryProject', 'consumptions']);
+        $query = InventoryMovement::query()->with(['item', 'beneficiaryProject', 'consumptions.batch']);
 
         $this->applyDateRangeFilters($query, $request);
 

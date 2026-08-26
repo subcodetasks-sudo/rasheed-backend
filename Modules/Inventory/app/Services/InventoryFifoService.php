@@ -171,7 +171,7 @@ class InventoryFifoService
 
             $this->balanceService->checkMinimumStock($item, $previousBalance);
 
-            return $movement->fresh(['item', 'beneficiaryProject', 'consumptions', 'creator']);
+            return $movement->fresh(['item', 'beneficiaryProject', 'consumptions.batch', 'creator']);
         });
     }
 }
