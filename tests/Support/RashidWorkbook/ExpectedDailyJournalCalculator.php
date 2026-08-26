@@ -116,8 +116,8 @@ class ExpectedDailyJournalCalculator
      * in the same definition order. Exactly like Case 1, the amount drawn is recorded as
      * administrative_debt (which then flows into accumulated_administrative_debt) and added onto the
      * beneficiary's fund_balance - the only difference from Case 1 is the funding source (another
-     * project's unused same-day fee, not the project's own). It is a real, zero-sum transfer: the
-     * source's fund_balance is reduced by the same amount, so the org-wide total is unaffected.
+     * project's unused same-day fee, not the project's own). The source's fund_balance is not reduced
+     * (fee already deducted in daily_total); only capacity / given audit fields move.
      *
      * @param  array<string, array{fund_balance: float, administrative_debt: float, remaining_fee: float, daily_total: float}>  $result
      * @return array<string, array{fund_balance: float, administrative_debt: float, remaining_fee: float, daily_total: float}>
@@ -181,7 +181,6 @@ class ExpectedDailyJournalCalculator
                     $result[$beneficiaryName]['administrative_debt'] + $used,
                     2
                 );
-                $result[$sourceName]['fund_balance'] = round($result[$sourceName]['fund_balance'] - $used, 2);
             }
         }
 

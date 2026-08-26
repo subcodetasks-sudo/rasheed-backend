@@ -75,7 +75,7 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
         // Beneficiary: fee 200; daily_total 1000-1200-200=-400; Case1 uses 200 -> fund -200, debt 200; deficit 200.
         // Source: fee 600; no deficit -> fund_balance 5000-600=4400; remainingFee 600 (case1Used 0).
         // Stage 3 relieves the remaining 200 like Case 1 does: administrative_debt += 200 -> 400; fund_balance += 200 -> 0.
-        // It is a real transfer: the source's own fund_balance is drawn down by the same 200 -> 4200.
+        // Source fund_balance stays 4400 (fee already in daily_total; no second drain).
         $beneficiaryEntry = $this->entryFor($beneficiary->id);
         $sourceEntry = $this->entryFor($source->id);
 
@@ -88,7 +88,7 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
         $this->assertEqualsWithDelta(200.0, (float) $sourceEntry->administrative_pool_relief_given, 0.001);
         $this->assertEqualsWithDelta(0.0, (float) $beneficiaryEntry->administrative_fee_remaining, 0.001);
         $this->assertEqualsWithDelta(400.0, (float) $sourceEntry->administrative_fee_remaining, 0.001);
-        $this->assertEqualsWithDelta(4200.0, (float) $sourceEntry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(4400.0, (float) $sourceEntry->fund_balance, 0.001);
 
         $allocations = AdminPercentagePoolReliefAllocation::query()->forDate(self::DATE)->get();
         $this->assertCount(1, $allocations);
@@ -112,6 +112,7 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
 
         // Beneficiary: fee 200; daily_total -1200; Case1 uses 200 -> fund -1000; deficit 1000.
         // Source: fee 300; fund_balance 1500-300=1200; remainingFee 300 (no deficit of its own), fully drawn.
+        // Source fund stays 1200 (no second drain).
         $beneficiaryEntry = $this->entryFor($beneficiary->id);
         $sourceEntry = $this->entryFor($source->id);
 
@@ -121,7 +122,7 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
         $this->assertEqualsWithDelta(300.0, (float) $sourceEntry->administrative_pool_relief_given, 0.001);
         $this->assertEqualsWithDelta(0.0, (float) $beneficiaryEntry->administrative_fee_remaining, 0.001);
         $this->assertEqualsWithDelta(0.0, (float) $sourceEntry->administrative_fee_remaining, 0.001);
-        $this->assertEqualsWithDelta(900.0, (float) $sourceEntry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(1200.0, (float) $sourceEntry->fund_balance, 0.001);
 
         $allocations = AdminPercentagePoolReliefAllocation::query()->forDate(self::DATE)->get();
         $this->assertCount(1, $allocations);
@@ -177,17 +178,17 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
         $this->assertSame($sourceC->id, $allocations[1]->source_project_id);
         $this->assertEqualsWithDelta(400.0, (float) $allocations[1]->amount, 0.001);
 
-        // Source B: fund_balance 1500-300=1200, fully drawn -> 900. Source C: fund_balance 2500-500=2000,
-        // only 400 of its 500 capacity drawn -> 1600.
+        // Source B: fund_balance 1500-300=1200 (unchanged by Stage 3). Source C: fund_balance 2500-500=2000
+        // (unchanged; 400 of 500 capacity given).
         $sourceBEntry = $this->entryFor($sourceB->id);
         $sourceCEntry = $this->entryFor($sourceC->id);
-        $this->assertEqualsWithDelta(900.0, (float) $sourceBEntry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(1200.0, (float) $sourceBEntry->fund_balance, 0.001);
         $this->assertEqualsWithDelta(300.0, (float) $sourceBEntry->administrative_pool_relief_given, 0.001);
-        $this->assertEqualsWithDelta(1600.0, (float) $sourceCEntry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(2000.0, (float) $sourceCEntry->fund_balance, 0.001);
         $this->assertEqualsWithDelta(400.0, (float) $sourceCEntry->administrative_pool_relief_given, 0.001);
         $this->assertEqualsWithDelta(0.0, (float) $sourceBEntry->administrative_fee_remaining, 0.001);
         $this->assertEqualsWithDelta(100.0, (float) $sourceCEntry->administrative_fee_remaining, 0.001);
-        // Zero-sum: total given == total received for the day.
+        // Capacity audit: total given == total received for the day.
         $beneficiaryEntry = $this->entryFor($beneficiary->id);
         $this->assertEqualsWithDelta(0.0, (float) $beneficiaryEntry->administrative_pool_relief_given, 0.001);
         $totalGiven = (float) $sourceBEntry->administrative_pool_relief_given + (float) $sourceCEntry->administrative_pool_relief_given;
@@ -232,10 +233,9 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
         $this->assertEqualsWithDelta(400.0, (float) $fromC, 0.001);
         $this->assertEqualsWithDelta(300.0, (float) $fromD, 0.001);
 
-        // Source C: fund_balance 2000-400=1600, fully drawn -> 1200. Source D: fund_balance 1500-300=1200,
-        // fully drawn (200 to A + 100 to B) -> 900.
-        $this->assertEqualsWithDelta(1200.0, (float) $this->entryFor($sourceC->id)->fund_balance, 0.001);
-        $this->assertEqualsWithDelta(900.0, (float) $this->entryFor($sourceD->id)->fund_balance, 0.001);
+        // Source C: fund_balance 2000-400=1600 (unchanged). Source D: fund_balance 1500-300=1200 (unchanged).
+        $this->assertEqualsWithDelta(1600.0, (float) $this->entryFor($sourceC->id)->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(1200.0, (float) $this->entryFor($sourceD->id)->fund_balance, 0.001);
     }
 
     /**
@@ -337,9 +337,9 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
         $this->assertEqualsWithDelta(0.0, (float) $beneficiaryEntry->administrative_pool_relief_given, 0.001);
         $this->assertEqualsWithDelta(0.0, (float) $beneficiaryEntry->fund_balance, 0.001);
 
-        // Re-saving must not double-draw the source either: still exactly one draw of 200, not 400.
+        // Re-saving must not double-draw capacity: still exactly one give of 200; source fund stays 4400.
         $sourceEntry = $this->entryFor($source->id);
-        $this->assertEqualsWithDelta(4200.0, (float) $sourceEntry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(4400.0, (float) $sourceEntry->fund_balance, 0.001);
         $this->assertEqualsWithDelta(200.0, (float) $sourceEntry->administrative_pool_relief_given, 0.001);
     }
 
@@ -373,17 +373,17 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
         $this->assertEqualsWithDelta(0.0, (float) $beneficiaryEntry->administrative_pool_relief_given, 0.001);
         $this->assertEqualsWithDelta(-80.0, (float) $beneficiaryEntry->fund_balance, 0.001);
 
-        // Source: income now 1000, fee 120 (12%); fund_balance 1000-120=880, fully drawn -> 760.
+        // Source: income now 1000, fee 120 (12%); fund_balance 1000-120=880 (unchanged by Stage 3 give of 120).
         $sourceEntry = $this->entryFor($source->id);
-        $this->assertEqualsWithDelta(760.0, (float) $sourceEntry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(880.0, (float) $sourceEntry->fund_balance, 0.001);
         $this->assertEqualsWithDelta(120.0, (float) $sourceEntry->administrative_pool_relief_given, 0.001);
     }
 
     /**
-     * 12. Zero-sum transfer: a beneficiary's gain is exactly matched by the source's loss, so Stage 3
-     * never inflates or deflates the org-wide total fund_balance — it only redistributes it.
+     * 12. Source fund_balance is unchanged by Stage 3: fee was already deducted in daily_total,
+     * so redirecting unused fee capacity must not hit the giver's cash a second time.
      */
-    public function test_stage3_is_a_zero_sum_transfer_between_source_and_beneficiary(): void
+    public function test_stage3_does_not_drain_source_fund_balance(): void
     {
         $this->actAsFinanceUser();
 
@@ -398,12 +398,11 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
         $beneficiaryEntry = $this->entryFor($beneficiary->id);
         $sourceEntry = $this->entryFor($source->id);
 
-        $totalBefore = -200.0 + 4400.0; // fund_balance right after Case 1, before Stage 3 runs
-        $totalAfter = (float) $beneficiaryEntry->fund_balance + (float) $sourceEntry->fund_balance;
-
-        $this->assertEqualsWithDelta($totalBefore, $totalAfter, 0.001, 'Stage 3 must redistribute, not create, cash');
+        // After Case 1 source fund was 4400; Stage 3 must leave it at 4400 while beneficiary moves -200 -> 0.
         $this->assertEqualsWithDelta(0.0, (float) $beneficiaryEntry->fund_balance, 0.001);
-        $this->assertEqualsWithDelta(4200.0, (float) $sourceEntry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(200.0, (float) $beneficiaryEntry->administrative_pool_relief, 0.001);
+        $this->assertEqualsWithDelta(4400.0, (float) $sourceEntry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(200.0, (float) $sourceEntry->administrative_pool_relief_given, 0.001);
     }
 
     /**

@@ -303,10 +303,10 @@ class DailyJournalCalculationService
      * greedily, until its deficit is met or sources run out. Exactly like Case 1, the amount drawn is
      * recorded as administrative_debt on the beneficiary (not left as an untracked fund top-up) and
      * added onto its fund_balance — the only difference from Case 1 is the funding source (another
-     * project's unused same-day fee instead of the project's own). This is a real, zero-sum cash
-     * transfer: the source's fund_balance is reduced by the exact same amount the beneficiary's is
-     * increased by, so the org-wide total is never inflated — money moves from the source's cash
-     * position into the beneficiary's, it is not fabricated.
+     * project's unused same-day fee instead of the project's own). The source's fund_balance is NOT
+     * reduced: administrative_fee was already deducted in daily_total, so redirecting unused fee
+     * capacity must not hit the source's cash position a second time. Only
+     * administrative_pool_relief_given / remaining capacity are updated on the source.
      *
      * @param  Collection<int, DailyJournalEntry>  $entries
      * @return array{entries: Collection<int, DailyJournalEntry>, allocations: list<array{source_project_id: int, beneficiary_project_id: int, relief_entry_id: int, amount: float}>}
@@ -369,7 +369,6 @@ class DailyJournalCalculationService
                     2
                 );
 
-                $source->fund_balance = round((float) $source->fund_balance - $used, 2);
                 $source->administrative_pool_relief_given = round(
                     (float) $source->administrative_pool_relief_given + $used,
                     2

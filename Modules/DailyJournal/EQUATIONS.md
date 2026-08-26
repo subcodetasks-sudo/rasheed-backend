@@ -224,15 +224,12 @@ never be both a source and a beneficiary on the same day. As a defensive rule, a
   Stage 3's relief flows into `accumulated_administrative_debt` for that day (§7) exactly as Case 1's does; it is
   not a separate, undebted "top-up". `administrative_pool_relief` additionally accumulates the total received, purely
   as an audit breakdown of how much of today's `administrative_debt` came from the pool versus from Case 1.
-- The source's `fund_balance` is **decreased by the same `used` amount** (`fund_balance −= used`). This is a real,
-  zero-sum cash transfer — the source's fee-derived capacity that gets redirected to another project's deficit is no
-  longer available in the source's own cash position, exactly as if the money physically moved from one project's
-  fund to the other's. The org-wide sum of `fund_balance` across all projects is therefore unchanged by Stage 3
-  alone: whatever a beneficiary gains, a source loses. (Note this can, in principle, leave a source project's own
-  `fund_balance` negative even though it had no deficit of its own before Stage 3 ran — that reflects a real
-  consequence of its fee capacity having been given away, not a bug.)
-- Any deficit that still remains after sources are exhausted stays negative, carried forward as-is — Stage 3 never
-  fabricates money on either side of the transfer.
+- The source's `fund_balance` is **not** decreased. `administrative_fee` was already deducted when computing
+  `daily_total` (§5), so unused fee capacity is accounting capacity already extracted from the source's cash
+  position — redirecting it to another project's deficit must not hit the source's صافي الصندوق / `fund_balance`
+  a second time. Only `administrative_pool_relief_given` and remaining capacity (`administrative_fee_remaining`)
+  are updated on the source for audit.
+- Any deficit that still remains after sources are exhausted stays negative, carried forward as-is.
 
 After allocation, persist per project:
 
@@ -298,8 +295,9 @@ fund_balance = surplus
 8. Capture `remainingDeficits = |fund_balance| if < 0 else 0` (for contribution validation; **before** Case 1 fund restore)
 9. Calculate administrative debt (Case 1 fund consumption + contribution) and restore Case 1 onto `fund_balance`
 9a. Apply same-day Administrative Percentage Pool relief (Stage 3, §6a) — delete that date's prior allocation rows,
-    recompute source/beneficiary capacity from the current entries, reallocate, and add the relief onto both
-    `administrative_debt` and `fund_balance` (same treatment as Case 1, different funding source)
+    recompute source/beneficiary capacity from the current entries, reallocate, and add the relief onto the
+    beneficiary's `administrative_debt` and `fund_balance` (same treatment as Case 1, different funding source);
+    source `fund_balance` is left unchanged (fee already deducted in `daily_total`)
 10. Update accumulated administrative debt
 11. Persist calculated fields
 
@@ -427,7 +425,7 @@ Action rejections:
 | Contribution re-save | Recomputes from same fund-consumption base (never compounds); additional pool debit only for increases |
 | Surplus day after prior debt | Surplus kept; accumulated unchanged until repay endpoint |
 | Pass-2 preserve | Fee / op / admin expense frozen from Pass 1 |
-| Deficit remains after Case 1, same-day pool has capacity | Stage 3 relieves `min(remainingFee sources, deficit)`, adding it to `administrative_debt` (like Case 1) and `fund_balance`; allocation rows record source→beneficiary breakdown |
+| Deficit remains after Case 1, same-day pool has capacity | Stage 3 relieves `min(remainingFee sources, deficit)` onto the beneficiary (`administrative_debt` + `fund_balance` like Case 1); source fund_balance unchanged (fee already in daily_total); allocation rows record source→beneficiary breakdown |
 | Deficit remains after Case 1, same-day pool exhausted/zero | No relief; deficit stays negative; no allocation rows created |
 | Non-active projects | Rejected on save |
 | Editing one date | Recalculates that date then later journal dates in order (fund + tip chain) |
