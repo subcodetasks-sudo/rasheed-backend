@@ -7,7 +7,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Modules\AdministrativeDebtSettlement\Enums\AdministrativeDebtSettlementStatus;
 use Modules\AdministrativeDebtSettlement\Models\AdministrativeDebtSettlement;
+use Modules\CashStation\Models\CashStationSettlement;
 use Modules\DailyJournal\Models\DailyJournalEntry;
+use Modules\MonthlySummary\Enums\ContributionType;
 use Modules\Project\Enums\OperationalDeductionType;
 use Modules\Project\Enums\ProjectStatus;
 use Modules\Project\Models\Project;
@@ -377,6 +379,157 @@ class AdministrativeFundApiTest extends TestCase
         $this->assertRoundedMoneyEquals(80.0, $day['debt_recovery']);
         $this->assertRoundedMoneyEquals(80.0, $day['total_income']);
         $this->assertRoundedMoneyEquals(80.0, $data['summary']['debt_recovery']);
+    }
+
+    public function test_debt_recovery_includes_applied_monthly_admin_debt_contribution(): void
+    {
+        $this->actAs('finance');
+        $from = $this->createProject(['name' => 'From '.uniqid()]);
+        $to = $this->createProject(['name' => 'To '.uniqid()]);
+
+        $settlement = CashStationSettlement::query()->create([
+            'year' => 2026,
+            'month' => 8,
+            'from_project_id' => $from->id,
+            'to_project_id' => $to->id,
+            'amount' => 45,
+            'contribution_type' => ContributionType::AdministrativeDebt,
+            'journal_anchor_date' => '2026-08-10',
+            'created_by' => null,
+        ]);
+        $settlement->forceFill(['created_at' => Carbon::parse('2026-08-14 10:00:00')])->save();
+
+        $data = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data');
+        $day = $this->findDay($data, '2026-08-14');
+
+        $this->assertRoundedMoneyEquals(45.0, $day['debt_recovery']);
+        $this->assertRoundedMoneyEquals(45.0, $day['total_income']);
+        $this->assertRoundedMoneyEquals(45.0, $data['summary']['debt_recovery']);
+    }
+
+    public function test_debt_recovery_adds_ads_and_monthly_contribution_on_same_day(): void
+    {
+        $this->actAs('finance');
+        $project = $this->createProject();
+        $from = $this->createProject(['name' => 'From '.uniqid()]);
+
+        $ads = AdministrativeDebtSettlement::query()->create([
+            'year' => 2026,
+            'month' => 8,
+            'project_id' => $project->id,
+            'surplus_at_settlement' => 500,
+            'recoverable_amount' => 50,
+            'allocated_cash_box' => 0,
+            'allocated_current_debt' => 50,
+            'allocated_carried_debt' => 0,
+            'status' => AdministrativeDebtSettlementStatus::Paid,
+            'settled_by' => null,
+        ]);
+        $ads->forceFill(['created_at' => Carbon::parse('2026-08-14 09:00:00')])->save();
+
+        $contribution = CashStationSettlement::query()->create([
+            'year' => 2026,
+            'month' => 8,
+            'from_project_id' => $from->id,
+            'to_project_id' => $project->id,
+            'amount' => 30,
+            'contribution_type' => ContributionType::AdministrativeDebt,
+            'journal_anchor_date' => '2026-08-10',
+            'created_by' => null,
+        ]);
+        $contribution->forceFill(['created_at' => Carbon::parse('2026-08-14 11:00:00')])->save();
+
+        $data = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data');
+        $day = $this->findDay($data, '2026-08-14');
+
+        $this->assertRoundedMoneyEquals(80.0, $day['debt_recovery']);
+        $this->assertRoundedMoneyEquals(80.0, $day['total_income']);
+        $this->assertRoundedMoneyEquals(80.0, $data['summary']['debt_recovery']);
+    }
+
+    public function test_pending_monthly_admin_debt_contribution_is_excluded_from_debt_recovery(): void
+    {
+        $this->actAs('finance');
+        $from = $this->createProject(['name' => 'From '.uniqid()]);
+        $to = $this->createProject(['name' => 'To '.uniqid()]);
+
+        $settlement = CashStationSettlement::query()->create([
+            'year' => 2026,
+            'month' => 8,
+            'from_project_id' => $from->id,
+            'to_project_id' => $to->id,
+            'amount' => 60,
+            'contribution_type' => ContributionType::AdministrativeDebt,
+            'journal_anchor_date' => null,
+            'created_by' => null,
+        ]);
+        $settlement->forceFill(['created_at' => Carbon::parse('2026-08-14 10:00:00')])->save();
+
+        $data = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data');
+        $day = $this->findDay($data, '2026-08-14');
+
+        $this->assertRoundedMoneyEquals(0.0, $day['debt_recovery']);
+        $this->assertRoundedMoneyEquals(0.0, $data['summary']['debt_recovery']);
+    }
+
+    public function test_deleting_monthly_admin_debt_contribution_reduces_debt_recovery(): void
+    {
+        $this->actAs('finance');
+        $from = $this->createProject(['name' => 'From '.uniqid()]);
+        $to = $this->createProject(['name' => 'To '.uniqid()]);
+
+        $settlement = CashStationSettlement::query()->create([
+            'year' => 2026,
+            'month' => 8,
+            'from_project_id' => $from->id,
+            'to_project_id' => $to->id,
+            'amount' => 55,
+            'contribution_type' => ContributionType::AdministrativeDebt,
+            'journal_anchor_date' => '2026-08-10',
+            'created_by' => null,
+        ]);
+        $settlement->forceFill(['created_at' => Carbon::parse('2026-08-14 10:00:00')])->save();
+
+        $this->assertRoundedMoneyEquals(
+            55.0,
+            $this->findDay(
+                $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data'),
+                '2026-08-14',
+            )['debt_recovery'],
+        );
+
+        $settlement->delete();
+
+        $data = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data');
+        $day = $this->findDay($data, '2026-08-14');
+
+        $this->assertRoundedMoneyEquals(0.0, $day['debt_recovery']);
+        $this->assertRoundedMoneyEquals(0.0, $data['summary']['debt_recovery']);
+    }
+
+    public function test_fund_deficit_contribution_does_not_affect_debt_recovery(): void
+    {
+        $this->actAs('finance');
+        $from = $this->createProject(['name' => 'From '.uniqid()]);
+        $to = $this->createProject(['name' => 'To '.uniqid()]);
+
+        $settlement = CashStationSettlement::query()->create([
+            'year' => 2026,
+            'month' => 8,
+            'from_project_id' => $from->id,
+            'to_project_id' => $to->id,
+            'amount' => 70,
+            'contribution_type' => ContributionType::FundDeficit,
+            'journal_anchor_date' => '2026-08-10',
+            'created_by' => null,
+        ]);
+        $settlement->forceFill(['created_at' => Carbon::parse('2026-08-14 10:00:00')])->save();
+
+        $data = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data');
+        $day = $this->findDay($data, '2026-08-14');
+
+        $this->assertRoundedMoneyEquals(0.0, $day['debt_recovery']);
+        $this->assertRoundedMoneyEquals(0.0, $data['summary']['debt_recovery']);
     }
 
     public function test_put_updates_manuals_and_recalculates(): void

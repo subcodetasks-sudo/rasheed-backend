@@ -16,6 +16,7 @@ use Modules\Inventory\Events\InventoryItemCreated;
 use Modules\Inventory\Events\InventoryItemDeleted;
 use Modules\Inventory\Events\InventoryMovementDeleted;
 use Modules\Inventory\Events\InventoryStockMoved;
+use Modules\MonthlySummary\Events\MonthlySummaryUpdated;
 use Modules\Notifications\Listeners\ApplyPendingContributionAdministrativeDebtOnDailyJournalUpdate;
 use Modules\Notifications\Listeners\ApplyPendingContributionFundBalanceOnDailyJournalUpdate;
 use Modules\Notifications\Listeners\NotifyAdministrativeDebtSettlementActivity;
@@ -29,6 +30,7 @@ use Modules\Notifications\Listeners\NotifyUserActivity;
 use Modules\Notifications\Listeners\RefreshAdministrativeDebtSettlementOnDailyJournalUpdate;
 use Modules\Notifications\Listeners\RefreshAdministrativeFundOnDailyJournalUpdate;
 use Modules\Notifications\Listeners\RefreshAdministrativeFundOnDebtSettlementCreated;
+use Modules\Notifications\Listeners\RefreshAdministrativeFundOnMonthlySummaryUpdate;
 use Modules\Notifications\Listeners\RefreshAdministrativeFundOnOperationalFundUpdate;
 use Modules\Notifications\Listeners\RefreshAdvancedReportsOnFinancialUpdate;
 use Modules\Notifications\Listeners\RefreshCashFundExpensesOnDailyJournalUpdate;
@@ -153,6 +155,10 @@ class EventServiceProvider extends ServiceProvider
             RefreshMonthlySummaryOnCashStationUpdate::class,
             RefreshReportsCenterOnFinancialUpdate::class,
             RefreshDashboardOnFinancialUpdate::class,
+        ],
+
+        MonthlySummaryUpdated::class => [
+            RefreshAdministrativeFundOnMonthlySummaryUpdate::class,
         ],
 
         AdministrativeDebtSettlementCreated::class => [

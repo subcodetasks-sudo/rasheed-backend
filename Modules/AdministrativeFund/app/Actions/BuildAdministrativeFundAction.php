@@ -179,11 +179,17 @@ class BuildAdministrativeFundAction
     }
 
     /**
+     * Debt recovery income for the month: ADS settlements plus applied Monthly Summary
+     * administrative_debt contributions. Keyed by created_at day. Cancelled contributions
+     * disappear because their cash_station_settlements row is deleted.
+     *
      * @return array<string, float>
      */
     private function debtRecoveryByDate(int $year, int $month): array
     {
-        $rows = DB::table('administrative_debt_settlements')
+        $keyed = [];
+
+        $adsRows = DB::table('administrative_debt_settlements')
             ->where('year', $year)
             ->where('month', $month)
             ->selectRaw('created_at')
@@ -192,8 +198,21 @@ class BuildAdministrativeFundAction
             )
             ->get();
 
-        $keyed = [];
-        foreach ($rows as $row) {
+        foreach ($adsRows as $row) {
+            $dateKey = $this->dateKey((string) $row->created_at);
+            $keyed[$dateKey] = round(($keyed[$dateKey] ?? 0) + (float) $row->debt_recovery, 2);
+        }
+
+        $contributionRows = DB::table('cash_station_settlements')
+            ->where('year', $year)
+            ->where('month', $month)
+            ->where('contribution_type', 'administrative_debt')
+            ->whereNotNull('journal_anchor_date')
+            ->selectRaw('created_at')
+            ->selectRaw('COALESCE(amount, 0) as debt_recovery')
+            ->get();
+
+        foreach ($contributionRows as $row) {
             $dateKey = $this->dateKey((string) $row->created_at);
             $keyed[$dateKey] = round(($keyed[$dateKey] ?? 0) + (float) $row->debt_recovery, 2);
         }
