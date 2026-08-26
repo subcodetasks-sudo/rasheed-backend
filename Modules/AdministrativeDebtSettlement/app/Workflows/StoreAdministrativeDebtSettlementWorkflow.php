@@ -10,6 +10,7 @@ use Modules\AdministrativeDebtSettlement\Actions\ValidateAdministrativeDebtSettl
 use Modules\AdministrativeDebtSettlement\Events\AdministrativeDebtSettlementCreated;
 use Modules\AdministrativeDebtSettlement\Events\AdministrativeDebtSettlementUpdated;
 use Modules\AdministrativeDebtSettlement\Models\AdministrativeDebtSettlement;
+use Modules\CashStation\Actions\AssertFinancialMonthUnlockedAction;
 use Modules\CashStation\Actions\BuildCashStationAction;
 use Modules\CashStation\Events\CashStationUpdated;
 use Modules\DailyJournal\Services\AdministrativePercentageBalanceService;
@@ -19,6 +20,7 @@ use Modules\MonthlySummary\Events\MonthlySummaryUpdated;
 class StoreAdministrativeDebtSettlementWorkflow
 {
     public function __construct(
+        private readonly AssertFinancialMonthUnlockedAction $assertFinancialMonthUnlockedAction,
         private readonly ValidateAdministrativeDebtSettlementAction $validateAdministrativeDebtSettlementAction,
         private readonly CreateAdministrativeDebtSettlementAction $createAdministrativeDebtSettlementAction,
         private readonly ApplyAdministrativeDebtSettlementToJournalAction $applyAdministrativeDebtSettlementToJournalAction,
@@ -30,6 +32,8 @@ class StoreAdministrativeDebtSettlementWorkflow
 
     public function handle(int $year, int $month, int $projectId, ?float $amount): AdministrativeDebtSettlement
     {
+        $this->assertFinancialMonthUnlockedAction->execute($year, $month);
+
         $settlement = DB::transaction(function () use ($year, $month, $projectId, $amount) {
             $validated = $this->validateAdministrativeDebtSettlementAction->execute(
                 $year,

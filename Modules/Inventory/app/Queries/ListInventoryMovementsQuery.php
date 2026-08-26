@@ -3,6 +3,7 @@
 namespace Modules\Inventory\Queries;
 
 use App\Support\Query\BaseQueryService;
+use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -38,8 +39,25 @@ class ListInventoryMovementsQuery
         return $query;
     }
 
+    /**
+     * When filter.month + filter.year are set, they define the date window
+     * (calendar month) and movement_date_from/to are ignored for that request.
+     */
     private function applyDateRangeFilters(Builder $query, Request $request): void
     {
+        $month = $request->input('filter.month');
+        $year = $request->input('filter.year');
+
+        if ($month !== null && $month !== '' && $year !== null && $year !== '') {
+            $start = Carbon::create((int) $year, (int) $month, 1)->startOfDay();
+            $end = $start->copy()->endOfMonth()->startOfDay();
+
+            $query->whereDate('movement_date', '>=', $start->toDateString())
+                ->whereDate('movement_date', '<=', $end->toDateString());
+
+            return;
+        }
+
         $from = $request->input('filter.movement_date_from');
         $to = $request->input('filter.movement_date_to');
 

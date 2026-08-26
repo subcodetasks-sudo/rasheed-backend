@@ -4,6 +4,7 @@ namespace Modules\DailyJournal\Actions;
 
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
+use Modules\CashStation\Actions\AssertFinancialMonthUnlockedAction;
 use Modules\DailyJournal\Events\AdministrativeDebtRepaid;
 use Modules\DailyJournal\Events\DailyJournalUpdated;
 use Modules\DailyJournal\Models\DailyJournalEntry;
@@ -15,10 +16,13 @@ class RepayAdministrativeDebtAction
     public function __construct(
         private readonly DailyJournalCalculationService $calculationService,
         private readonly RecalculateDailyJournalForwardChainAction $recalculateDailyJournalForwardChainAction,
+        private readonly AssertFinancialMonthUnlockedAction $assertFinancialMonthUnlockedAction,
     ) {}
 
     public function execute(string $journalDate, int $projectId): DailyJournalEntry
     {
+        $this->assertFinancialMonthUnlockedAction->executeForDate($journalDate);
+
         $project = Project::query()->active()->whereKey($projectId)->first();
 
         if (! $project) {

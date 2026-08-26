@@ -4,6 +4,7 @@ namespace Modules\DailyJournal\Actions;
 
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Modules\CashStation\Actions\AssertFinancialMonthUnlockedAction;
 use Modules\DailyJournal\DTOs\DailyJournalData;
 use Modules\DailyJournal\Models\DailyJournalEntry;
 use Modules\DailyJournal\Services\AdministrativePercentageBalanceService;
@@ -23,6 +24,7 @@ class ProcessDailyJournalWriteAction
         private readonly RecalculateDailyJournalForwardChainAction $recalculateDailyJournalForwardChainAction,
         private readonly ValidateDailyJournalContributionsAction $validateDailyJournalContributionsAction,
         private readonly AdministrativePercentageBalanceService $administrativePercentageBalanceService,
+        private readonly AssertFinancialMonthUnlockedAction $assertFinancialMonthUnlockedAction,
     ) {}
 
     /**
@@ -30,6 +32,8 @@ class ProcessDailyJournalWriteAction
      */
     public function execute(DailyJournalData $data, bool $replaceMissingEditableFields): Collection
     {
+        $this->assertFinancialMonthUnlockedAction->executeForDate($data->journalDate);
+
         $existing = $this->loadExistingContributionState($data->journalDate->toDateString());
 
         $pass1Data = $data->withPositiveContributionsZeroed();

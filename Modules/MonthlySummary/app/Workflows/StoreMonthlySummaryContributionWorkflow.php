@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Modules\AdministrativeDebtSettlement\Actions\BuildAdministrativeDebtSettlementAction;
 use Modules\AdministrativeDebtSettlement\Events\AdministrativeDebtSettlementUpdated;
+use Modules\CashStation\Actions\AssertFinancialMonthUnlockedAction;
 use Modules\CashStation\Actions\BuildCashStationAction;
 use Modules\CashStation\Actions\CreateCashStationSettlementAction;
 use Modules\CashStation\Events\CashStationSettlementCreated;
@@ -22,6 +23,7 @@ use Modules\MonthlySummary\Events\MonthlySummaryUpdated;
 class StoreMonthlySummaryContributionWorkflow
 {
     public function __construct(
+        private readonly AssertFinancialMonthUnlockedAction $assertFinancialMonthUnlockedAction,
         private readonly ValidateMonthlySummaryContributionAction $validateMonthlySummaryContributionAction,
         private readonly CreateCashStationSettlementAction $createCashStationSettlementAction,
         private readonly ApplyContributionAdministrativeDebtAction $applyContributionAdministrativeDebtAction,
@@ -40,6 +42,8 @@ class StoreMonthlySummaryContributionWorkflow
         ContributionType $contributionType,
         float $amount,
     ): CashStationSettlement {
+        $this->assertFinancialMonthUnlockedAction->execute($year, $month);
+
         $settlement = DB::transaction(function () use (
             $year,
             $month,

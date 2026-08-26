@@ -14,6 +14,7 @@ use Modules\Project\Exceptions\BusinessException;
 class DeleteCashStationSettlementAction
 {
     public function __construct(
+        private readonly AssertFinancialMonthUnlockedAction $assertFinancialMonthUnlockedAction,
         private readonly BuildCashStationAction $buildCashStationAction,
         private readonly ReverseContributionAdministrativeDebtAction $reverseContributionAdministrativeDebtAction,
         private readonly ReverseContributionFundBalanceAction $reverseContributionFundBalanceAction,
@@ -29,6 +30,11 @@ class DeleteCashStationSettlementAction
         if ($settlement === null) {
             throw new BusinessException(__('messages.cash_station_settlement_not_found'), 404);
         }
+
+        $this->assertFinancialMonthUnlockedAction->execute(
+            (int) $settlement->year,
+            (int) $settlement->month,
+        );
 
         $year = $settlement->year;
         $month = $settlement->month;

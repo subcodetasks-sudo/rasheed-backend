@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\CashStation\Models\CashStationMonthCarry;
 use Modules\CashStation\Models\CashStationSettlement;
+use Modules\CashStation\Models\FinancialMonthLock;
+use Modules\CashStation\Models\FinancialMonthProjectSnapshot;
 use Modules\DailyJournal\Actions\ReadAccumulatedAdministrativeDebtTipAction;
 use Modules\MonthlySummary\Enums\ContributionType;
 use Modules\Project\Models\Project;
@@ -26,6 +28,20 @@ class BuildCashStationAction
     private array $monthBalanceContextCache = [];
 
     public function execute(int $month, int $year): array
+    {
+        $lock = FinancialMonthLock::query()
+            ->where('year', $year)
+            ->where('month', $month)
+            ->first();
+
+        if ($lock !== null) {
+            return $this->buildFromSnapshot($lock);
+        }
+
+        return $this->buildLive($month, $year);
+    }
+
+    public function buildLive(int $month, int $year): array
     {
         $startOfMonth = Carbon::create($year, $month, 1)->startOfDay();
         $endOfMonth = $startOfMonth->copy()->endOfMonth()->startOfDay();
@@ -130,7 +146,95 @@ class BuildCashStationAction
 
         return [
             'month' => ['month' => $month, 'year' => $year],
+            'locked' => false,
+            'frozen_at' => null,
             'carried_forward_from_previous' => $carriedFromPrevious,
+            'summary' => [
+                'total_monthly_surplus' => FormatMoneyDecimal::formatRounded($totalSurplus),
+                'total_monthly_deficit' => FormatMoneyDecimal::formatRounded($totalDeficit),
+                'administrative_debts' => FormatMoneyDecimal::formatRounded($totalAdminDebts),
+                'net_cash_funds' => FormatMoneyDecimal::formatRounded($totalNetCashFunds),
+                'monthly_revenue' => FormatMoneyDecimal::formatRounded($totalRevenue),
+                'monthly_expenses' => FormatMoneyDecimal::formatRounded($totalExpenses),
+                'total_administrative_percentage' => FormatMoneyDecimal::formatRounded($totalAdminPercentage),
+                'total_operational_deduction' => FormatMoneyDecimal::formatRounded($totalOperationalDeduction),
+                'net_month' => FormatMoneyDecimal::formatRounded($totalNetMonth),
+            ],
+            'projects' => $projectRows,
+            'settlements' => $settlements->map(fn (CashStationSettlement $settlement) => [
+                'id' => $settlement->id,
+                'year' => $settlement->year,
+                'month' => $settlement->month,
+                'from_project_id' => $settlement->from_project_id,
+                'to_project_id' => $settlement->to_project_id,
+                'amount' => FormatMoneyDecimal::format($settlement->amount),
+                'contribution_type' => $settlement->contribution_type?->value,
+            ])->values()->all(),
+        ];
+    }
+
+    private function buildFromSnapshot(FinancialMonthLock $lock): array
+    {
+        $year = (int) $lock->year;
+        $month = (int) $lock->month;
+
+        $snapshots = FinancialMonthProjectSnapshot::query()
+            ->where('year', $year)
+            ->where('month', $month)
+            ->orderBy('project_id')
+            ->get();
+
+        $settlements = $this->settlementsForMonth($year, $month);
+
+        $projectRows = [];
+        $totalSurplus = 0.0;
+        $totalDeficit = 0.0;
+        $totalAdminDebts = 0.0;
+        $totalNetCashFunds = 0.0;
+        $totalRevenue = 0.0;
+        $totalExpenses = 0.0;
+        $totalAdminPercentage = 0.0;
+        $totalOperationalDeduction = 0.0;
+        $totalNetMonth = 0.0;
+
+        foreach ($snapshots as $snapshot) {
+            $monthlyTotal = (float) $snapshot->monthly_total;
+            $netCashFund = (float) $snapshot->net_cash_fund;
+            $administrativeDebt = (float) $snapshot->remaining_administrative_debt;
+
+            $projectRows[] = [
+                'project_id' => (int) $snapshot->project_id,
+                'project_name' => $snapshot->project_name,
+                'previous_monthly_total' => FormatMoneyDecimal::formatRounded((float) $snapshot->previous_monthly_total),
+                'monthly_total' => FormatMoneyDecimal::formatRounded($monthlyTotal),
+                'administrative_debt' => FormatMoneyDecimal::formatRounded((float) $snapshot->cs_administrative_debt),
+                'added_contribution' => FormatMoneyDecimal::formatRounded((float) $snapshot->cs_added_contribution),
+                'deducted_contribution' => FormatMoneyDecimal::formatRounded((float) $snapshot->cs_deducted_contribution),
+                'net_cash_fund' => FormatMoneyDecimal::formatRounded($netCashFund),
+                'remaining_administrative_debt' => FormatMoneyDecimal::formatRounded($administrativeDebt),
+                'status' => $snapshot->cash_status,
+            ];
+
+            if ($monthlyTotal > 0) {
+                $totalSurplus += $monthlyTotal;
+            } elseif ($monthlyTotal < 0) {
+                $totalDeficit += abs($monthlyTotal);
+            }
+
+            $totalAdminDebts += $administrativeDebt;
+            $totalNetCashFunds += $netCashFund;
+            $totalRevenue += (float) $snapshot->monthly_revenue;
+            $totalExpenses += (float) $snapshot->monthly_expenses;
+            $totalAdminPercentage += (float) $snapshot->administrative_percentage;
+            $totalOperationalDeduction += (float) $snapshot->operational_deduction;
+            $totalNetMonth += $monthlyTotal;
+        }
+
+        return [
+            'month' => ['month' => $month, 'year' => $year],
+            'locked' => true,
+            'frozen_at' => $lock->frozen_at?->toIso8601String(),
+            'carried_forward_from_previous' => (bool) $lock->carried_forward_from_previous,
             'summary' => [
                 'total_monthly_surplus' => FormatMoneyDecimal::formatRounded($totalSurplus),
                 'total_monthly_deficit' => FormatMoneyDecimal::formatRounded($totalDeficit),

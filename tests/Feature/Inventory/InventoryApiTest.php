@@ -593,4 +593,98 @@ class InventoryApiTest extends InventoryFeatureTestCase
         $this->assertSame('8.00', $response->json('summary.total_outgoing_value'));
         $this->assertSame('-8.00', $response->json('summary.net_movement_value'));
     }
+
+    public function test_list_movements_month_year_filter_scopes_rows_and_summary(): void
+    {
+        $this->actAsInventoryUser();
+        $owner = $this->createActiveProject();
+        $beneficiary = $this->createActiveProject();
+
+        $itemId = $this->postJson('/api/v1/inventory/items', [
+            'name' => 'Tents',
+            'category_id' => $this->createInventoryCategory(['name' => 'camp'])->id,
+            'project_id' => $owner->id,
+            'unit' => 'pc',
+            'opening_price' => 100,
+            'opening_quantity' => 20,
+        ])->json('data.id');
+
+        $augIncomingId = $this->postJson('/api/v1/inventory/movements/incoming', [
+            'inventory_item_id' => $itemId,
+            'quantity' => 5,
+            'unit_price' => 350,
+        ])->json('data.id');
+
+        $augOutgoingId = $this->postJson('/api/v1/inventory/movements/outgoing', [
+            'inventory_item_id' => $itemId,
+            'quantity' => 2,
+            'beneficiary_project_id' => $beneficiary->id,
+            'expense_type' => InventoryExpenseType::Operational->value,
+        ])->json('data.id');
+
+        $sepIncomingId = $this->postJson('/api/v1/inventory/movements/incoming', [
+            'inventory_item_id' => $itemId,
+            'quantity' => 3,
+            'unit_price' => 300,
+        ])->json('data.id');
+
+        InventoryMovement::query()->whereKey($augIncomingId)->update(['movement_date' => '2026-08-10']);
+        InventoryMovement::query()->whereKey($augOutgoingId)->update(['movement_date' => '2026-08-15']);
+        InventoryMovement::query()->whereKey($sepIncomingId)->update(['movement_date' => '2026-09-05']);
+
+        $response = $this->getJson('/api/v1/inventory/movements?filter[month]=8&filter[year]=2026')
+            ->assertOk();
+
+        $ids = collect($response->json('data'))->pluck('id')->all();
+        $this->assertContains($augIncomingId, $ids);
+        $this->assertContains($augOutgoingId, $ids);
+        $this->assertNotContains($sepIncomingId, $ids);
+
+        // Separate totals for the filtered month only (incoming 5*350, outgoing FIFO from opening @100).
+        $this->assertSame('1750.00', $response->json('summary.total_incoming_value'));
+        $this->assertSame('200.00', $response->json('summary.total_outgoing_value'));
+        $this->assertSame('1550.00', $response->json('summary.net_movement_value'));
+    }
+
+    public function test_list_movements_month_year_takes_precedence_over_date_range(): void
+    {
+        $this->actAsInventoryUser();
+        $owner = $this->createActiveProject();
+
+        $itemId = $this->postJson('/api/v1/inventory/items', [
+            'name' => 'Ropes',
+            'category_id' => $this->createInventoryCategory(['name' => 'camp'])->id,
+            'project_id' => $owner->id,
+            'unit' => 'm',
+            'opening_price' => 5,
+            'opening_quantity' => 10,
+        ])->json('data.id');
+
+        $augId = $this->postJson('/api/v1/inventory/movements/incoming', [
+            'inventory_item_id' => $itemId,
+            'quantity' => 1,
+            'unit_price' => 10,
+        ])->json('data.id');
+
+        $sepId = $this->postJson('/api/v1/inventory/movements/incoming', [
+            'inventory_item_id' => $itemId,
+            'quantity' => 1,
+            'unit_price' => 20,
+        ])->json('data.id');
+
+        InventoryMovement::query()->whereKey($augId)->update(['movement_date' => '2026-08-20']);
+        InventoryMovement::query()->whereKey($sepId)->update(['movement_date' => '2026-09-01']);
+
+        // from/to would include September, but month/year=8 must win.
+        $response = $this->getJson(
+            '/api/v1/inventory/movements?filter[month]=8&filter[year]=2026'
+            .'&filter[movement_date_from]=2026-08-01&filter[movement_date_to]=2026-09-30'
+        )->assertOk();
+
+        $ids = collect($response->json('data'))->pluck('id')->all();
+        $this->assertContains($augId, $ids);
+        $this->assertNotContains($sepId, $ids);
+        $this->assertSame('10.00', $response->json('summary.total_incoming_value'));
+        $this->assertSame('0.00', $response->json('summary.total_outgoing_value'));
+    }
 }

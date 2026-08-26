@@ -21,6 +21,8 @@ class ListInventoryMovementsRequest extends FormRequest
             'filter.beneficiary_project_id' => ['nullable', 'integer'],
             'filter.movement_date_from' => ['nullable', 'date'],
             'filter.movement_date_to' => ['nullable', 'date', 'after_or_equal:filter.movement_date_from'],
+            'filter.month' => ['nullable', 'integer', 'min:1', 'max:12', 'required_with:filter.year'],
+            'filter.year' => ['nullable', 'integer', 'min:2000', 'max:2100', 'required_with:filter.month'],
             'sort' => ['nullable', 'string'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
             'page' => ['nullable', 'integer', 'min:1'],

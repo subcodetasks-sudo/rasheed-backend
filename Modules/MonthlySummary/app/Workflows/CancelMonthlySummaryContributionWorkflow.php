@@ -5,6 +5,7 @@ namespace Modules\MonthlySummary\Workflows;
 use Illuminate\Support\Facades\DB;
 use Modules\AdministrativeDebtSettlement\Actions\BuildAdministrativeDebtSettlementAction;
 use Modules\AdministrativeDebtSettlement\Events\AdministrativeDebtSettlementUpdated;
+use Modules\CashStation\Actions\AssertFinancialMonthUnlockedAction;
 use Modules\CashStation\Actions\BuildCashStationAction;
 use Modules\CashStation\Events\CashStationSettlementDeleted;
 use Modules\CashStation\Events\CashStationUpdated;
@@ -20,6 +21,7 @@ use Modules\Project\Exceptions\BusinessException;
 class CancelMonthlySummaryContributionWorkflow
 {
     public function __construct(
+        private readonly AssertFinancialMonthUnlockedAction $assertFinancialMonthUnlockedAction,
         private readonly ReverseContributionAdministrativeDebtAction $reverseContributionAdministrativeDebtAction,
         private readonly ReverseContributionFundBalanceAction $reverseContributionFundBalanceAction,
         private readonly BroadcastContributionJournalTipAction $broadcastContributionJournalTipAction,
@@ -42,6 +44,11 @@ class CancelMonthlySummaryContributionWorkflow
             if ($settlement->contribution_type === null) {
                 throw new BusinessException(__('messages.monthly_summary_contribution_not_found'), 404);
             }
+
+            $this->assertFinancialMonthUnlockedAction->execute(
+                (int) $settlement->year,
+                (int) $settlement->month,
+            );
 
             $year = $settlement->year;
             $month = $settlement->month;

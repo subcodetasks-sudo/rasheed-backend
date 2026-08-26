@@ -8,6 +8,8 @@ use Illuminate\Support\Collection;
 use Modules\CashStation\Actions\BuildCashStationAction;
 use Modules\CashStation\Models\CashStationMonthCarry;
 use Modules\CashStation\Models\CashStationSettlement;
+use Modules\CashStation\Models\FinancialMonthLock;
+use Modules\CashStation\Models\FinancialMonthProjectSnapshot;
 use Modules\DailyJournal\Actions\ReadFundBalanceTipAction;
 use Modules\Project\Models\Project;
 
@@ -19,6 +21,20 @@ class BuildMonthlySummaryAction
     ) {}
 
     public function execute(int $month, int $year): array
+    {
+        $lock = FinancialMonthLock::query()
+            ->where('year', $year)
+            ->where('month', $month)
+            ->first();
+
+        if ($lock !== null) {
+            return $this->buildFromSnapshot($lock);
+        }
+
+        return $this->buildLive($month, $year);
+    }
+
+    public function buildLive(int $month, int $year): array
     {
         [, $end, $calculationDate] = $this->calculationWindow($month, $year);
 
@@ -69,8 +85,64 @@ class BuildMonthlySummaryAction
 
         return [
             'month' => ['month' => $month, 'year' => $year],
+            'locked' => false,
+            'frozen_at' => null,
             'calculation_date' => $calculationDate,
             'carried_forward_from_previous' => $carriedFromPrevious,
+            'projects' => $projectRows,
+            'contributions' => $settlements
+                ->filter(fn (CashStationSettlement $s) => $s->contribution_type !== null)
+                ->map(fn (CashStationSettlement $settlement) => [
+                    'id' => $settlement->id,
+                    'year' => $settlement->year,
+                    'month' => $settlement->month,
+                    'from_project_id' => $settlement->from_project_id,
+                    'to_project_id' => $settlement->to_project_id,
+                    'contribution_type' => $settlement->contribution_type->value,
+                    'amount' => FormatMoneyDecimal::format($settlement->amount),
+                ])
+                ->values()
+                ->all(),
+        ];
+    }
+
+    private function buildFromSnapshot(FinancialMonthLock $lock): array
+    {
+        $year = (int) $lock->year;
+        $month = (int) $lock->month;
+
+        $snapshots = FinancialMonthProjectSnapshot::query()
+            ->where('year', $year)
+            ->where('month', $month)
+            ->orderBy('project_id')
+            ->get();
+
+        $settlements = $this->buildCashStationAction->settlementsForMonth($year, $month);
+
+        $projectRows = [];
+        foreach ($snapshots as $snapshot) {
+            $fundBalance = (float) $snapshot->fund_balance_tip;
+
+            $projectRows[] = [
+                'project_id' => (int) $snapshot->project_id,
+                'project_name' => $snapshot->project_name,
+                'project_type' => $snapshot->project_type,
+                'project_status' => $snapshot->project_status,
+                'project_net_result' => FormatMoneyDecimal::formatRounded($fundBalance),
+                'net_result_state' => $this->netResultState($fundBalance),
+                'administrative_debt' => FormatMoneyDecimal::formatRounded((float) $snapshot->ms_administrative_debt),
+                'total_received_contributions' => FormatMoneyDecimal::formatRounded((float) $snapshot->ms_added_contribution),
+                'total_deducted_contributions' => FormatMoneyDecimal::formatRounded((float) $snapshot->ms_deducted_contribution),
+            ];
+        }
+
+        return [
+            'month' => ['month' => $month, 'year' => $year],
+            'locked' => true,
+            'frozen_at' => $lock->frozen_at?->toIso8601String(),
+            'calculation_date' => $lock->calculation_date?->toDateString()
+                ?? Carbon::create($year, $month, 1)->endOfMonth()->toDateString(),
+            'carried_forward_from_previous' => (bool) $lock->carried_forward_from_previous,
             'projects' => $projectRows,
             'contributions' => $settlements
                 ->filter(fn (CashStationSettlement $s) => $s->contribution_type !== null)

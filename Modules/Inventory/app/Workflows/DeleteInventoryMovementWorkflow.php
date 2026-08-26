@@ -3,6 +3,8 @@
 namespace Modules\Inventory\Workflows;
 
 use Illuminate\Support\Facades\DB;
+use Modules\CashStation\Actions\AssertFinancialMonthUnlockedAction;
+use Modules\Inventory\Enums\InventoryExpenseType;
 use Modules\Inventory\Enums\InventoryMovementType;
 use Modules\Inventory\Events\InventoryMovementDeleted;
 use Modules\Inventory\Models\InventoryBatch;
@@ -16,6 +18,7 @@ class DeleteInventoryMovementWorkflow
 {
     public function __construct(
         private readonly InventoryBalanceService $balanceService,
+        private readonly AssertFinancialMonthUnlockedAction $assertFinancialMonthUnlockedAction,
     ) {}
 
     public function handle(int $movementId, ?string $deletedBy = null): InventoryItem
@@ -25,6 +28,10 @@ class DeleteInventoryMovementWorkflow
 
             if (! $movement) {
                 throw new BusinessException(__('messages.inventory_movement_not_found'), 404);
+            }
+
+            if ($movement->expense_type === InventoryExpenseType::Administrative) {
+                $this->assertFinancialMonthUnlockedAction->executeForDate($movement->movement_date);
             }
 
             $item = InventoryItem::query()->lockForUpdate()->find($movement->inventory_item_id);

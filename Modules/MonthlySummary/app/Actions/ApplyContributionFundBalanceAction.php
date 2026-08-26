@@ -2,6 +2,7 @@
 
 namespace Modules\MonthlySummary\Actions;
 
+use Modules\CashStation\Actions\AssertFinancialMonthUnlockedAction;
 use Modules\CashStation\Models\CashStationSettlement;
 use Modules\DailyJournal\Models\DailyJournalEntry;
 
@@ -9,6 +10,7 @@ class ApplyContributionFundBalanceAction
 {
     public function __construct(
         private readonly ApplyContributionContributorFundDebitAction $applyContributionContributorFundDebitAction,
+        private readonly AssertFinancialMonthUnlockedAction $assertFinancialMonthUnlockedAction,
     ) {}
 
     /**
@@ -18,6 +20,13 @@ class ApplyContributionFundBalanceAction
      */
     public function execute(CashStationSettlement $settlement): void
     {
+        if ($this->assertFinancialMonthUnlockedAction->isLocked(
+            (int) $settlement->year,
+            (int) $settlement->month,
+        )) {
+            return;
+        }
+
         $amount = round(max(0, (float) $settlement->amount), 2);
         if ($amount <= 0) {
             return;

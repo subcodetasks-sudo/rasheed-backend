@@ -66,3 +66,33 @@ List movements (`GET /api/v1/inventory/movements`) and create outgoing (`POST /a
 | Tooltip on average | إن ظهر المتوسط: «متوسط موزون (FIFO) — راجع تفصيل الوارد» |
 
 Do not change backend costing; this is display-only.
+
+---
+
+## List page: separate cost totals + monthly filter
+
+`GET /api/v1/inventory/movements` already returns a **`summary`** object with **separate** totals (same filters as the list):
+
+| Field | Arabic label suggestion | Meaning |
+|--------|-------------------------|---------|
+| `summary.total_incoming_value` | إجمالي تكلفة الوارد | Sum of `total_cost` for incoming movements |
+| `summary.total_outgoing_value` | إجمالي تكلفة الصادر | Sum of `total_cost` for outgoing movements |
+| `summary.net_movement_value` | الصافي | Incoming − outgoing |
+
+Show **وارد** and **صادر** totals separately in the footer — do not collapse them into one number unless you also show net.
+
+### Monthly filter
+
+Send both query params together:
+
+```
+GET /api/v1/inventory/movements?filter[month]=8&filter[year]=2026
+```
+
+- Scopes list rows and `summary` to that calendar month (`movement_date`).
+- `filter[month]` and `filter[year]` are required together (1–12 / year ≥ 2000).
+- If month/year are set, they **override** `filter[movement_date_from]` / `filter[movement_date_to]` for that request.
+- Without month/year, the existing from/to date range still works.
+
+Opening stock is not a movement row, so it is not included in `total_incoming_value`.
+

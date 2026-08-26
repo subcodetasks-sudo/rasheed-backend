@@ -99,6 +99,7 @@ return [
     'advanced_reports_invalid_report_type' => 'نوع التقرير المتقدم المحدد غير صالح.',
     'cash_station_fetched_successfully' => 'تم جلب محطة الصندوق بنجاح.',
     'cash_station_carried_forward_successfully' => 'تم ترحيل شهر محطة الصندوق بنجاح.',
+    'financial_month_locked' => 'هذا الشهر المالي مقفل ولا يمكن تعديله.',
     'dashboard_fetched_successfully' => 'تم جلب لوحة التحكم بنجاح.',
     'notifications_fetched_successfully' => 'تم جلب الإشعارات بنجاح.',
     'notification_fetched_successfully' => 'تم جلب الإشعار بنجاح.',

@@ -3,6 +3,7 @@
 namespace Modules\CashStation\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Modules\CashStation\Console\FreezeClosedFinancialMonthsCommand;
 use Nwidart\Modules\Traits\PathNamespace;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -18,12 +19,20 @@ class CashStationServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->registerConfig();
+        $this->registerCommands();
         $this->loadMigrationsFrom(module_path($this->name, 'database/migrations'));
     }
 
     public function register(): void
     {
         $this->app->register(RouteServiceProvider::class);
+    }
+
+    protected function registerCommands(): void
+    {
+        $this->commands([
+            FreezeClosedFinancialMonthsCommand::class,
+        ]);
     }
 
     protected function registerConfig(): void

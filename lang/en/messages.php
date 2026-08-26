@@ -99,6 +99,7 @@ return [
     'advanced_reports_invalid_report_type' => 'The selected advanced report type is invalid.',
     'cash_station_fetched_successfully' => 'Cash station fetched successfully.',
     'cash_station_carried_forward_successfully' => 'Cash station month carried forward successfully.',
+    'financial_month_locked' => 'This financial month is locked and can no longer be changed.',
     'dashboard_fetched_successfully' => 'Dashboard fetched successfully.',
     'notifications_fetched_successfully' => 'Notifications fetched successfully.',
     'notification_fetched_successfully' => 'Notification fetched successfully.',
