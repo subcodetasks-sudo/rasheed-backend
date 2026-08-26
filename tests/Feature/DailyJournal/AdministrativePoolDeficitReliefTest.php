@@ -12,8 +12,13 @@ use Modules\Project\Models\Project;
  * Stage 3: same-day Administrative Percentage Pool relief. Verifies deficits still
  * open after Case 1 (§6) are covered from OTHER projects' unused same-day
  * administrative_fee only, with today's operating deficits (`daily_total < 0`)
- * before carried-only deficits, then project_id order within each group, and a
- * full source->beneficiary allocation history.
+ * before carried-only deficits, then project_id order within each group, a
+ * full source->beneficiary allocation history, and that a project with zero
+ * daily_income that day is never a beneficiary regardless of expense.
+ *
+ * Beneficiary fixtures below use a token daily_income (e.g. 1) alongside the
+ * expense that produces their intended deficit, purely to remain Stage 3-eligible
+ * under that last rule — it does not change the deficit amount being tested.
  */
 class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
 {
@@ -161,12 +166,13 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
         $sourceC = $this->subjectProject(['administrative_fee_percentage' => 20]); // fee 500
 
         $this->saveJournal(self::DATE, [
-            ['project_id' => $beneficiary->id, 'daily_expense' => 700],
+            ['project_id' => $beneficiary->id, 'daily_income' => 1, 'daily_expense' => 701],
             ['project_id' => $sourceB->id, 'daily_income' => 1500],
             ['project_id' => $sourceC->id, 'daily_income' => 2500],
         ]);
 
-        // Beneficiary admin_exempt -> fee 0 -> Case1 debt 0; deficit stays 700.
+        // Beneficiary admin_exempt -> fee 0 -> Case1 debt 0; deficit stays 700 (token income 1 keeps
+        // it Stage3-eligible without changing the deficit amount).
         $beneficiaryEntry = $this->entryFor($beneficiary->id);
         $this->assertEqualsWithDelta(0.0, (float) $beneficiaryEntry->fund_balance, 0.001);
         $this->assertEqualsWithDelta(700.0, (float) $beneficiaryEntry->administrative_pool_relief, 0.001);
@@ -207,8 +213,8 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
         $sourceD = $this->subjectProject(['administrative_fee_percentage' => 20]); // fee 300
 
         $this->saveJournal(self::DATE, [
-            ['project_id' => $beneficiaryA->id, 'daily_expense' => 600],
-            ['project_id' => $beneficiaryB->id, 'daily_expense' => 500],
+            ['project_id' => $beneficiaryA->id, 'daily_income' => 1, 'daily_expense' => 601],
+            ['project_id' => $beneficiaryB->id, 'daily_income' => 1, 'daily_expense' => 501],
             ['project_id' => $sourceC->id, 'daily_income' => 2000],
             ['project_id' => $sourceD->id, 'daily_income' => 1500],
         ]);
@@ -259,11 +265,15 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
         ]);
         $this->assertEqualsWithDelta(-400.0, (float) $this->entryFor($carried->id)->fund_balance, 0.001);
 
-        // Day 2: carried has no worsening activity (daily_total ~ 0, tip still negative).
-        // Today-deficit project spends 300. Source fee = 200 — enough for only one full cover.
+        // Day 2: carried has real activity that nets to zero (daily_total ~ 0, tip still negative) —
+        // it must stay a genuine (lower-priority) candidate here, not a zero-income day, since a
+        // project with zero daily_income is excluded from Stage 3 entirely regardless of expense (see
+        // test_carried_deficit_with_zero_income_is_never_a_stage3_beneficiary_regardless_of_expense
+        // below). Today-deficit project spends 300 (token income 1 keeps it Stage3-eligible without
+        // changing the deficit amount). Source fee = 200 — enough for only one full cover.
         $this->saveJournal(self::OTHER_DATE, [
-            ['project_id' => $carried->id, 'daily_income' => 0, 'daily_expense' => 0],
-            ['project_id' => $todayDeficit->id, 'daily_expense' => 300],
+            ['project_id' => $carried->id, 'daily_income' => 100, 'daily_expense' => 100],
+            ['project_id' => $todayDeficit->id, 'daily_income' => 1, 'daily_expense' => 301],
             ['project_id' => $source->id, 'daily_income' => 1000],
         ]);
 
@@ -300,9 +310,11 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
             ['project_id' => $source->id, 'daily_income' => 5000],
         ]);
 
-        // Day 2: beneficiary has a deficit; source has no income (fee 0) on day 2.
+        // Day 2: beneficiary has a deficit (token income keeps it Stage3-eligible, isolating this
+        // test's actual point — that source's day-1 fee doesn't carry — from the separate
+        // zero-income exclusion rule). source has no income (fee 0) on day 2.
         $this->saveJournal(self::OTHER_DATE, [
-            ['project_id' => $beneficiary->id, 'daily_expense' => 300],
+            ['project_id' => $beneficiary->id, 'daily_income' => 1, 'daily_expense' => 301],
         ]);
 
         $beneficiaryEntry = $this->entryFor($beneficiary->id, self::OTHER_DATE);
@@ -442,5 +454,245 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
         // Day 1's own accumulated debt is untouched by day 2's Stage 3 relief.
         $dayOneEntry->refresh();
         $this->assertEqualsWithDelta(40.0, (float) $dayOneEntry->accumulated_administrative_debt, 0.001);
+    }
+
+    /**
+     * A project with zero daily_income that day is never a Stage 3 beneficiary — regardless of how
+     * much daily_expense it has, how negative its carried tip is, or how ample and otherwise-unused
+     * the pool is. administrative_fee is a percentage of income, so a project earning nothing that
+     * day has no fee-generating activity to justify drawing on other projects' fee capacity; it
+     * simply carries its deficit forward untouched.
+     */
+    public function test_carried_deficit_with_zero_income_is_never_a_stage3_beneficiary_regardless_of_expense(): void
+    {
+        $this->actAsFinanceUser();
+
+        $carriedBeneficiary = $this->subjectProject(['administrative_fee_percentage' => 20]);
+        $source = $this->subjectProject(['administrative_fee_percentage' => 20]);
+
+        // Day 1: builds a carried tip deficit (fee 0 since income is 0; Case 1 is a no-op).
+        $this->saveJournal(self::DATE, [
+            ['project_id' => $carriedBeneficiary->id, 'daily_income' => 0, 'daily_expense' => 400],
+        ]);
+        $this->assertEqualsWithDelta(-400.0, (float) $this->entryFor($carriedBeneficiary->id)->fund_balance, 0.001);
+
+        // Day 2: carriedBeneficiary has zero income but a real (non-zero) expense of 50 — proving the
+        // exclusion is about income specifically, not "zero activity" — carrying -400-50=-450. An
+        // ample, otherwise untouched source is present, but must never be drawn from.
+        $this->saveJournal(self::OTHER_DATE, [
+            ['project_id' => $carriedBeneficiary->id, 'daily_income' => 0, 'daily_expense' => 50],
+            ['project_id' => $source->id, 'daily_income' => 2500],
+        ]);
+
+        $beneficiaryEntry = $this->entryFor($carriedBeneficiary->id, self::OTHER_DATE);
+        $sourceEntry = $this->entryFor($source->id, self::OTHER_DATE);
+
+        $this->assertEqualsWithDelta(-450.0, (float) $beneficiaryEntry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $beneficiaryEntry->administrative_pool_relief, 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $beneficiaryEntry->administrative_debt, 0.001);
+
+        // Source's fee (500) is entirely unused — proving there was no eligible beneficiary at all,
+        // not merely insufficient capacity.
+        $this->assertEqualsWithDelta(0.0, (float) $sourceEntry->administrative_pool_relief_given, 0.001);
+        $this->assertEqualsWithDelta(500.0, (float) $sourceEntry->administrative_fee_remaining, 0.001);
+
+        $this->assertCount(0, AdminPercentagePoolReliefAllocation::query()->forDate(self::OTHER_DATE)->get());
+    }
+
+    /** A source that itself needed partial Case 1 relief still exposes its unused fee remainder as Stage 3 capacity. */
+    public function test_source_with_own_partial_case1_usage_still_has_leftover_capacity_for_others(): void
+    {
+        $this->actAsFinanceUser();
+
+        $sourceWithOwnDeficit = $this->subjectProject(['administrative_fee_percentage' => 20]);
+        $beneficiary = $this->subjectProject(['administrative_fee_percentage' => 20]);
+
+        $this->saveJournal(self::DATE, [
+            ['project_id' => $sourceWithOwnDeficit->id, 'daily_income' => 2500, 'daily_expense' => 2400],
+            ['project_id' => $beneficiary->id, 'daily_income' => 500, 'daily_expense' => 800],
+        ]);
+
+        // sourceWithOwnDeficit: daily_total 100; fee 500; pre-Case1 fund_balance -400.
+        // Case1: deficitDebt=min(400,500)=400 -> fund_balance 0, administrative_debt 400.
+        // caseOneUsed=400 -> remainingFee=100.
+        $sourceEntry = $this->entryFor($sourceWithOwnDeficit->id);
+        $this->assertEqualsWithDelta(0.0, (float) $sourceEntry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(400.0, (float) $sourceEntry->administrative_debt, 0.001);
+
+        // beneficiary: daily_total -300; fee 100; pre-Case1 fund_balance -400.
+        // Case1: deficitDebt=min(400,100)=100 -> fund_balance -300, administrative_debt 100; need 300.
+        // Stage 3: only 100 available from sourceWithOwnDeficit -> used=100.
+        $beneficiaryEntry = $this->entryFor($beneficiary->id);
+        $this->assertEqualsWithDelta(-200.0, (float) $beneficiaryEntry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(200.0, (float) $beneficiaryEntry->administrative_debt, 0.001);
+        $this->assertEqualsWithDelta(100.0, (float) $beneficiaryEntry->administrative_pool_relief, 0.001);
+
+        $sourceEntry->refresh();
+        $this->assertEqualsWithDelta(0.0, (float) $sourceEntry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(400.0, (float) $sourceEntry->administrative_debt, 0.001);
+        $this->assertEqualsWithDelta(100.0, (float) $sourceEntry->administrative_pool_relief_given, 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $sourceEntry->administrative_fee_remaining, 0.001);
+
+        $allocations = AdminPercentagePoolReliefAllocation::query()->forDate(self::DATE)->get();
+        $this->assertCount(1, $allocations);
+        $this->assertEqualsWithDelta(100.0, (float) $allocations->first()->amount, 0.001);
+    }
+
+    /** Boundary: source capacity exactly equal to a beneficiary's need must not leak into an untouched second source. */
+    public function test_boundary_exact_source_capacity_leaves_second_source_untouched(): void
+    {
+        $this->actAsFinanceUser();
+
+        $beneficiary = $this->subjectProject(['administrative_exempt' => true]);
+        $source1 = $this->subjectProject(['administrative_fee_percentage' => 20]); // fee 500, exact match
+        $source2 = $this->subjectProject(['administrative_fee_percentage' => 20]); // fee 300, must stay untouched
+
+        $this->saveJournal(self::DATE, [
+            ['project_id' => $beneficiary->id, 'daily_income' => 1, 'daily_expense' => 501],
+            ['project_id' => $source1->id, 'daily_income' => 2500],
+            ['project_id' => $source2->id, 'daily_income' => 1500],
+        ]);
+
+        $beneficiaryEntry = $this->entryFor($beneficiary->id);
+        $this->assertEqualsWithDelta(0.0, (float) $beneficiaryEntry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(500.0, (float) $beneficiaryEntry->administrative_pool_relief, 0.001);
+
+        $source1Entry = $this->entryFor($source1->id);
+        $this->assertEqualsWithDelta(500.0, (float) $source1Entry->administrative_pool_relief_given, 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $source1Entry->administrative_fee_remaining, 0.001);
+        $this->assertEqualsWithDelta(2000.0, (float) $source1Entry->fund_balance, 0.001);
+
+        $source2Entry = $this->entryFor($source2->id);
+        $this->assertEqualsWithDelta(0.0, (float) $source2Entry->administrative_pool_relief_given, 0.001);
+        $this->assertEqualsWithDelta(300.0, (float) $source2Entry->administrative_fee_remaining, 0.001);
+        $this->assertEqualsWithDelta(1200.0, (float) $source2Entry->fund_balance, 0.001);
+
+        $allocations = AdminPercentagePoolReliefAllocation::query()->forDate(self::DATE)->get();
+        $this->assertCount(1, $allocations);
+        $this->assertSame($source1->id, $allocations->first()->source_project_id);
+        $this->assertEqualsWithDelta(500.0, (float) $allocations->first()->amount, 0.001);
+    }
+
+    /** Rounding safety: a 3-way split with asymmetric cent amounts must sum exactly, with no drift. */
+    public function test_rounding_safety_across_three_way_split_sums_exactly_to_the_cent(): void
+    {
+        $this->actAsFinanceUser();
+
+        $beneficiary = $this->subjectProject(['administrative_exempt' => true]);
+        $s1 = $this->subjectProject(['administrative_fee_percentage' => 10]); // fee 33.33
+        $s2 = $this->subjectProject(['administrative_fee_percentage' => 10]); // fee 33.33
+        $s3 = $this->subjectProject(['administrative_fee_percentage' => 10]); // fee 33.34
+
+        $this->saveJournal(self::DATE, [
+            ['project_id' => $beneficiary->id, 'daily_income' => 1, 'daily_expense' => 101],
+            ['project_id' => $s1->id, 'daily_income' => 333.30],
+            ['project_id' => $s2->id, 'daily_income' => 333.30],
+            ['project_id' => $s3->id, 'daily_income' => 333.40],
+        ]);
+
+        $beneficiaryEntry = $this->entryFor($beneficiary->id);
+        $this->assertEqualsWithDelta(0.0, (float) $beneficiaryEntry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(100.0, (float) $beneficiaryEntry->administrative_pool_relief, 0.001);
+
+        $s1Entry = $this->entryFor($s1->id);
+        $s2Entry = $this->entryFor($s2->id);
+        $s3Entry = $this->entryFor($s3->id);
+        $this->assertEqualsWithDelta(33.33, (float) $s1Entry->administrative_pool_relief_given, 0.001);
+        $this->assertEqualsWithDelta(33.33, (float) $s2Entry->administrative_pool_relief_given, 0.001);
+        $this->assertEqualsWithDelta(33.34, (float) $s3Entry->administrative_pool_relief_given, 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $s1Entry->administrative_fee_remaining, 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $s2Entry->administrative_fee_remaining, 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $s3Entry->administrative_fee_remaining, 0.001);
+
+        $allocations = AdminPercentagePoolReliefAllocation::query()->forDate(self::DATE)->orderBy('source_project_id')->get();
+        $this->assertCount(3, $allocations);
+        $this->assertEqualsWithDelta(33.33, (float) $allocations[0]->amount, 0.001);
+        $this->assertEqualsWithDelta(33.33, (float) $allocations[1]->amount, 0.001);
+        $this->assertEqualsWithDelta(33.34, (float) $allocations[2]->amount, 0.001);
+        $this->assertEqualsWithDelta(100.0, (float) $allocations->sum('amount'), 0.001);
+    }
+
+    /** A third, lower-priority beneficiary can be fully starved (zero relief, no allocation row) once the pool is exhausted. */
+    public function test_three_beneficiaries_share_pool_and_the_last_is_fully_starved(): void
+    {
+        $this->actAsFinanceUser();
+
+        $beneficiaryA = $this->subjectProject(['administrative_exempt' => true]);
+        $beneficiaryB = $this->subjectProject(['administrative_exempt' => true]);
+        $beneficiaryC = $this->subjectProject(['administrative_exempt' => true]);
+        $source = $this->subjectProject(['administrative_fee_percentage' => 20]); // fee 500 < total need 900
+
+        $this->saveJournal(self::DATE, [
+            ['project_id' => $beneficiaryA->id, 'daily_income' => 1, 'daily_expense' => 301],
+            ['project_id' => $beneficiaryB->id, 'daily_income' => 1, 'daily_expense' => 301],
+            ['project_id' => $beneficiaryC->id, 'daily_income' => 1, 'daily_expense' => 301],
+            ['project_id' => $source->id, 'daily_income' => 2500],
+        ]);
+
+        // A (min(500,300)=300, pool left 200), B (min(200,300)=200, pool left 0), C gets nothing.
+        $entryA = $this->entryFor($beneficiaryA->id);
+        $entryB = $this->entryFor($beneficiaryB->id);
+        $entryC = $this->entryFor($beneficiaryC->id);
+
+        $this->assertEqualsWithDelta(300.0, (float) $entryA->administrative_pool_relief, 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $entryA->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(200.0, (float) $entryB->administrative_pool_relief, 0.001);
+        $this->assertEqualsWithDelta(-100.0, (float) $entryB->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $entryC->administrative_pool_relief, 0.001);
+        $this->assertEqualsWithDelta(-300.0, (float) $entryC->fund_balance, 0.001);
+
+        $allocations = AdminPercentagePoolReliefAllocation::query()->forDate(self::DATE)->get();
+        $this->assertCount(2, $allocations);
+        $this->assertEqualsWithDelta(500.0, (float) $allocations->sum('amount'), 0.001);
+        $this->assertCount(0, $allocations->where('beneficiary_project_id', $beneficiaryC->id));
+    }
+
+    /**
+     * Editing an earlier date's carried balance must be reflected in a later, already-saved date's
+     * Stage 3 relief via the forward-chain recalculation that runs on every save.
+     */
+    public function test_forward_chain_recalculation_updates_a_later_days_stage3_relief(): void
+    {
+        $this->actAsFinanceUser();
+
+        $chainProject = $this->subjectProject(['administrative_exempt' => true]);
+        $source = $this->subjectProject(['administrative_fee_percentage' => 20]);
+
+        // Day 1: chainProject builds a carried tip deficit; source is not saved this day (its fee
+        // would be 0 anyway) so nothing can relieve chainProject on Day 1 itself.
+        $this->saveJournal(self::DATE, [
+            ['project_id' => $chainProject->id, 'daily_income' => 0, 'daily_expense' => 200],
+        ]);
+        $this->assertEqualsWithDelta(-200.0, (float) $this->entryFor($chainProject->id)->fund_balance, 0.001);
+
+        // Day 2: chainProject has real (non-zero-activity) activity netting to 0, tip carried -200 -> need 200.
+        // source fee 200 on day 2 fully covers it.
+        $this->saveJournal(self::OTHER_DATE, [
+            ['project_id' => $chainProject->id, 'daily_income' => 50, 'daily_expense' => 50],
+            ['project_id' => $source->id, 'daily_income' => 1000],
+        ]);
+
+        $day2Entry = $this->entryFor($chainProject->id, self::OTHER_DATE);
+        $this->assertEqualsWithDelta(0.0, (float) $day2Entry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(200.0, (float) $day2Entry->administrative_pool_relief, 0.001);
+
+        // Re-save Day 1 only, raising chainProject's expense from 200 to 500 (source's day-1 entry
+        // is not resent; partial-payload saves leave other same-date entries untouched).
+        $this->saveJournal(self::DATE, [
+            ['project_id' => $chainProject->id, 'daily_income' => 0, 'daily_expense' => 500],
+        ]);
+
+        $day1Entry = $this->entryFor($chainProject->id);
+        $this->assertEqualsWithDelta(-500.0, (float) $day1Entry->fund_balance, 0.001);
+
+        // Forward-chain recalculation must have updated Day 2: need is now 500, source capacity is
+        // still only 200 -> only partial coverage, worse fund_balance than before.
+        $day2Entry = $this->entryFor($chainProject->id, self::OTHER_DATE);
+        $this->assertEqualsWithDelta(200.0, (float) $day2Entry->administrative_pool_relief, 0.001);
+        $this->assertEqualsWithDelta(-300.0, (float) $day2Entry->fund_balance, 0.001);
+
+        $allocations = AdminPercentagePoolReliefAllocation::query()->forDate(self::OTHER_DATE)->get();
+        $this->assertCount(1, $allocations);
+        $this->assertEqualsWithDelta(200.0, (float) $allocations->first()->amount, 0.001);
     }
 }

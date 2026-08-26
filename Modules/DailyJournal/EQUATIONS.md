@@ -213,8 +213,12 @@ never be both a source and a beneficiary on the same day. As a defensive rule, a
 
 **Allocation (deterministic, greedy):**
 - Beneficiaries (`fund_balance < 0` after Case 1) are processed with **today's operating deficit first**
-  (`daily_total < 0`), then **carried-only** deficits (`daily_total >= 0`, e.g. zero activity with a negative
-  tip from a prior day). Within each group, order is `project_id` ascending.
+  (`daily_total < 0`), then **carried-only** deficits from days with income netting to `daily_total >= 0` plus a
+  negative tip from a prior day. Within each group, order is `project_id` ascending. A project with **zero
+  `daily_income`** that day is never a Stage 3 beneficiary at all, regardless of `daily_expense` or how negative
+  its carried `fund_balance` is — `administrative_fee` is a percentage of income, so a project earning nothing
+  that day has no fee-generating activity to justify drawing on other projects' fee capacity; it is simply
+  skipped and its deficit carries forward untouched by Stage 3.
 - For each beneficiary, sources (`remainingFee > 0`) are consumed in `project_id` ascending order:
   `used = min(source's remaining capacity, beneficiary's remaining need)`; both are reduced by `used`; continue
   until the beneficiary's need reaches 0 or all sources are exhausted.
@@ -427,6 +431,7 @@ Action rejections:
 | Pass-2 preserve | Fee / op / admin expense frozen from Pass 1 |
 | Deficit remains after Case 1, same-day pool has capacity | Stage 3 relieves `min(remainingFee sources, deficit)` onto the beneficiary (`administrative_debt` + `fund_balance` like Case 1); source fund_balance unchanged (fee already in daily_total); allocation rows record source→beneficiary breakdown |
 | Deficit remains after Case 1, same-day pool exhausted/zero | No relief; deficit stays negative; no allocation rows created |
+| Carried deficit, zero income that day (regardless of expense) | Never a Stage 3 beneficiary, even if the pool is ample; deficit carries forward untouched |
 | Non-active projects | Rejected on save |
 | Editing one date | Recalculates that date then later journal dates in order (fund + tip chain) |
 | Project delete | Blocked if any journal entries exist |

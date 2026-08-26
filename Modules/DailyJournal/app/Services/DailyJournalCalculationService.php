@@ -298,8 +298,12 @@ class DailyJournalCalculationService
      * would have consumed its entire fee), so a project can never be both a source and a beneficiary.
      *
      * Beneficiaries (fund_balance < 0) are covered with today's operating deficit first
-     * (`daily_total < 0`), then carried-only deficits (`daily_total >= 0`), and within each group by
-     * project_id ascending. Each draws from sources (remaining fee > 0) in project_id ascending order,
+     * (`daily_total < 0`), then carried-only deficits from days with income, and within each group
+     * by project_id ascending. A project with zero daily_income that day is never a beneficiary,
+     * regardless of expense or how negative its carried fund_balance is — administrative_fee is a
+     * percentage of income, so a project earning nothing that day has no fee-generating activity to
+     * justify drawing on other projects' fee capacity; it simply carries its deficit forward. Each
+     * beneficiary draws from sources (remaining fee > 0) in project_id ascending order,
      * greedily, until its deficit is met or sources run out. Exactly like Case 1, the amount drawn is
      * recorded as administrative_debt on the beneficiary (not left as an untracked fund top-up) and
      * added onto its fund_balance — the only difference from Case 1 is the funding source (another
@@ -326,7 +330,8 @@ class DailyJournalCalculationService
         }
 
         $beneficiaries = $entries
-            ->filter(fn (DailyJournalEntry $entry) => (float) $entry->fund_balance < 0)
+            ->filter(fn (DailyJournalEntry $entry) => (float) $entry->fund_balance < 0
+                && $entry->incomeAmount() !== 0.0)
             ->sortBy(fn (DailyJournalEntry $entry) => [
                 (float) $entry->daily_total < 0 ? 0 : 1,
                 (int) $entry->project_id,
