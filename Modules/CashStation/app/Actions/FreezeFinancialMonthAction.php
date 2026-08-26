@@ -97,9 +97,10 @@ class FreezeFinancialMonthAction
                     'remaining_administrative_debt' => (float) ($cs['remaining_administrative_debt'] ?? 0),
                     'cs_added_contribution' => (float) ($cs['added_contribution'] ?? 0),
                     'cs_deducted_contribution' => (float) ($cs['deducted_contribution'] ?? 0),
-                    'net_cash_fund' => (float) ($cs['net_cash_fund'] ?? 0),
+                    // Same tip as Monthly Summary project_net_result / CS live net_cash_fund.
+                    'net_cash_fund' => (float) ($ms['project_net_result'] ?? $cs['net_cash_fund'] ?? 0),
                     'cash_status' => (string) ($cs['status'] ?? 'balanced'),
-                    'fund_balance_tip' => (float) ($ms['project_net_result'] ?? 0),
+                    'fund_balance_tip' => (float) ($ms['project_net_result'] ?? $cs['net_cash_fund'] ?? 0),
                     'ms_administrative_debt' => (float) ($ms['administrative_debt'] ?? 0),
                     'ms_added_contribution' => (float) ($ms['total_received_contributions'] ?? 0),
                     'ms_deducted_contribution' => (float) ($ms['total_deducted_contributions'] ?? 0),

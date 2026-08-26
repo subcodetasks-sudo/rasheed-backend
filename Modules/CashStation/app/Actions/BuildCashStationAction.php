@@ -12,20 +12,15 @@ use Modules\CashStation\Models\CashStationSettlement;
 use Modules\CashStation\Models\FinancialMonthLock;
 use Modules\CashStation\Models\FinancialMonthProjectSnapshot;
 use Modules\DailyJournal\Actions\ReadAccumulatedAdministrativeDebtTipAction;
+use Modules\DailyJournal\Actions\ReadFundBalanceTipAction;
 use Modules\MonthlySummary\Enums\ContributionType;
 use Modules\Project\Models\Project;
 
 class BuildCashStationAction
 {
-    /**
-     * @var array<string, array{
-     *     carriedFromPrevious: bool,
-     *     currentAggregates: array<int, object>,
-     *     previousAggregates: array<int, object>,
-     *     contributions: array<int, array{added: float, deducted: float}>
-     * }>
-     */
-    private array $monthBalanceContextCache = [];
+    public function __construct(
+        private readonly ReadFundBalanceTipAction $readFundBalanceTipAction,
+    ) {}
 
     public function execute(int $month, int $year): array
     {
@@ -75,6 +70,7 @@ class BuildCashStationAction
             : [];
 
         $debts = $this->administrativeDebtsByProject($projectIds, $endOfMonth->toDateString());
+        $fundBalances = $this->readFundBalanceTipAction->execute($projectIds, $endOfMonth->toDateString());
         $adsDebtSettledThisMonth = $this->administrativeDebtSettledInMonthByProject($projectIds, $year, $month);
         $settlements = $this->settlementsForMonth($year, $month);
         $contributions = $this->cashContributionsByProject($settlements);
@@ -106,7 +102,8 @@ class BuildCashStationAction
 
             $added = (float) ($contributions[$project->id]['added'] ?? 0);
             $deducted = (float) ($contributions[$project->id]['deducted'] ?? 0);
-            $netCashFund = $previousMonthlyTotal + $monthlyTotal + $added - $deducted;
+            // Same cumulative journal tip as Monthly Summary project_net_result (صافي الصندوق).
+            $netCashFund = (float) ($fundBalances[$project->id] ?? 0);
 
             $originatingDebt = (float) ($debts[$project->id] ?? 0);
             $settledDebtThisMonth = (float) ($adsDebtSettledThisMonth[$project->id] ?? 0);
@@ -199,7 +196,9 @@ class BuildCashStationAction
 
         foreach ($snapshots as $snapshot) {
             $monthlyTotal = (float) $snapshot->monthly_total;
-            $netCashFund = (float) $snapshot->net_cash_fund;
+            // Prefer fund_balance_tip so locked months match Monthly Summary even if an older
+            // snapshot still stored the pre-tip net_cash_fund formula.
+            $netCashFund = (float) ($snapshot->fund_balance_tip ?? $snapshot->net_cash_fund);
             $administrativeDebt = (float) $snapshot->remaining_administrative_debt;
 
             $projectRows[] = [
@@ -212,7 +211,7 @@ class BuildCashStationAction
                 'deducted_contribution' => FormatMoneyDecimal::formatRounded((float) $snapshot->cs_deducted_contribution),
                 'net_cash_fund' => FormatMoneyDecimal::formatRounded($netCashFund),
                 'remaining_administrative_debt' => FormatMoneyDecimal::formatRounded($administrativeDebt),
-                'status' => $snapshot->cash_status,
+                'status' => $this->cashBoxStatus($netCashFund),
             ];
 
             if ($monthlyTotal > 0) {
@@ -260,7 +259,7 @@ class BuildCashStationAction
     }
 
     /**
-     * Transferable surplus for a project in a month = max(0, previous + monthly_total + added − deducted).
+     * Transferable surplus for a project in a month = max(0, journal fund_balance tip).
      */
     public function transferableBalance(int $projectId, int $month, int $year): float
     {
@@ -402,117 +401,15 @@ class BuildCashStationAction
     }
 
     /**
-     * Net cash fund for a project in a month (can be negative).
+     * Net cash fund for a project in a month = journal fund_balance tip as of month end
+     * (same source as Monthly Summary project_net_result). Can be negative.
      */
     public function netCashFundForProject(int $projectId, int $month, int $year): float
     {
-        $context = $this->monthBalanceContext($month, $year);
+        $endOfMonth = Carbon::create($year, $month, 1)->endOfMonth()->toDateString();
+        $balances = $this->readFundBalanceTipAction->execute([$projectId], $endOfMonth);
 
-        $previousMonthlyTotal = 0.0;
-        if ($context['carriedFromPrevious']) {
-            $previousMonthlyTotal = $this->monthlyTotalFromAggregate(
-                $this->aggregateForProjectInContext($context, $projectId, $month, $year, previous: true)
-            );
-        }
-
-        $monthlyTotal = $this->monthlyTotalFromAggregate(
-            $this->aggregateForProjectInContext($context, $projectId, $month, $year, previous: false)
-        );
-        $added = (float) ($context['contributions'][$projectId]['added'] ?? 0);
-        $deducted = (float) ($context['contributions'][$projectId]['deducted'] ?? 0);
-
-        return $previousMonthlyTotal + $monthlyTotal + $added - $deducted;
-    }
-
-    /**
-     * @return array{
-     *     carriedFromPrevious: bool,
-     *     currentAggregates: array<int, object>,
-     *     previousAggregates: array<int, object>,
-     *     contributions: array<int, array{added: float, deducted: float}>
-     * }
-     */
-    private function monthBalanceContext(int $month, int $year): array
-    {
-        $key = "{$year}-{$month}";
-        if (isset($this->monthBalanceContextCache[$key])) {
-            return $this->monthBalanceContextCache[$key];
-        }
-
-        $startOfMonth = Carbon::create($year, $month, 1)->startOfDay();
-        $endOfMonth = $startOfMonth->copy()->endOfMonth()->startOfDay();
-        $previousMonth = $startOfMonth->copy()->subMonthNoOverflow();
-
-        $carriedFromPrevious = $this->hasCarryFromPrevious(
-            (int) $previousMonth->year,
-            (int) $previousMonth->month,
-            $year,
-            $month,
-        );
-
-        $projectIds = Project::query()->active()->pluck('id')->all();
-
-        $currentAggregates = $this->monthlyAggregatesByProject(
-            $projectIds,
-            $startOfMonth->toDateString(),
-            $endOfMonth->toDateString(),
-        );
-
-        $previousAggregates = [];
-        if ($carriedFromPrevious) {
-            $previousAggregates = $this->monthlyAggregatesByProject(
-                $projectIds,
-                $previousMonth->copy()->startOfMonth()->toDateString(),
-                $previousMonth->copy()->endOfMonth()->toDateString(),
-            );
-        }
-
-        $contributions = $this->cashContributionsByProject(
-            $this->settlementsForMonth($year, $month)
-        );
-
-        return $this->monthBalanceContextCache[$key] = [
-            'carriedFromPrevious' => $carriedFromPrevious,
-            'currentAggregates' => $currentAggregates,
-            'previousAggregates' => $previousAggregates,
-            'contributions' => $contributions,
-        ];
-    }
-
-    /**
-     * @param  array{
-     *     carriedFromPrevious: bool,
-     *     currentAggregates: array<int, object>,
-     *     previousAggregates: array<int, object>,
-     *     contributions: array<int, array{added: float, deducted: float}>
-     * }  $context
-     */
-    private function aggregateForProjectInContext(
-        array $context,
-        int $projectId,
-        int $month,
-        int $year,
-        bool $previous,
-    ): mixed {
-        $aggregates = $previous ? $context['previousAggregates'] : $context['currentAggregates'];
-
-        if (array_key_exists($projectId, $aggregates)) {
-            return $aggregates[$projectId];
-        }
-
-        $startOfMonth = Carbon::create($year, $month, 1)->startOfDay();
-        if ($previous) {
-            $monthAnchor = $startOfMonth->copy()->subMonthNoOverflow();
-            $start = $monthAnchor->copy()->startOfMonth()->toDateString();
-            $end = $monthAnchor->copy()->endOfMonth()->toDateString();
-        } else {
-            $start = $startOfMonth->toDateString();
-            $end = $startOfMonth->copy()->endOfMonth()->toDateString();
-        }
-
-        $loaded = $this->monthlyAggregatesByProject([$projectId], $start, $end);
-
-        return $loaded[$projectId] ?? null;
+        return (float) ($balances[$projectId] ?? 0);
     }
 
     /**
@@ -537,12 +434,10 @@ class BuildCashStationAction
     }
 
     /**
-     * For net_cash_fund purposes only. The contributor's surplus is genuinely spent regardless
-     * of contribution type - real money leaves their cash position either way - but only manual
-     * settlements (contribution_type null) and fund_deficit contributions actually deliver cash
-     * to the beneficiary. An administrative_debt contribution instead settles the beneficiary's
-     * accumulated_administrative_debt (ApplyContributionAdministrativeDebtAction), so it must not
-     * also inflate their cash position: added is skipped, deducted still applies.
+     * Display totals for added/deducted contribution columns on Cash Station cards.
+     * Manual settlements and fund_deficit contributions add cash to the beneficiary;
+     * administrative_debt contributions settle debt only (added skipped, deducted still applies).
+     * These figures are informational — net_cash_fund comes from the journal fund_balance tip.
      *
      * @param  Collection<int, CashStationSettlement>  $settlements
      * @return array<int, array{added: float, deducted: float}>

@@ -124,21 +124,23 @@ class CashStationApiTest extends TestCase
         $data = $response->json('data');
         $row = $this->findProject($data, $project->id);
 
+        // monthly_total from operating aggregates — not fund_balance / daily_total
         // (1000+500) - (100+40) - (50+10) - (200+100) = 1000
-        $this->assertSame('1000.00', $row['monthly_total']);
-        $this->assertSame('0.00', $row['previous_monthly_total']);
-        $this->assertSame('1000.00', $row['net_cash_fund']);
-        $this->assertSame('40.00', $row['administrative_debt']);
-        $this->assertSame('40.00', $row['remaining_administrative_debt']);
+        $this->assertSame('1000', $row['monthly_total']);
+        $this->assertSame('0', $row['previous_monthly_total']);
+        // net_cash_fund = journal tip (latest fund_balance <= month end)
+        $this->assertSame('6666', $row['net_cash_fund']);
+        $this->assertSame('40', $row['administrative_debt']);
+        $this->assertSame('40', $row['remaining_administrative_debt']);
         $this->assertSame('surplus', $row['status']);
 
-        $this->assertSame('1500.00', $data['summary']['monthly_revenue']);
-        $this->assertSame('300.00', $data['summary']['monthly_expenses']);
-        $this->assertSame('140.00', $data['summary']['total_administrative_percentage']);
-        $this->assertSame('60.00', $data['summary']['total_operational_deduction']);
-        $this->assertSame('1000.00', $data['summary']['net_month']);
-        $this->assertSame('1000.00', $data['summary']['net_cash_funds']);
-        $this->assertSame('40.00', $data['summary']['administrative_debts']);
+        $this->assertSame('1500', $data['summary']['monthly_revenue']);
+        $this->assertSame('300', $data['summary']['monthly_expenses']);
+        $this->assertSame('140', $data['summary']['total_administrative_percentage']);
+        $this->assertSame('60', $data['summary']['total_operational_deduction']);
+        $this->assertSame('1000', $data['summary']['net_month']);
+        $this->assertSame('6666', $data['summary']['net_cash_funds']);
+        $this->assertSame('40', $data['summary']['administrative_debts']);
         $this->assertFalse($data['carried_forward_from_previous']);
     }
 
@@ -153,6 +155,7 @@ class CashStationApiTest extends TestCase
             'administrative_fee' => 100,
             'operational_deduction' => 0,
             'daily_expense' => 400,
+            'fund_balance' => 1500,
         ]);
         // July monthly total = 1500
 
@@ -161,11 +164,12 @@ class CashStationApiTest extends TestCase
             'administrative_fee' => 0,
             'operational_deduction' => 0,
             'daily_expense' => 600,
+            'fund_balance' => -500,
         ]);
         // July monthly total = -500
 
         $july = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
-        $this->assertSame('0.00', $this->findProject($july, $surplus->id)['previous_monthly_total']);
+        $this->assertSame('0', $this->findProject($july, $surplus->id)['previous_monthly_total']);
         $this->assertFalse($july['carried_forward_from_previous']);
 
         $this->postJson(self::ENDPOINT.'/carry-forward', [
@@ -179,21 +183,23 @@ class CashStationApiTest extends TestCase
             'administrative_fee' => 0,
             'operational_deduction' => 0,
             'daily_expense' => 50,
+            'fund_balance' => 1750,
         ]);
-        // August monthly total = 250
+        // August monthly total = 250; tip = 1750
 
         $august = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data');
         $this->assertTrue($august['carried_forward_from_previous']);
 
         $surplusRow = $this->findProject($august, $surplus->id);
-        $this->assertSame('1500.00', $surplusRow['previous_monthly_total']);
-        $this->assertSame('250.00', $surplusRow['monthly_total']);
-        $this->assertSame('1750.00', $surplusRow['net_cash_fund']);
+        $this->assertSame('1500', $surplusRow['previous_monthly_total']);
+        $this->assertSame('250', $surplusRow['monthly_total']);
+        $this->assertSame('1750', $surplusRow['net_cash_fund']);
 
         $deficitRow = $this->findProject($august, $deficit->id);
-        $this->assertSame('-500.00', $deficitRow['previous_monthly_total']);
-        $this->assertSame('0.00', $deficitRow['monthly_total']);
-        $this->assertSame('-500.00', $deficitRow['net_cash_fund']);
+        $this->assertSame('-500', $deficitRow['previous_monthly_total']);
+        $this->assertSame('0', $deficitRow['monthly_total']);
+        // No August entry → tip remains July fund_balance
+        $this->assertSame('-500', $deficitRow['net_cash_fund']);
     }
 
     public function test_previous_remains_zero_until_carry_forward_is_executed(): void
@@ -204,11 +210,12 @@ class CashStationApiTest extends TestCase
         $this->seedEntry($project->id, '2026-07-10', [
             'daily_income' => 1000,
             'daily_expense' => 200,
+            'fund_balance' => 800,
         ]);
 
         $august = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data');
         $this->assertFalse($august['carried_forward_from_previous']);
-        $this->assertSame('0.00', $this->findProject($august, $project->id)['previous_monthly_total']);
+        $this->assertSame('0', $this->findProject($august, $project->id)['previous_monthly_total']);
     }
 
     public function test_editing_carried_month_updates_dependent_previous_monthly_total(): void
@@ -221,6 +228,7 @@ class CashStationApiTest extends TestCase
             'administrative_fee' => 0,
             'operational_deduction' => 0,
             'daily_expense' => 200,
+            'fund_balance' => 800,
         ]);
         // monthly total = 800
 
@@ -230,20 +238,21 @@ class CashStationApiTest extends TestCase
         ])->assertOk();
 
         $before = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data');
-        $this->assertSame('800.00', $this->findProject($before, $project->id)['previous_monthly_total']);
+        $this->assertSame('800', $this->findProject($before, $project->id)['previous_monthly_total']);
+        $this->assertSame('800', $this->findProject($before, $project->id)['net_cash_fund']);
 
         $entry->update([
             'daily_income' => 1500,
         ]);
-        // monthly total becomes 1300
+        // monthly total becomes 1300; tip unchanged until fund_balance is updated
 
         $after = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data');
         $row = $this->findProject($after, $project->id);
-        $this->assertSame('1300.00', $row['previous_monthly_total']);
-        $this->assertSame('1300.00', $row['net_cash_fund']);
+        $this->assertSame('1300', $row['previous_monthly_total']);
+        $this->assertSame('800', $row['net_cash_fund']);
     }
 
-    public function test_settlement_affects_net_cash_fund_only(): void
+    public function test_settlement_updates_contribution_columns_not_net_cash_fund(): void
     {
         $this->actAs('finance');
         $from = $this->createProject(['name' => 'مساهم']);
@@ -254,17 +263,21 @@ class CashStationApiTest extends TestCase
             'administrative_fee' => 0,
             'operational_deduction' => 0,
             'daily_expense' => 0,
+            'fund_balance' => 2000,
         ]);
         $this->seedEntry($to->id, '2026-07-12', [
             'daily_income' => 0,
             'administrative_fee' => 0,
             'operational_deduction' => 0,
             'daily_expense' => 500,
+            'fund_balance' => -500,
         ]);
 
         $before = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
-        $this->assertSame('2000.00', $this->findProject($before, $from->id)['monthly_total']);
-        $this->assertSame('-500.00', $this->findProject($before, $to->id)['monthly_total']);
+        $this->assertSame('2000', $this->findProject($before, $from->id)['monthly_total']);
+        $this->assertSame('-500', $this->findProject($before, $to->id)['monthly_total']);
+        $this->assertSame('2000', $this->findProject($before, $from->id)['net_cash_fund']);
+        $this->assertSame('-500', $this->findProject($before, $to->id)['net_cash_fund']);
 
         $create = $this->postJson(self::ENDPOINT.'/settlements', [
             'month' => 7,
@@ -279,16 +292,17 @@ class CashStationApiTest extends TestCase
         $fromRow = $this->findProject($data, $from->id);
         $toRow = $this->findProject($data, $to->id);
 
-        $this->assertSame('2000.00', $fromRow['monthly_total']);
-        $this->assertSame('0.00', $fromRow['previous_monthly_total']);
-        $this->assertSame('400.00', $fromRow['deducted_contribution']);
-        $this->assertSame('0.00', $fromRow['added_contribution']);
-        $this->assertSame('1600.00', $fromRow['net_cash_fund']);
+        $this->assertSame('2000', $fromRow['monthly_total']);
+        $this->assertSame('0', $fromRow['previous_monthly_total']);
+        $this->assertSame('400', $fromRow['deducted_contribution']);
+        $this->assertSame('0', $fromRow['added_contribution']);
+        // Untyped CS settlements do not mutate journal tip
+        $this->assertSame('2000', $fromRow['net_cash_fund']);
 
-        $this->assertSame('-500.00', $toRow['monthly_total']);
-        $this->assertSame('400.00', $toRow['added_contribution']);
-        $this->assertSame('0.00', $toRow['deducted_contribution']);
-        $this->assertSame('-100.00', $toRow['net_cash_fund']);
+        $this->assertSame('-500', $toRow['monthly_total']);
+        $this->assertSame('400', $toRow['added_contribution']);
+        $this->assertSame('0', $toRow['deducted_contribution']);
+        $this->assertSame('-500', $toRow['net_cash_fund']);
 
         $this->assertCount(1, $data['settlements']);
         $settlementId = $data['settlements'][0]['id'];
@@ -298,8 +312,8 @@ class CashStationApiTest extends TestCase
             ->assertJsonPath('message', __('messages.cash_station_settlement_deleted_successfully'))
             ->json('data');
 
-        $this->assertSame('2000.00', $this->findProject($deleted, $from->id)['net_cash_fund']);
-        $this->assertSame('-500.00', $this->findProject($deleted, $to->id)['net_cash_fund']);
+        $this->assertSame('2000', $this->findProject($deleted, $from->id)['net_cash_fund']);
+        $this->assertSame('-500', $this->findProject($deleted, $to->id)['net_cash_fund']);
         $this->assertSame([], $deleted['settlements']);
     }
 
@@ -312,10 +326,12 @@ class CashStationApiTest extends TestCase
         $this->seedEntry($from->id, '2026-07-12', [
             'daily_income' => 0,
             'daily_expense' => 500,
+            'fund_balance' => -500,
         ]);
         $this->seedEntry($to->id, '2026-07-12', [
             'daily_income' => 100,
             'daily_expense' => 0,
+            'fund_balance' => 100,
         ]);
 
         $this->postJson(self::ENDPOINT.'/settlements', [
@@ -337,6 +353,7 @@ class CashStationApiTest extends TestCase
         $this->seedEntry($from->id, '2026-07-12', [
             'daily_income' => 200,
             'daily_expense' => 0,
+            'fund_balance' => 200,
         ]);
 
         $this->postJson(self::ENDPOINT.'/settlements', [
@@ -358,6 +375,7 @@ class CashStationApiTest extends TestCase
         $this->seedEntry($from->id, '2026-07-12', [
             'daily_income' => 1000,
             'daily_expense' => 0,
+            'fund_balance' => 1000,
         ]);
 
         $this->postJson(self::ENDPOINT.'/settlements', [
@@ -374,9 +392,9 @@ class CashStationApiTest extends TestCase
         ])->assertOk();
 
         $august = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data');
-        // Opening uses Monthly Total only (1000), not Net Cash Fund after settlement (600)
-        $this->assertSame('1000.00', $this->findProject($august, $from->id)['previous_monthly_total']);
-        $this->assertSame('0.00', $this->findProject($august, $to->id)['previous_monthly_total']);
+        // Opening uses Monthly Total only (1000), not settlement-adjusted display columns
+        $this->assertSame('1000', $this->findProject($august, $from->id)['previous_monthly_total']);
+        $this->assertSame('0', $this->findProject($august, $to->id)['previous_monthly_total']);
     }
 
     public function test_surplus_and_deficit_summary_cards_use_monthly_total(): void
@@ -388,16 +406,18 @@ class CashStationApiTest extends TestCase
         $this->seedEntry($a->id, '2026-07-01', [
             'daily_income' => 1000,
             'daily_expense' => 0,
+            'fund_balance' => 1000,
         ]);
         $this->seedEntry($b->id, '2026-07-01', [
             'daily_income' => 0,
             'daily_expense' => 250,
+            'fund_balance' => -250,
         ]);
 
         $data = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
 
-        $this->assertSame('1000.00', $data['summary']['total_monthly_surplus']);
-        $this->assertSame('250.00', $data['summary']['total_monthly_deficit']);
+        $this->assertSame('1000', $data['summary']['total_monthly_surplus']);
+        $this->assertSame('250', $data['summary']['total_monthly_deficit']);
     }
 
     public function test_settlement_does_not_change_surplus_deficit_or_net_month(): void
@@ -411,19 +431,21 @@ class CashStationApiTest extends TestCase
             'administrative_fee' => 0,
             'operational_deduction' => 0,
             'daily_expense' => 0,
+            'fund_balance' => 1000,
         ]);
         $this->seedEntry($to->id, '2026-07-12', [
             'daily_income' => 0,
             'administrative_fee' => 0,
             'operational_deduction' => 0,
             'daily_expense' => 500,
+            'fund_balance' => -500,
         ]);
 
         $before = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
-        $this->assertSame('1000.00', $before['summary']['total_monthly_surplus']);
-        $this->assertSame('500.00', $before['summary']['total_monthly_deficit']);
-        $this->assertSame('500.00', $before['summary']['net_month']);
-        $this->assertSame('500.00', $before['summary']['net_cash_funds']);
+        $this->assertSame('1000', $before['summary']['total_monthly_surplus']);
+        $this->assertSame('500', $before['summary']['total_monthly_deficit']);
+        $this->assertSame('500', $before['summary']['net_month']);
+        $this->assertSame('500', $before['summary']['net_cash_funds']);
 
         $after = $this->postJson(self::ENDPOINT.'/settlements', [
             'month' => 7,
@@ -433,13 +455,13 @@ class CashStationApiTest extends TestCase
             'amount' => 400,
         ])->assertCreated()->json('data');
 
-        // Surplus/deficit/net_month stay on Monthly Total; only per-project net cash moves.
-        $this->assertSame('1000.00', $after['summary']['total_monthly_surplus']);
-        $this->assertSame('500.00', $after['summary']['total_monthly_deficit']);
-        $this->assertSame('500.00', $after['summary']['net_month']);
-        $this->assertSame('500.00', $after['summary']['net_cash_funds']);
-        $this->assertSame('600.00', $this->findProject($after, $from->id)['net_cash_fund']);
-        $this->assertSame('-100.00', $this->findProject($after, $to->id)['net_cash_fund']);
+        // Surplus/deficit/net_month stay on Monthly Total; tips unchanged by untyped settlement.
+        $this->assertSame('1000', $after['summary']['total_monthly_surplus']);
+        $this->assertSame('500', $after['summary']['total_monthly_deficit']);
+        $this->assertSame('500', $after['summary']['net_month']);
+        $this->assertSame('500', $after['summary']['net_cash_funds']);
+        $this->assertSame('1000', $this->findProject($after, $from->id)['net_cash_fund']);
+        $this->assertSame('-500', $this->findProject($after, $to->id)['net_cash_fund']);
     }
 
     public function test_carry_forward_does_not_inflate_next_month_surplus_deficit(): void
@@ -452,6 +474,7 @@ class CashStationApiTest extends TestCase
             'administrative_fee' => 0,
             'operational_deduction' => 0,
             'daily_expense' => 500,
+            'fund_balance' => 1500,
         ]);
         // July monthly total = 1500
 
@@ -465,21 +488,22 @@ class CashStationApiTest extends TestCase
             'administrative_fee' => 0,
             'operational_deduction' => 0,
             'daily_expense' => 50,
+            'fund_balance' => 1750,
         ]);
         // August monthly total = 250
 
         $august = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data');
         $row = $this->findProject($august, $project->id);
 
-        $this->assertSame('1500.00', $row['previous_monthly_total']);
-        $this->assertSame('250.00', $row['monthly_total']);
-        $this->assertSame('1750.00', $row['net_cash_fund']);
+        $this->assertSame('1500', $row['previous_monthly_total']);
+        $this->assertSame('250', $row['monthly_total']);
+        $this->assertSame('1750', $row['net_cash_fund']);
 
-        // Surplus/deficit use August Monthly Total only; previous appears only in net cash.
-        $this->assertSame('250.00', $august['summary']['total_monthly_surplus']);
-        $this->assertSame('0.00', $august['summary']['total_monthly_deficit']);
-        $this->assertSame('250.00', $august['summary']['net_month']);
-        $this->assertSame('1750.00', $august['summary']['net_cash_funds']);
+        // Surplus/deficit use August Monthly Total only
+        $this->assertSame('250', $august['summary']['total_monthly_surplus']);
+        $this->assertSame('0', $august['summary']['total_monthly_deficit']);
+        $this->assertSame('250', $august['summary']['net_month']);
+        $this->assertSame('1750', $august['summary']['net_cash_funds']);
     }
 
     public function test_summary_administrative_percentage_uses_collected_not_gross_fee(): void
@@ -498,6 +522,7 @@ class CashStationApiTest extends TestCase
             'administrative_debt' => 80,
             'contribution' => 30,
             'daily_expense' => 0,
+            'fund_balance' => 930,
         ]);
 
         // Exempt fees must not enter the collected summary card.
@@ -506,20 +531,19 @@ class CashStationApiTest extends TestCase
             'administrative_fee' => 50,
             'administrative_debt' => 0,
             'contribution' => 0,
+            'fund_balance' => 500,
         ]);
 
         $data = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
 
-        $this->assertSame('70.00', $data['summary']['total_administrative_percentage']);
+        $this->assertSame('70', $data['summary']['total_administrative_percentage']);
 
         // Monthly Total / Net Monthly Result deduct collected only: 1000 − 70 = 930.
-        // Unpaid portion (debt-related) is not deducted from monthly_total.
-        $this->assertSame('930.00', $this->findProject($data, $eligible->id)['monthly_total']);
+        $this->assertSame('930', $this->findProject($data, $eligible->id)['monthly_total']);
 
-        // Exempt fee is ignored for both collected card and monthly_total admin deduction.
         // Exempt monthly_total = 500 − 0 = 500.
-        $this->assertSame('500.00', $this->findProject($data, $exempt->id)['monthly_total']);
-        $this->assertSame('1430.00', $data['summary']['net_month']);
+        $this->assertSame('500', $this->findProject($data, $exempt->id)['monthly_total']);
+        $this->assertSame('1430', $data['summary']['net_month']);
     }
 
     public function test_net_month_does_not_deduct_unpaid_administrative_percentage(): void
@@ -536,15 +560,16 @@ class CashStationApiTest extends TestCase
             'operational_deduction' => 50,
             'daily_expense' => 100,
             'accumulated_administrative_debt' => 80,
+            'fund_balance' => 730,
         ]);
 
         $data = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
 
         // Net month = 1000 − 120 − 50 − 100 = 730 (not 1000 − 200 − 50 − 100 = 650).
-        $this->assertSame('120.00', $data['summary']['total_administrative_percentage']);
-        $this->assertSame('730.00', $data['summary']['net_month']);
-        $this->assertSame('730.00', $this->findProject($data, $project->id)['monthly_total']);
-        $this->assertSame('80.00', $data['summary']['administrative_debts']);
+        $this->assertSame('120', $data['summary']['total_administrative_percentage']);
+        $this->assertSame('730', $data['summary']['net_month']);
+        $this->assertSame('730', $this->findProject($data, $project->id)['monthly_total']);
+        $this->assertSame('80', $data['summary']['administrative_debts']);
     }
 
     public function test_status_reflects_net_cash_fund(): void
@@ -556,13 +581,16 @@ class CashStationApiTest extends TestCase
 
         $this->seedEntry($surplus->id, '2026-07-01', [
             'daily_income' => 100,
+            'fund_balance' => 100,
         ]);
         $this->seedEntry($deficit->id, '2026-07-01', [
             'daily_expense' => 50,
+            'fund_balance' => -50,
         ]);
         $this->seedEntry($balanced->id, '2026-07-01', [
             'daily_income' => 0,
             'daily_expense' => 0,
+            'fund_balance' => 0,
         ]);
 
         $data = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
@@ -573,10 +601,8 @@ class CashStationApiTest extends TestCase
     }
 
     /**
-     * A sub-whole-unit residual (e.g. -0.07, left over when Stage 3's relief pool falls a few
-     * fils short of a project's full deficit) must not report as "deficit" while the displayed
-     * net_cash_fund rounds to "0" - status is derived from the same whole-unit precision that is
-     * displayed, so the two never visibly contradict each other.
+     * A sub-whole-unit residual must not report as "deficit" while the displayed
+     * net_cash_fund rounds to "0" — status uses the same whole-unit precision.
      */
     public function test_status_matches_whole_unit_display_for_sub_unit_residual(): void
     {
@@ -585,6 +611,7 @@ class CashStationApiTest extends TestCase
 
         $this->seedEntry($project->id, '2026-07-01', [
             'daily_expense' => 0.07,
+            'fund_balance' => -0.07,
         ]);
 
         $data = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data');
@@ -595,11 +622,8 @@ class CashStationApiTest extends TestCase
     }
 
     /**
-     * An administrative_debt-type Monthly Summary contribution settles the beneficiary's
-     * accumulated_administrative_debt (ApplyContributionAdministrativeDebtAction), not their cash
-     * position - so the beneficiary's net_cash_fund must not increase. The contributor's surplus,
-     * however, is genuinely given away either way, exactly like a fund_deficit contribution: their
-     * net_cash_fund must still decrease by the full amount.
+     * administrative_debt contributions debit the contributor tip (net_cash_fund) and
+     * reduce beneficiary debt without increasing beneficiary tip / added_contribution.
      */
     public function test_administrative_debt_contribution_deducts_contributor_but_not_beneficiary_cash(): void
     {
@@ -610,9 +634,11 @@ class CashStationApiTest extends TestCase
 
         $this->seedEntry($from->id, '2026-07-12', [
             'daily_income' => 800,
+            'fund_balance' => 800,
         ]);
         $this->seedEntry($to->id, '2026-07-12', [
             'daily_income' => 100,
+            'fund_balance' => 100,
             'administrative_debt' => 50,
             'accumulated_administrative_debt' => 120,
         ]);
@@ -634,15 +660,12 @@ class CashStationApiTest extends TestCase
         $fromAfter = $this->findProject($after, $from->id);
         $toAfter = $this->findProject($after, $to->id);
 
-        // The debt relief did happen, on the debt ledger.
         $this->assertSame('120', $toBefore['remaining_administrative_debt']);
         $this->assertSame('40', $toAfter['remaining_administrative_debt']);
 
-        // Contributor: real money given away, same as a fund_deficit contribution would.
-        $this->assertSame((string) round((float) $fromBefore['net_cash_fund'] - 80, 2), $fromAfter['net_cash_fund']);
+        $this->assertSame('720', $fromAfter['net_cash_fund']);
         $this->assertSame('80', $fromAfter['deducted_contribution']);
 
-        // Beneficiary: cash position unaffected - only the debt ledger moved.
         $this->assertSame($toBefore['net_cash_fund'], $toAfter['net_cash_fund']);
         $this->assertSame('0', $toAfter['added_contribution']);
     }
@@ -694,8 +717,8 @@ class CashStationApiTest extends TestCase
         // repayToday = min(200, 150) = 150
         // Calculation reduces accumulated during repayToday (300 - 150 = 150),
         // then repays remaining surplus against accumulated (150 - 50 = 100).
-        $this->assertSame('100.00', $row['administrative_debt']);
-        $this->assertSame('100.00', $row['remaining_administrative_debt']);
+        $this->assertSame('100', $row['administrative_debt']);
+        $this->assertSame('100', $row['remaining_administrative_debt']);
     }
 
     public function test_delete_missing_settlement_returns_404(): void
