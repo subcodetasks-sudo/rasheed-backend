@@ -62,13 +62,16 @@ class OperationalFundApiTest extends TestCase
         $this->getJson(self::MONTH.'?month=8&year=2026')->assertForbidden();
     }
 
-    public function test_day_expected_income_is_base_plus_fixed(): void
+    public function test_day_expected_income_equals_employee_total(): void
     {
         $this->actAs('finance');
         $this->createFixedProject(154);
 
+        // Expected operational income is the whole employee-cost budget outright — the fixed
+        // project's 154 is a carve-out of that budget (reducing the relative pool elsewhere), not
+        // an addition on top of it.
         $base = ResolveEffectiveOperationalDeductionAction::DEFAULT_TOTAL;
-        $expected = number_format($base + 154, 2, '.', '');
+        $expected = number_format($base, 2, '.', '');
 
         $data = $this->getJson(self::DAY.'?date=2026-08-05')
             ->assertOk()

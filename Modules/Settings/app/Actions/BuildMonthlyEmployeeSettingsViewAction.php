@@ -24,9 +24,12 @@ class BuildMonthlyEmployeeSettingsViewAction
             ? $row->categoryAmounts()
             : MonthlyEmployeeCategories::zeros();
 
-        $relative = MonthlyEmployeeCategories::sum($categories);
+        // The employee-category total IS the total daily operational deduction outright; fixed-type
+        // projects' flat charges are a carve-out of that same total, not an addition on top of it.
+        $employeeTotal = MonthlyEmployeeCategories::sum($categories);
         $fixed = $this->sumFixedOperationalDeductionsAction->execute();
-        $total = round($relative + $fixed, 2);
+        $relative = round(max(0, $employeeTotal - $fixed), 2);
+        $total = round($employeeTotal, 2);
 
         $categoryDecimals = [];
         foreach ($categories as $key => $value) {

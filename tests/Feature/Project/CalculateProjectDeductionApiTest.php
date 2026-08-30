@@ -48,7 +48,9 @@ class CalculateProjectDeductionApiTest extends ProjectFeatureTestCase
                 999 => 500,
             ],
         ])->assertOk()
-            ->assertJsonPath('data.operational_deduction', 540.5)
+            // Pool = employee total (1081) - fixed sum (75, the $fixed project below already
+            // exists) = 1006; this project's 500/1000 share = 503.
+            ->assertJsonPath('data.operational_deduction', 503.0)
             ->assertJsonPath('data.administrative_deduction', 60)
             ->assertJsonPath('data.operational_deduction_type', OperationalDeductionType::Relative->value);
 

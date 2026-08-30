@@ -59,7 +59,9 @@ class CalculateDeductionsApiTest extends ProjectFeatureTestCase
             ->assertJsonPath('data.0.project_name', 'Relative Project')
             ->assertJsonPath('data.0.income', 1000)
             ->assertJsonPath('data.0.operational_deduction_type', OperationalDeductionType::Relative->value)
-            ->assertJsonPath('data.0.operational_deduction', 1081)
+            // Relative pool = employee total (1081) - fixed sum (154) = 927; sole relative project
+            // takes the whole pool (its own income is the entire participating base).
+            ->assertJsonPath('data.0.operational_deduction', 927)
             ->assertJsonPath('data.0.administrative_deduction', 120)
             ->assertJsonPath('data.0.administrative_exempt', false)
             ->assertJsonPath('data.1.project_id', $fixed->id)

@@ -17,7 +17,9 @@ namespace Tests\Support\RashidWorkbook;
  */
 class ExpectedDailyJournalCalculator
 {
-    private const OPERATIONAL_DEDUCTION_POOL = 1081.0;
+    /** Employee-cost budget for the day (Monthly Employee Settings category sum) — fixed-type
+     *  projects' deductions are a carve-out of this total, not an addition on top of it. */
+    private const EMPLOYEE_TOTAL_POOL = 1081.0;
 
     /** @var array<string, float> project name => running fund balance */
     private array $fundBalance = [];
@@ -33,11 +35,16 @@ class ExpectedDailyJournalCalculator
     public function computeDay(array $projectDefs, array $incomeExpenseForDay): array
     {
         $relativeIncomeTotal = 0.0;
+        $fixedSum = 0.0;
         foreach ($projectDefs as $name => $def) {
             if ($def['operational_deduction_type'] === 'relative') {
                 $relativeIncomeTotal += $incomeExpenseForDay[$name]['income'];
+            } elseif ($def['operational_deduction_type'] === 'fixed') {
+                $fixedSum += (float) $def['operational_fixed_amount'];
             }
         }
+
+        $relativePool = round(max(0, self::EMPLOYEE_TOTAL_POOL - $fixedSum), 2);
 
         $result = [];
 
@@ -51,7 +58,7 @@ class ExpectedDailyJournalCalculator
 
             $operationalDeduction = match ($def['operational_deduction_type']) {
                 'relative' => $relativeIncomeTotal > 0
-                    ? round(($income / $relativeIncomeTotal) * self::OPERATIONAL_DEDUCTION_POOL, 2)
+                    ? round(($income / $relativeIncomeTotal) * $relativePool, 2)
                     : 0.0,
                 'fixed' => (float) $def['operational_fixed_amount'],
                 'exempt' => 0.0,

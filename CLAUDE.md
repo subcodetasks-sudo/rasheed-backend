@@ -223,7 +223,10 @@ Key cross-module dependencies baked into the equations:
 ### Operational deduction rate scheduling (effective-dated settings)
 
 `Modules\Project\Models\OperationalDeductionRate` (`operational_deduction_rates` table: `amount`, `effective_from`)
-stores a history of the shared operational-deduction pool amount, keyed by the date it takes effect.
+stores a history of the total employee-cost budget for the day (the Monthly Employee Settings category sum, "إجمالي
+الاستقطاع التشغيلي اليومي"), keyed by the date it takes effect — **not** the relative-type pool by itself; `fixed`-type
+projects' deductions are a live carve-out of this total, subtracted at read time (see `EQUATIONS.md` §2 and
+`OperationalDeductionService`), not stored separately here.
 `ResolveEffectiveOperationalDeductionAction::execute($date)` picks the latest row with `effective_from <= $date`
 (default `1081.00` if none exist). `ScheduleOperationalDeductionChangeAction::execute($newAmount)` is how a settings
 change gets written: it never mutates "today's" effective amount — it (1) backfills an open-ended history row if
@@ -326,9 +329,11 @@ Three more read-mostly modules layer on top of `DailyJournal`/`Project`, all gat
   persistence of its own.
 - **`OperationalFund`** persists one row per day in `operational_fund_days` (`operational_expense`, written via
   `UpdateOperationalFundDayController → UpsertOperationalFundDayAction`, `lockForUpdate()`d). Reads combine that
-  manual expense with `expected_operational_income` — `ResolveExpectedOperationalIncomeAction` sums `Project`'s
-  effective-dated operational-deduction pool (`ResolveEffectiveOperationalDeductionAction`, see above) plus the sum
-  of all `fixed`-type projects' deductions (`SumFixedOperationalDeductionsAction`) — to produce a daily net
+  manual expense with `expected_operational_income` — `ResolveExpectedOperationalIncomeAction` returns `Project`'s
+  effective-dated operational-deduction pool as-is (`ResolveEffectiveOperationalDeductionAction`, see above), which
+  represents the whole employee-cost budget for the day; `fixed`-type projects' deductions
+  (`SumFixedOperationalDeductionsAction`) are a carve-out of that same total (see `EQUATIONS.md` §2), not an
+  addition on top of it — to produce a daily net
   (`BuildOperationalFundDayAction`) or a full month view with a running deficit-coverage accumulator that carries
   a day's uncovered deficit forward and marks later days `covered`/`not_covered` against it
   (`BuildOperationalFundMonthAction`, `DeficitCoverageStatus` enum).

@@ -8,7 +8,9 @@ use Modules\Settings\app\Models\MonthlyEmployeeSetting;
 class ResolveTotalOperationalDeductionAction
 {
     /**
-     * Relative operational pool for display: current month's employee category sum.
+     * Total daily operational deduction for display: current month's employee category sum.
+     * This already matches the total_daily_operational_deduction rule (fixed-type projects are a
+     * carve-out of this total, not an addition on top of it) — no fixed-sum addition here.
      * Journal math uses ResolveEffectiveOperationalDeductionAction (rates table).
      */
     public function execute(): float

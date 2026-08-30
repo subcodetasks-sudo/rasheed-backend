@@ -94,10 +94,12 @@ class MonthlyEmployeeSettingsApiTest extends TestCase
             'cooks' => 25,
         ]);
 
+        // Employee category sum (825) is the total outright; fixed (250) is a carve-out of it, so
+        // relative_deduction = 825 - 250 = 575, not 825, and total = 825, not 825 + 250.
         $response->assertOk()
-            ->assertJsonPath('data.relative_deduction', '825.00')
+            ->assertJsonPath('data.relative_deduction', '575.00')
             ->assertJsonPath('data.fixed_project_deductions', '250.00')
-            ->assertJsonPath('data.total_daily_operational_deduction', '1075.00');
+            ->assertJsonPath('data.total_daily_operational_deduction', '825.00');
 
         $this->assertDatabaseHas('monthly_employee_settings', [
             'year' => 2026,
@@ -106,7 +108,8 @@ class MonthlyEmployeeSettingsApiTest extends TestCase
             'cooks' => 25,
         ]);
 
-        // Current month → schedules rates from relative sum (not total_operational_deduction setting)
+        // Current month → schedules rates from the employee-category sum itself (the gross total,
+        // not net of fixed — the carve-out happens at read time, not here).
         $this->assertNotNull(
             OperationalDeductionRate::query()
                 ->whereDate('effective_from', '2026-08-16')

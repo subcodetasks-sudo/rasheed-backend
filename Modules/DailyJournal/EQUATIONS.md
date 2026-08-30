@@ -48,13 +48,23 @@ Resolve: latest rate where `effective_from <= journal_date` (default **12.00** i
 A mid-day settings update never affects today or earlier dates; recalculation of a historical journal uses the percentage that was effective on that date.
 
 ### 2. Operational deduction (from Project + Settings)
-Pool = **effective** `total_operational_deduction` for the journal date (not the live settings value).
+`employeeTotal` = **effective** `total_operational_deduction` for the journal date (not the live
+settings value) — this is the whole employee-cost budget for the day (the Monthly Employee
+Settings category sum), **not** the relative pool by itself.
 
 Settings changes are scheduled for the **next calendar day** via `operational_deduction_rates`.
-Each change also pins a row for the current day holding the pool that was already in force, so the new
+Each change also pins a row for the current day holding the amount that was already in force, so the new
 amount cannot reach today even if the open-ended history row is later re-seeded.
 Resolve: latest rate where `effective_from <= journal_date` (default **1081.00** if none).
-A mid-day settings update never affects today or earlier dates; recalculation of a historical journal uses the pool that was effective on that date.
+A mid-day settings update never affects today or earlier dates; recalculation of a historical journal uses the amount that was effective on that date.
+
+`fixedSum` = live sum of every active `fixed`-type project's `operational_fixed_amount` (not
+date-effective — a change applies immediately to any date, including recalculating historical
+journals).
+
+Fixed-type projects' flat charges are a **carve-out** of `employeeTotal`, not an addition on top of
+it: `pool` (the amount actually distributed to `relative`-type projects) = `max(0, employeeTotal −
+fixedSum)`, clamped at zero if `fixedSum` exceeds `employeeTotal`.
 
 Participating projects = Active AND not `Exempt`.
 Relative base = sum of incomes of projects with type `Relative` only.

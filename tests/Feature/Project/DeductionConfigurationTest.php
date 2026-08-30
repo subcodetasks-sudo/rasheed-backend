@@ -265,7 +265,9 @@ class DeductionConfigurationTest extends ProjectFeatureTestCase
             $exempt->id => 1000,
         ]);
 
-        $this->assertSame(1081.0, $distributed[$relative->id]);
+        // Relative pool = employee total (1081) - fixed sum (154) = 927; sole relative project
+        // takes the whole pool.
+        $this->assertSame(927.0, $distributed[$relative->id]);
         $this->assertSame(154.0, $distributed[$fixed->id]);
         $this->assertArrayNotHasKey($exempt->id, $distributed);
 
