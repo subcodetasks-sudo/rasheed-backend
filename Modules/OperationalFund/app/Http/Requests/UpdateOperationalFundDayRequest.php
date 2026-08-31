@@ -7,7 +7,7 @@ use Illuminate\Validation\Validator;
 
 class UpdateOperationalFundDayRequest extends FormRequest
 {
-    private const EDITABLE = ['operational_expense'];
+    private const EDITABLE = ['expenses'];
 
     public function authorize(): bool
     {
@@ -17,7 +17,9 @@ class UpdateOperationalFundDayRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'operational_expense' => ['present', 'nullable', 'numeric', 'min:0'],
+            'expenses' => ['present', 'nullable', 'array'],
+            'expenses.*.amount' => ['required', 'numeric', 'gt:0'],
+            'expenses.*.description' => ['required', 'string', 'max:255'],
         ];
     }
 
@@ -35,10 +37,18 @@ class UpdateOperationalFundDayRequest extends FormRequest
         });
     }
 
-    public function operationalExpense(): float
+    /**
+     * Full-replace list of expense line items for the day.
+     *
+     * @return list<array{amount: float, description: string}>
+     */
+    public function expenses(): array
     {
-        $value = $this->validated('operational_expense');
+        $rows = $this->validated('expenses') ?? [];
 
-        return $value === null ? 0.0 : (float) $value;
+        return array_values(array_map(static fn (array $row): array => [
+            'amount' => round((float) $row['amount'], 2),
+            'description' => trim((string) $row['description']),
+        ], $rows));
     }
 }

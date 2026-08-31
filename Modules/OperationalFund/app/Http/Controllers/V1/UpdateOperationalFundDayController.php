@@ -18,7 +18,7 @@ class UpdateOperationalFundDayController extends Controller
         return $this->successResponse(
             __('messages.operational_fund_updated_successfully'),
             new OperationalFundMonthResource(
-                $workflow->handle($date, $request->operationalExpense()),
+                $workflow->handle($date, $request->expenses()),
             ),
         );
     }

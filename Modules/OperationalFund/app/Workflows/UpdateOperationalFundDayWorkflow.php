@@ -15,12 +15,15 @@ class UpdateOperationalFundDayWorkflow
         private readonly BuildOperationalFundMonthAction $buildOperationalFundMonthAction,
     ) {}
 
-    public function handle(string $date, float $operationalExpense): array
+    /**
+     * @param  list<array{amount: float, description: string}>  $expenses
+     */
+    public function handle(string $date, array $expenses): array
     {
-        $payload = DB::transaction(function () use ($date, $operationalExpense) {
+        $payload = DB::transaction(function () use ($date, $expenses) {
             $this->upsertOperationalFundDayAction->execute(
                 $date,
-                $operationalExpense,
+                $expenses,
                 auth()->user()?->uuid,
             );
 

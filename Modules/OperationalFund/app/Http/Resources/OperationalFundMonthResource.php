@@ -14,6 +14,7 @@ class OperationalFundMonthResource extends JsonResource
             'year' => $this->resource['year'],
             'summary' => $this->resource['summary'],
             'days' => $this->resource['days'],
+            'expense_items' => $this->resource['expense_items'],
         ];
     }
 }

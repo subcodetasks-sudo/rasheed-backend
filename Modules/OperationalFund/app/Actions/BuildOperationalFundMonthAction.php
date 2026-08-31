@@ -12,6 +12,7 @@ class BuildOperationalFundMonthAction
     public function __construct(
         private readonly ResolveExpectedOperationalIncomeAction $resolveExpectedOperationalIncomeAction,
         private readonly LoadOperationalExpensesByDateAction $loadOperationalExpensesByDateAction,
+        private readonly LoadOperationalExpenseItemsByDateAction $loadOperationalExpenseItemsByDateAction,
     ) {}
 
     public function execute(int $month, int $year): array
@@ -22,6 +23,8 @@ class BuildOperationalFundMonthAction
         $end = $endOfMonth->toDateString();
 
         $expenses = $this->loadOperationalExpensesByDateAction->execute($start, $end);
+        $itemsByDate = $this->loadOperationalExpenseItemsByDateAction->execute($start, $end);
+        ksort($itemsByDate);
 
         $days = [];
         $totalIncome = 0.0;
@@ -40,10 +43,11 @@ class BuildOperationalFundMonthAction
             $days[] = [
                 'date' => $dateString,
                 'operational_income' => FormatMoneyDecimal::formatRounded($income),
-                'operational_expense' => $this->decimal($expense),
+                'operational_expense' => FormatMoneyDecimal::formatRounded($expense),
                 'daily_net' => FormatMoneyDecimal::formatRounded($net),
                 'day_status' => $status->value,
                 'deficit_coverage_status' => $coverage?->value,
+                'expenses' => $this->formatItems($itemsByDate[$dateString] ?? []),
             ];
 
             $totalIncome += $income;
@@ -64,7 +68,43 @@ class BuildOperationalFundMonthAction
                 'monthly_operational_net' => FormatMoneyDecimal::formatRounded($monthlyNet),
             ],
             'days' => $days,
+            'expense_items' => $this->flattenExpenseItems($itemsByDate),
         ];
+    }
+
+    /**
+     * Flat, date-ordered list of every expense line item in the month — the bottom-of-page
+     * breakdown table (كل صادر وقيمته وفي شو انصرف).
+     *
+     * @param  array<string, list<array{amount: float, description: string}>>  $itemsByDate
+     * @return list<array{date: string, amount: string, description: string}>
+     */
+    private function flattenExpenseItems(array $itemsByDate): array
+    {
+        $flat = [];
+        foreach ($itemsByDate as $date => $items) {
+            foreach ($items as $item) {
+                $flat[] = [
+                    'date' => $date,
+                    'amount' => FormatMoneyDecimal::formatRounded($item['amount']),
+                    'description' => $item['description'],
+                ];
+            }
+        }
+
+        return $flat;
+    }
+
+    /**
+     * @param  list<array{amount: float, description: string}>  $items
+     * @return list<array{amount: string, description: string}>
+     */
+    private function formatItems(array $items): array
+    {
+        return array_map(fn (array $item): array => [
+            'amount' => FormatMoneyDecimal::formatRounded($item['amount']),
+            'description' => $item['description'],
+        ], $items);
     }
 
     /**
@@ -86,10 +126,5 @@ class BuildOperationalFundMonthAction
         }
 
         return [DayStatus::Balanced, null, $accum];
-    }
-
-    private function decimal(mixed $value): string
-    {
-        return number_format((float) $value, 2, '.', '');
     }
 }

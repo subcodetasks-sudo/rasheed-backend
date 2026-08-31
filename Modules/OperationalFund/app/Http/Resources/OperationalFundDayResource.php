@@ -15,6 +15,7 @@ class OperationalFundDayResource extends JsonResource
             'operational_expense' => $this->resource['operational_expense'],
             'daily_operational_net' => $this->resource['daily_operational_net'],
             'day_status' => $this->resource['day_status'],
+            'expenses' => $this->resource['expenses'],
         ];
     }
 }

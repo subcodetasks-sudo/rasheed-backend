@@ -4,6 +4,7 @@ namespace Modules\OperationalFund\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\User\app\Models\User;
 
 class OperationalFundDay extends Model
@@ -27,5 +28,10 @@ class OperationalFundDay extends Model
     public function updater(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by', 'uuid');
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(OperationalFundExpenseItem::class, 'operational_fund_day_id');
     }
 }

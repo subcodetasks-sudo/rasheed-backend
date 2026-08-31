@@ -51,6 +51,18 @@ class OperationalFundApiTest extends TestCase
         $this->fail("Day {$date} not found.");
     }
 
+    /**
+     * PUT the day with a single expense line item totalling $amount (0 clears the day).
+     */
+    private function putExpense(string $date, float $amount, string $description = 'مصروف تشغيلي')
+    {
+        $expenses = $amount > 0
+            ? [['amount' => $amount, 'description' => $description]]
+            : [];
+
+        return $this->putJson(self::MONTH.'/'.$date, ['expenses' => $expenses]);
+    }
+
     public function test_guest_gets_401(): void
     {
         $this->getJson(self::MONTH.'?month=8&year=2026')->assertUnauthorized();
@@ -71,7 +83,7 @@ class OperationalFundApiTest extends TestCase
         // project's 154 is a carve-out of that budget (reducing the relative pool elsewhere), not
         // an addition on top of it.
         $base = ResolveEffectiveOperationalDeductionAction::DEFAULT_TOTAL;
-        $expected = number_format($base, 2, '.', '');
+        $expected = number_format($base, 0, '.', '');
 
         $data = $this->getJson(self::DAY.'?date=2026-08-05')
             ->assertOk()
@@ -80,9 +92,10 @@ class OperationalFundApiTest extends TestCase
 
         $this->assertSame('2026-08-05', $data['date']);
         $this->assertSame($expected, $data['expected_operational_income']);
-        $this->assertSame('0.00', $data['operational_expense']);
+        $this->assertSame('0', $data['operational_expense']);
         $this->assertSame($expected, $data['daily_operational_net']);
         $this->assertSame('operational_surplus', $data['day_status']);
+        $this->assertSame([], $data['expenses']);
     }
 
     public function test_put_expense_updates_net_and_returns_month(): void
@@ -90,17 +103,15 @@ class OperationalFundApiTest extends TestCase
         $this->actAs('finance');
         $base = ResolveEffectiveOperationalDeductionAction::DEFAULT_TOTAL;
 
-        $data = $this->putJson(self::MONTH.'/2026-08-01', [
-            'operational_expense' => $base + 100,
-        ])
+        $data = $this->putExpense('2026-08-01', $base + 100)
             ->assertOk()
             ->assertJsonPath('message', __('messages.operational_fund_updated_successfully'))
             ->json('data');
 
         $day = $this->findDay($data, '2026-08-01');
-        $this->assertSame(number_format($base, 2, '.', ''), $day['operational_income']);
-        $this->assertSame(number_format($base + 100, 2, '.', ''), $day['operational_expense']);
-        $this->assertSame('-100.00', $day['daily_net']);
+        $this->assertSame(number_format($base, 0, '.', ''), $day['operational_income']);
+        $this->assertSame(number_format($base + 100, 0, '.', ''), $day['operational_expense']);
+        $this->assertSame('-100', $day['daily_net']);
         $this->assertSame('operational_deficit', $day['day_status']);
         $this->assertSame('not_covered', $day['deficit_coverage_status']);
     }
@@ -111,12 +122,10 @@ class OperationalFundApiTest extends TestCase
         $base = ResolveEffectiveOperationalDeductionAction::DEFAULT_TOTAL;
 
         // Day 1: expense 0 → surplus = base
-        $this->putJson(self::MONTH.'/2026-08-01', ['operational_expense' => 0])->assertOk();
+        $this->putExpense('2026-08-01', 0)->assertOk();
 
         // Day 2: expense = base + 50 → deficit 50, covered by day-1 surplus
-        $data = $this->putJson(self::MONTH.'/2026-08-02', [
-            'operational_expense' => $base + 50,
-        ])->assertOk()->json('data');
+        $data = $this->putExpense('2026-08-02', $base + 50)->assertOk()->json('data');
 
         $day2 = $this->findDay($data, '2026-08-02');
         $this->assertSame('operational_deficit', $day2['day_status']);
@@ -128,15 +137,11 @@ class OperationalFundApiTest extends TestCase
         $this->actAs('finance');
         $base = ResolveEffectiveOperationalDeductionAction::DEFAULT_TOTAL;
 
-        $this->putJson(self::MONTH.'/2026-08-01', ['operational_expense' => 0])->assertOk();
-        $this->putJson(self::MONTH.'/2026-08-02', [
-            'operational_expense' => $base + 50,
-        ])->assertOk();
+        $this->putExpense('2026-08-01', 0)->assertOk();
+        $this->putExpense('2026-08-02', $base + 50)->assertOk();
 
         // Exhaust day-1 surplus by setting expense = base (net 0) → day 2 not covered
-        $data = $this->putJson(self::MONTH.'/2026-08-01', [
-            'operational_expense' => $base,
-        ])->assertOk()->json('data');
+        $data = $this->putExpense('2026-08-01', $base)->assertOk()->json('data');
 
         $day2 = $this->findDay($data, '2026-08-02');
         $this->assertSame('not_covered', $day2['deficit_coverage_status']);
@@ -148,12 +153,10 @@ class OperationalFundApiTest extends TestCase
         $base = ResolveEffectiveOperationalDeductionAction::DEFAULT_TOTAL;
 
         // July surplus
-        $this->putJson(self::MONTH.'/2026-07-31', ['operational_expense' => 0])->assertOk();
+        $this->putExpense('2026-07-31', 0)->assertOk();
 
         // August deficit without August surplus
-        $data = $this->putJson(self::MONTH.'/2026-08-01', [
-            'operational_expense' => $base + 10,
-        ])->assertOk()->json('data');
+        $data = $this->putExpense('2026-08-01', $base + 10)->assertOk()->json('data');
 
         $day = $this->findDay($data, '2026-08-01');
         $this->assertSame('not_covered', $day['deficit_coverage_status']);
@@ -174,7 +177,7 @@ class OperationalFundApiTest extends TestCase
     public function test_month_summary_equals_sum_of_days(): void
     {
         $this->actAs('finance');
-        $this->putJson(self::MONTH.'/2026-08-03', ['operational_expense' => 100])->assertOk();
+        $this->putExpense('2026-08-03', 100)->assertOk();
 
         $data = $this->getJson(self::MONTH.'?month=8&year=2026')->assertOk()->json('data');
 
@@ -187,15 +190,15 @@ class OperationalFundApiTest extends TestCase
 
         $this->assertSame(
             $data['summary']['total_monthly_operational_income'],
-            number_format($sumIncome, 2, '.', ''),
+            number_format($sumIncome, 0, '.', ''),
         );
         $this->assertSame(
             $data['summary']['total_monthly_operational_expense'],
-            number_format($sumExpense, 2, '.', ''),
+            number_format($sumExpense, 0, '.', ''),
         );
         $this->assertSame(
             $data['summary']['monthly_operational_net'],
-            number_format($sumIncome - $sumExpense, 2, '.', ''),
+            number_format($sumIncome - $sumExpense, 0, '.', ''),
         );
     }
 
@@ -203,19 +206,88 @@ class OperationalFundApiTest extends TestCase
     {
         $this->actAs('finance');
 
+        // operational_expense is now derived from the line items and no longer accepted.
         $this->putJson(self::MONTH.'/2026-08-01', [
+            'expenses' => [],
             'operational_expense' => 10,
+        ])->assertStatus(422);
+
+        $this->putJson(self::MONTH.'/2026-08-01', [
+            'expenses' => [],
             'expected_operational_income' => 999,
         ])->assertStatus(422);
+    }
+
+    public function test_put_expenses_sets_operational_expense_to_their_sum(): void
+    {
+        $this->actAs('finance');
+
+        $data = $this->putJson(self::MONTH.'/2026-08-10', [
+            'expenses' => [
+                ['amount' => 300, 'description' => 'رواتب عمال نظافة'],
+                ['amount' => 150.5, 'description' => 'صيانة مكيّف'],
+            ],
+        ])->assertOk()->json('data');
+
+        $day = $this->findDay($data, '2026-08-10');
+        $this->assertSame('451', $day['operational_expense']);
+        $this->assertCount(2, $day['expenses']);
+        $this->assertSame('300', $day['expenses'][0]['amount']);
+        $this->assertSame('رواتب عمال نظافة', $day['expenses'][0]['description']);
+
+        // Flat month-level breakdown table (جدول أسفل الصفحة).
+        $items = collect($data['expense_items'])->where('date', '2026-08-10')->values();
+        $this->assertCount(2, $items);
+        $this->assertSame('151', $items[1]['amount']);
+        $this->assertSame('صيانة مكيّف', $items[1]['description']);
+
+        // Day endpoint exposes the same line items.
+        $dayPayload = $this->getJson(self::DAY.'?date=2026-08-10')->assertOk()->json('data');
+        $this->assertSame('451', $dayPayload['operational_expense']);
+        $this->assertCount(2, $dayPayload['expenses']);
+    }
+
+    public function test_put_expenses_replaces_previous_line_items(): void
+    {
+        $this->actAs('finance');
+
+        $this->putJson(self::MONTH.'/2026-08-11', [
+            'expenses' => [
+                ['amount' => 300, 'description' => 'رواتب'],
+                ['amount' => 200, 'description' => 'وقود'],
+            ],
+        ])->assertOk();
+
+        $data = $this->putJson(self::MONTH.'/2026-08-11', [
+            'expenses' => [
+                ['amount' => 120, 'description' => 'قرطاسية'],
+            ],
+        ])->assertOk()->json('data');
+
+        $day = $this->findDay($data, '2026-08-11');
+        $this->assertSame('120', $day['operational_expense']);
+        $this->assertCount(1, $day['expenses']);
+        $this->assertCount(1, collect($data['expense_items'])->where('date', '2026-08-11'));
+    }
+
+    public function test_expense_item_requires_description_and_positive_amount(): void
+    {
+        $this->actAs('finance');
+
+        $this->putJson(self::MONTH.'/2026-08-12', [
+            'expenses' => [['amount' => 100]],
+        ])->assertStatus(422)->assertJsonValidationErrors('expenses.0.description');
+
+        $this->putJson(self::MONTH.'/2026-08-12', [
+            'expenses' => [['amount' => 0, 'description' => 'صفر']],
+        ])->assertStatus(422)->assertJsonValidationErrors('expenses.0.amount');
     }
 
     public function test_admin_fund_operational_administration_is_independent_of_operational_fund(): void
     {
         $this->actAs('finance');
 
-        $this->putJson(self::MONTH.'/2026-08-10', [
-            'operational_expense' => 77.5,
-        ])->assertOk();
+        $this->putExpense('2026-08-10', 77.5)->assertOk();
 
         $admin = $this->getJson('/api/v1/administrative-fund?month=8&year=2026')
             ->assertOk()
@@ -231,7 +303,7 @@ class OperationalFundApiTest extends TestCase
 
         $this->assertNotNull($day);
         $this->assertSame('0.00', $day['operational_administration']);
-        $this->assertSame('0.00', $day['total_expenses']);
+        $this->assertSame('0', $day['total_expenses']);
 
         $this->putJson('/api/v1/administrative-fund/2026-08-10', [
             'operational_administration' => 40,
@@ -241,19 +313,21 @@ class OperationalFundApiTest extends TestCase
             ->assertOk()
             ->json('data');
 
-        $this->assertSame('77.50', $operationalFundDay['operational_expense']);
+        $this->assertSame('78', $operationalFundDay['operational_expense']);
     }
 
     public function test_clear_expense_with_null(): void
     {
         $this->actAs('finance');
 
-        $this->putJson(self::MONTH.'/2026-08-04', ['operational_expense' => 50])->assertOk();
-        $data = $this->putJson(self::MONTH.'/2026-08-04', ['operational_expense' => null])
+        $this->putExpense('2026-08-04', 50)->assertOk();
+        $data = $this->putJson(self::MONTH.'/2026-08-04', ['expenses' => []])
             ->assertOk()
             ->json('data');
 
         $day = $this->findDay($data, '2026-08-04');
-        $this->assertSame('0.00', $day['operational_expense']);
+        $this->assertSame('0', $day['operational_expense']);
+        $this->assertSame([], $day['expenses']);
+        $this->assertCount(0, collect($data['expense_items'])->where('date', '2026-08-04'));
     }
 }

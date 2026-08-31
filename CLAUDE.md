@@ -327,9 +327,16 @@ Three more read-mostly modules layer on top of `DailyJournal`/`Project`, all gat
   month it aggregates `daily_journal_entries` (joined to `projects` for `operational_deduction_type`) into a
   zero-filled daily calendar plus relative/fixed/total operational-deduction and admin-percentage summaries. No
   persistence of its own.
-- **`OperationalFund`** persists one row per day in `operational_fund_days` (`operational_expense`, written via
-  `UpdateOperationalFundDayController → UpsertOperationalFundDayAction`, `lockForUpdate()`d). Reads combine that
-  manual expense with `expected_operational_income` — `ResolveExpectedOperationalIncomeAction` returns `Project`'s
+- **`OperationalFund`** persists one row per day in `operational_fund_days` plus that day's expense breakdown in
+  `operational_fund_expense_items` (`amount` + `description` per line). `PUT /v1/operational-fund/{date}` takes
+  `{expenses: [{amount, description}, ...]}` and **replaces** the day's line items wholesale
+  (`UpdateOperationalFundDayController → UpsertOperationalFundDayAction`, `lockForUpdate()`d); an empty/omitted list
+  clears the day. `operational_fund_days.operational_expense` is a **cached sum** of that day's line items — it is
+  never client-supplied (a raw `operational_expense` key is rejected as non-editable), and it stays the single
+  scalar every other module reads (`LoadOperationalExpensesByDateAction`, and the cross-module dependency from
+  `AdministrativeFund`). Day/month payloads expose the per-day `expenses` list, and the month payload adds a flat
+  date-ordered `expense_items` breakdown table. Reads combine that
+  expense with `expected_operational_income` — `ResolveExpectedOperationalIncomeAction` returns `Project`'s
   effective-dated operational-deduction pool as-is (`ResolveEffectiveOperationalDeductionAction`, see above), which
   represents the whole employee-cost budget for the day; `fixed`-type projects' deductions
   (`SumFixedOperationalDeductionsAction`) are a carve-out of that same total (see `EQUATIONS.md` §2), not an

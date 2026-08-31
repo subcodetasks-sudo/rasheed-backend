@@ -273,6 +273,57 @@ Realtime: saving operational expense on الصندوق التشغيلي now also
 
 ---
 
+## 6) Operational Fund — الصادر التشغيلي is now itemised (في شو انصرف)
+
+**Route (unchanged path, new body):** `PUT /api/v1/operational-fund/{date}`
+
+The single `operational_expense` number is replaced by a list of expense line items, each with a **بيان** (what
+the money was spent on). Sending the list **replaces** all of that day's items; an empty list (or omitting it)
+clears the day. A raw `operational_expense` key is now rejected (`422`).
+
+```json
+// request
+{
+  "expenses": [
+    { "amount": 300,   "description": "رواتب عمال نظافة" },
+    { "amount": 150.5, "description": "صيانة مكيّف" }
+  ]
+}
+```
+
+- `expenses.*.amount` — required, numeric, `> 0`.
+- `expenses.*.description` — required, string, max 255.
+
+`operational_fund_days.operational_expense` (the day total everywhere else — Operational Rate §5, this page's net,
+the running deficit-coverage accumulator) is now the **auto-computed sum** of the day's line items. Never send it.
+
+**Response — `GET /api/v1/operational-fund?month&year` and the `PUT` response** (`OperationalFundMonthResource`):
+each `days[]` row gains `expenses: [{amount, description}]`, and the payload gains a flat, date-ordered
+`expense_items: [{date, amount, description}]` for the bottom-of-page breakdown table (كل صادر وقيمته وفي شو
+انصرف).
+
+```json
+{
+  "summary": { "total_monthly_operational_income": "…", "total_monthly_operational_expense": "…", "monthly_operational_net": "…" },
+  "days": [
+    { "date": "2026-08-10", "operational_income": "1081.00", "operational_expense": "450.50",
+      "daily_net": "630.50", "day_status": "operational_surplus", "deficit_coverage_status": null,
+      "expenses": [ { "amount": "300.00", "description": "رواتب عمال نظافة" },
+                    { "amount": "150.50", "description": "صيانة مكيّف" } ] }
+  ],
+  "expense_items": [
+    { "date": "2026-08-03", "amount": "200.00", "description": "وقود مولد" },
+    { "date": "2026-08-10", "amount": "300.00", "description": "رواتب عمال نظافة" },
+    { "date": "2026-08-10", "amount": "150.50", "description": "صيانة مكيّف" }
+  ]
+}
+```
+
+`GET /api/v1/operational-fund/day?date=` (`OperationalFundDayResource`) also gains `expenses: [{amount, description}]`
+for the selected day.
+
+---
+
 ## What did **not** change
 
 - No new REST routes for pool relief allocations (history table is backend-only).
