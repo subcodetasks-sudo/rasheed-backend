@@ -115,7 +115,10 @@ class BuildAdministrativeFundAction
 
     /**
      * Per day: outstanding tip (display) and new uncovered transfers (subtracted in total_income).
-     * Administrative percentage is the base of total_income (إجمالي إداري الصناديق).
+     * Administrative percentage is the base of total_income (إجمالي إداري الصناديق) — sourced from
+     * administrative_fee_remaining (النسبة الادارية المتبقية), not the raw administrative_fee, since
+     * same-day repayment (Case 1 debt coverage, Stage 3 pool relief given to other projects) already
+     * consumes part of a project's fee before it reaches the fund as income.
      *
      * @return array<string, array{
      *     project_administration: float,
@@ -136,8 +139,12 @@ class BuildAdministrativeFundAction
             ->selectRaw(
                 'COALESCE(SUM(COALESCE(daily_journal_entries.uncovered_administrative_expense, 0)), 0) as project_administration_income'
             )
+            // administrative_fee_remaining, not the raw administrative_fee: same-day repayment
+            // (Case 1 debt coverage, Stage 3 pool relief given to other projects) already consumes
+            // part of a project's fee before it ever reaches the fund as income — summing the raw
+            // fee would overstate the administrative percentage actually collected.
             ->selectRaw(
-                'COALESCE(SUM(COALESCE(daily_journal_entries.administrative_fee, 0)), 0) as total_administrative_percentage'
+                'COALESCE(SUM(COALESCE(daily_journal_entries.administrative_fee_remaining, 0)), 0) as total_administrative_percentage'
             )
             ->get();
 

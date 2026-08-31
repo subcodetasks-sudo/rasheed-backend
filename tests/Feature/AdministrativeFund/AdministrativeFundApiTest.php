@@ -69,6 +69,14 @@ class AdministrativeFundApiTest extends TestCase
             $payload['outstanding_project_administration'] = (float) ($payload['uncovered_administrative_expense'] ?? 0);
         }
 
+        // Fixtures here bypass the real calculation pipeline (which is what actually derives
+        // administrative_fee_remaining via Case 1 / Stage 3 consumption), so default it to the full
+        // fee — no repayment consumed — unless a test explicitly overrides it to model a scenario
+        // where part of the fee was already used internally.
+        if (! array_key_exists('administrative_fee_remaining', $attrs)) {
+            $payload['administrative_fee_remaining'] = (float) ($payload['administrative_fee'] ?? 0);
+        }
+
         return DailyJournalEntry::factory()->create($payload);
     }
 
@@ -140,6 +148,32 @@ class AdministrativeFundApiTest extends TestCase
 
         $this->assertRoundedMoneyEquals(0.0, $day['total_administrative_percentage']);
         $this->assertRoundedMoneyEquals(0.0, $data['summary']['total_administrative_percentage']);
+    }
+
+    public function test_total_administrative_percentage_uses_remaining_fee_not_gross_fee(): void
+    {
+        $this->actAs('finance');
+
+        // Project A: fee 100, but 60 of it was already consumed same-day (Case 1 debt coverage
+        // and/or Stage 3 relief given to another project) — only 40 actually reaches the fund.
+        $consumed = $this->createProject(['name' => 'Consumed '.uniqid()]);
+        $this->seedEntry($consumed->id, '2026-08-10', [
+            'administrative_fee' => 100,
+            'administrative_fee_remaining' => 40,
+        ]);
+
+        // Project B: fee 30, nothing consumed — full fee reaches the fund.
+        $untouched = $this->createProject(['name' => 'Untouched '.uniqid()]);
+        $this->seedEntry($untouched->id, '2026-08-10', [
+            'administrative_fee' => 30,
+        ]);
+
+        $data = $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data');
+        $day = $this->findDay($data, '2026-08-10');
+
+        // 40 + 30 = 70, not the gross 100 + 30 = 130.
+        $this->assertRoundedMoneyEquals(70.0, $day['total_administrative_percentage']);
+        $this->assertRoundedMoneyEquals(70.0, $data['summary']['total_administrative_percentage']);
     }
 
     public function test_total_administrative_percentage_sums_fees_and_never_becomes_project_administration(): void
@@ -276,7 +310,7 @@ class AdministrativeFundApiTest extends TestCase
         $this->assertRoundedMoneyEquals(-25.0, $day['total_income']);
         $this->assertRoundedMoneyEquals(40.0, $day['total_administrative_percentage']);
 
-        $entry->forceFill(['administrative_fee' => 90])->save();
+        $entry->forceFill(['administrative_fee' => 90, 'administrative_fee_remaining' => 90])->save();
 
         $day = $this->findDay(
             $this->getJson(self::ENDPOINT.'?month=8&year=2026')->assertOk()->json('data'),

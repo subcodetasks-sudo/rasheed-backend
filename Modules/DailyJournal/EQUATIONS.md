@@ -166,7 +166,10 @@ Rules:
 Administrative Fund:
 
 - Daily **`project_administration`** (إداري المشروعات) = `SUM(outstanding_project_administration)` for entries on that date (outstanding tip).
-- Daily **`total_administrative_percentage`** (وارد النسبة الإدارية) = `SUM(administrative_fee)`.
+- Daily **`total_administrative_percentage`** (وارد النسبة الإدارية) = `SUM(administrative_fee_remaining)`, **not**
+  `SUM(administrative_fee)` — same-day repayment (Case 1 debt coverage in §6, Stage 3 pool relief given to other
+  projects in §6a) already consumes part of a project's fee before it ever reaches the fund as income, so summing
+  the raw fee would overstate what was actually collected.
 - Daily **`total_income`** (إجمالي إداري الصناديق) uses the day's **new uncovered transfers** (`SUM(uncovered_administrative_expense)`), not the outstanding tip, so settlement/carry is not subtracted again on later days:
 
 ```
