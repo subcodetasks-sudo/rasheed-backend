@@ -26,6 +26,7 @@ class InventoryItemResource extends JsonResource
             'project_id' => $this->project_id,
             'latest_incoming_price' => $this->latest_incoming_price,
             'opening_quantity' => $this->opening_quantity,
+            'opening_price' => $this->opening_price,
             'total_incoming_quantity' => $this->total_incoming_quantity,
             'total_outgoing_quantity' => $this->total_outgoing_quantity,
             'current_balance' => $this->current_balance,

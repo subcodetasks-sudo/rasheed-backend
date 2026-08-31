@@ -34,6 +34,7 @@ class InventoryApiTest extends InventoryFeatureTestCase
         $response->assertCreated()
             ->assertJsonPath('data.name', 'Paper A4')
             ->assertJsonPath('data.opening_quantity', '50.00')
+            ->assertJsonPath('data.opening_price', '10.00')
             ->assertJsonPath('data.total_incoming_quantity', '0.00')
             ->assertJsonPath('data.total_outgoing_quantity', '0.00')
             ->assertJsonPath('data.current_balance', '50.00')
@@ -103,6 +104,7 @@ class InventoryApiTest extends InventoryFeatureTestCase
 
         $item = InventoryItem::query()->findOrFail($itemId);
         $this->assertSame('10.00', $item->opening_quantity);
+        $this->assertSame('5.00', $item->opening_price);
         $this->assertSame('20.00', $item->total_incoming_quantity);
         $this->assertSame('0.00', $item->total_outgoing_quantity);
         $this->assertSame('30.00', $item->current_balance);
@@ -686,5 +688,126 @@ class InventoryApiTest extends InventoryFeatureTestCase
         $this->assertNotContains($sepId, $ids);
         $this->assertSame('10.00', $response->json('summary.total_incoming_value'));
         $this->assertSame('0.00', $response->json('summary.total_outgoing_value'));
+    }
+
+    public function test_list_items_returns_total_opening_balance_value_for_all_items(): void
+    {
+        $this->actAsInventoryUser();
+        $project = $this->createActiveProject();
+        $categoryId = $this->createInventoryCategory(['name' => 'office'])->id;
+
+        $this->postJson('/api/v1/inventory/items', [
+            'name' => 'Item A',
+            'category_id' => $categoryId,
+            'project_id' => $project->id,
+            'unit' => 'pc',
+            'opening_price' => 10,
+            'opening_quantity' => 10,
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/inventory/items', [
+            'name' => 'Item B',
+            'category_id' => $categoryId,
+            'project_id' => $project->id,
+            'unit' => 'pc',
+            'opening_price' => 20,
+            'opening_quantity' => 5,
+        ])->assertCreated();
+
+        $response = $this->getJson('/api/v1/inventory/items')->assertOk();
+
+        $this->assertSame('200', $response->json('summary.total_opening_balance_value'));
+    }
+
+    public function test_opening_balance_summary_ignores_list_filters(): void
+    {
+        $this->actAsInventoryUser();
+        $project = $this->createActiveProject();
+        $categoryA = $this->createInventoryCategory(['name' => 'cat-a'])->id;
+        $categoryB = $this->createInventoryCategory(['name' => 'cat-b'])->id;
+
+        $this->postJson('/api/v1/inventory/items', [
+            'name' => 'Filtered Out',
+            'category_id' => $categoryA,
+            'project_id' => $project->id,
+            'unit' => 'pc',
+            'opening_price' => 100,
+            'opening_quantity' => 1,
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/inventory/items', [
+            'name' => 'Filtered In',
+            'category_id' => $categoryB,
+            'project_id' => $project->id,
+            'unit' => 'pc',
+            'opening_price' => 50,
+            'opening_quantity' => 2,
+        ])->assertCreated();
+
+        $response = $this->getJson('/api/v1/inventory/items?filter[category_id]='.$categoryB)->assertOk();
+
+        $this->assertCount(1, $response->json('data'));
+        $this->assertSame('200', $response->json('summary.total_opening_balance_value'));
+    }
+
+    public function test_opening_balance_summary_unchanged_after_movements(): void
+    {
+        $this->actAsInventoryUser();
+        $project = $this->createActiveProject();
+
+        $itemId = $this->postJson('/api/v1/inventory/items', [
+            'name' => 'Stable Opening',
+            'category_id' => $this->createInventoryCategory(['name' => 'office'])->id,
+            'project_id' => $project->id,
+            'unit' => 'pc',
+            'opening_price' => 10,
+            'opening_quantity' => 10,
+        ])->json('data.id');
+
+        $before = $this->getJson('/api/v1/inventory/items')->assertOk()->json('summary.total_opening_balance_value');
+        $this->assertSame('100', $before);
+
+        $this->postJson('/api/v1/inventory/movements/incoming', [
+            'inventory_item_id' => $itemId,
+            'quantity' => 20,
+            'unit_price' => 99,
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/inventory/movements/outgoing', [
+            'inventory_item_id' => $itemId,
+            'quantity' => 5,
+            'beneficiary_project_id' => $project->id,
+            'expense_type' => 'administrative',
+        ])->assertCreated();
+
+        $item = InventoryItem::query()->findOrFail($itemId);
+        $this->assertSame('10.00', $item->opening_quantity);
+        $this->assertSame('10.00', $item->opening_price);
+        $this->assertSame('25.00', $item->current_balance);
+        $this->assertSame('99.00', $item->latest_incoming_price);
+
+        $after = $this->getJson('/api/v1/inventory/items')->assertOk()->json('summary.total_opening_balance_value');
+        $this->assertSame('100', $after);
+    }
+
+    public function test_opening_price_backfilled_from_opening_batch(): void
+    {
+        $this->actAsInventoryUser();
+        $project = $this->createActiveProject();
+
+        $itemId = $this->postJson('/api/v1/inventory/items', [
+            'name' => 'Legacy Shape',
+            'category_id' => $this->createInventoryCategory(['name' => 'office'])->id,
+            'project_id' => $project->id,
+            'unit' => 'pc',
+            'opening_price' => 12.5,
+            'opening_quantity' => 4,
+        ])->json('data.id');
+
+        $this->assertDatabaseHas('inventory_items', [
+            'id' => $itemId,
+            'opening_price' => 12.5,
+            'opening_quantity' => 4,
+        ]);
     }
 }

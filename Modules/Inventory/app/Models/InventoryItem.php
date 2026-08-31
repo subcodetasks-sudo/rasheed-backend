@@ -22,6 +22,7 @@ class InventoryItem extends Model
         'unit',
         'latest_incoming_price',
         'opening_quantity',
+        'opening_price',
         'total_incoming_quantity',
         'total_outgoing_quantity',
         'current_balance',
@@ -36,6 +37,7 @@ class InventoryItem extends Model
         return [
             'latest_incoming_price' => 'decimal:2',
             'opening_quantity' => 'decimal:2',
+            'opening_price' => 'decimal:2',
             'total_incoming_quantity' => 'decimal:2',
             'total_outgoing_quantity' => 'decimal:2',
             'current_balance' => 'decimal:2',

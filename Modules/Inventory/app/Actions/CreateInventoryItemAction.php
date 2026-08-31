@@ -29,6 +29,7 @@ class CreateInventoryItemAction
             'unit' => $data->unit,
             'latest_incoming_price' => $openingPrice,
             'opening_quantity' => $openingQuantity,
+            'opening_price' => $openingPrice,
             'total_incoming_quantity' => 0,
             'total_outgoing_quantity' => 0,
             'current_balance' => $openingQuantity,

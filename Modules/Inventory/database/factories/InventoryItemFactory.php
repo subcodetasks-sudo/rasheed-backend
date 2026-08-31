@@ -18,6 +18,7 @@ class InventoryItemFactory extends Factory
     public function definition(): array
     {
         $opening = fake()->randomFloat(2, 0, 100);
+        $price = fake()->randomFloat(2, 1, 100);
 
         return [
             'code' => (string) Str::ulid(),
@@ -25,8 +26,9 @@ class InventoryItemFactory extends Factory
             'name' => fake()->words(3, true),
             'inventory_category_id' => InventoryCategory::factory(),
             'unit' => fake()->randomElement(['piece', 'box', 'kg']),
-            'latest_incoming_price' => fake()->randomFloat(2, 1, 100),
+            'latest_incoming_price' => $price,
             'opening_quantity' => $opening,
+            'opening_price' => $price,
             'total_incoming_quantity' => 0,
             'total_outgoing_quantity' => 0,
             'current_balance' => $opening,
