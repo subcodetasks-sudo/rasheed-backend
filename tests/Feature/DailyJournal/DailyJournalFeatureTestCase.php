@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\DailyJournal;
 
+use App\Support\Money\FormatMoneyDecimal;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Modules\Project\Enums\OperationalDeductionType;
@@ -77,5 +78,10 @@ abstract class DailyJournalFeatureTestCase extends TestCase
         ])->assertOk();
 
         return $donor;
+    }
+
+    protected function roundedMoney(float $value): string
+    {
+        return FormatMoneyDecimal::formatRounded($value);
     }
 }

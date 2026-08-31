@@ -191,13 +191,13 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
         ]);
 
         $response->assertOk()
-            ->assertJsonPath('data.entries.0.administrative_fee', '120.00')
-            ->assertJsonPath('data.entries.0.operational_deduction', '0.00')
-            ->assertJsonPath('data.entries.0.administrative_expense', '0.00');
+            ->assertJsonPath('data.entries.0.administrative_fee', $this->roundedMoney(120))
+            ->assertJsonPath('data.entries.0.operational_deduction', $this->roundedMoney(0))
+            ->assertJsonPath('data.entries.0.administrative_expense', $this->roundedMoney(0));
 
         // 1000 + 0 - 50 - 0 - 120 - 0 = 830
-        $this->assertSame('830.00', $response->json('data.entries.0.daily_total'));
-        $this->assertSame('830.00', $response->json('data.entries.0.fund_balance'));
+        $this->assertSame($this->roundedMoney(830), $response->json('data.entries.0.daily_total'));
+        $this->assertSame($this->roundedMoney(830), $response->json('data.entries.0.fund_balance'));
     }
 
     public function test_relative_fixed_and_exempt_operational_deductions(): void
@@ -234,10 +234,10 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
 
         $byProject = collect($response->json('data.entries'))->keyBy('project.id');
 
-        $this->assertSame('540.50', $byProject[$relativeA->id]['operational_deduction']);
-        $this->assertSame('540.50', $byProject[$relativeB->id]['operational_deduction']);
-        $this->assertSame('154.00', $byProject[$fixed->id]['operational_deduction']);
-        $this->assertSame('0.00', $byProject[$exempt->id]['operational_deduction']);
+        $this->assertSame($this->roundedMoney(464), $byProject[$relativeA->id]['operational_deduction']);
+        $this->assertSame($this->roundedMoney(464), $byProject[$relativeB->id]['operational_deduction']);
+        $this->assertSame($this->roundedMoney(154), $byProject[$fixed->id]['operational_deduction']);
+        $this->assertSame($this->roundedMoney(0), $byProject[$exempt->id]['operational_deduction']);
     }
 
     public function test_fund_balance_carries_forward_signed_without_creating_debt(): void
@@ -281,9 +281,9 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
 
         // previous 100 + daily_total (-250) = -150; debt stays 0
         $entry = collect($response->json('data.entries'))->firstWhere('project.id', $project->id);
-        $this->assertSame('-150.00', $entry['fund_balance']);
-        $this->assertSame('0.00', $entry['administrative_debt']);
-        $this->assertSame('0.00', $entry['accumulated_administrative_debt']);
+        $this->assertSame($this->roundedMoney(-150), $entry['fund_balance']);
+        $this->assertSame($this->roundedMoney(0), $entry['administrative_debt']);
+        $this->assertSame($this->roundedMoney(0), $entry['accumulated_administrative_debt']);
 
         $this->assertSame(
             100.0,
@@ -302,8 +302,8 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
         ])->assertOk();
 
         $nextEntry = collect($next->json('data.entries'))->firstWhere('project.id', $project->id);
-        $this->assertSame('100.00', $nextEntry['fund_balance']);
-        $this->assertSame('0.00', $nextEntry['administrative_debt']);
+        $this->assertSame($this->roundedMoney(100), $nextEntry['fund_balance']);
+        $this->assertSame($this->roundedMoney(0), $nextEntry['administrative_debt']);
     }
 
     public function test_editing_one_date_does_not_mutate_another_date(): void
@@ -610,12 +610,12 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
 
         $entry = collect($response->json('data.entries'))->firstWhere('project.id', $project->id);
 
-        $this->assertSame('-100.00', $entry['daily_total']);
-        $this->assertSame('-50.00', $entry['fund_balance']);
-        $this->assertSame('100.00', $entry['administrative_debt']);
-        $this->assertSame('100.00', $entry['accumulated_administrative_debt']);
-        $this->assertSame('0.00', $entry['administrative_fee']);
-        $this->assertSame('0.00', $entry['operational_deduction']);
+        $this->assertSame($this->roundedMoney(-100), $entry['daily_total']);
+        $this->assertSame($this->roundedMoney(-50), $entry['fund_balance']);
+        $this->assertSame($this->roundedMoney(100), $entry['administrative_debt']);
+        $this->assertSame($this->roundedMoney(100), $entry['accumulated_administrative_debt']);
+        $this->assertSame($this->roundedMoney(0), $entry['administrative_fee']);
+        $this->assertSame($this->roundedMoney(0), $entry['operational_deduction']);
         $this->assertSame('100.00', $entry['contribution']);
 
         $this->assertDatabaseHas('admin_percentage_balance_debits', [
@@ -687,12 +687,12 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
 
         $entry = collect($response->json('data.entries'))->firstWhere('project.id', $project->id);
 
-        $this->assertSame('-50.00', $entry['daily_total']);
-        $this->assertSame('0.00', $entry['fund_balance']);
-        $this->assertSame('150.00', $entry['administrative_debt']);
-        $this->assertSame('150.00', $entry['accumulated_administrative_debt']);
-        $this->assertSame('0.00', $entry['administrative_fee']);
-        $this->assertSame('0.00', $entry['operational_deduction']);
+        $this->assertSame($this->roundedMoney(-50), $entry['daily_total']);
+        $this->assertSame($this->roundedMoney(0), $entry['fund_balance']);
+        $this->assertSame($this->roundedMoney(150), $entry['administrative_debt']);
+        $this->assertSame($this->roundedMoney(150), $entry['accumulated_administrative_debt']);
+        $this->assertSame($this->roundedMoney(0), $entry['administrative_fee']);
+        $this->assertSame($this->roundedMoney(0), $entry['operational_deduction']);
     }
 
     public function test_contribution_does_not_recalculate_admin_fee_or_op_deduction(): void
@@ -798,7 +798,7 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
 
         $entry = collect($response->json('data.entries'))->firstWhere('project.id', $project->id);
         $this->assertSame('100.00', $entry['contribution']);
-        $this->assertSame('-100.00', $entry['daily_total']);
+        $this->assertSame($this->roundedMoney(-100), $entry['daily_total']);
     }
 
     public function test_case1_administrative_fee_covers_deficit_as_debt(): void
@@ -844,10 +844,10 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
 
         $entry = collect($response->json('data.entries'))->firstWhere('project.id', $project->id);
 
-        $this->assertSame('-250.00', $entry['fund_balance']);
-        $this->assertSame('0.00', $entry['administrative_fee']);
-        $this->assertSame('0.00', $entry['administrative_debt']);
-        $this->assertSame('0.00', $entry['accumulated_administrative_debt']);
+        $this->assertSame($this->roundedMoney(-250), $entry['fund_balance']);
+        $this->assertSame($this->roundedMoney(0), $entry['administrative_fee']);
+        $this->assertSame($this->roundedMoney(0), $entry['administrative_debt']);
+        $this->assertSame($this->roundedMoney(0), $entry['accumulated_administrative_debt']);
     }
 
     public function test_journal_save_does_not_automatically_repay_prior_accumulated_debt(): void

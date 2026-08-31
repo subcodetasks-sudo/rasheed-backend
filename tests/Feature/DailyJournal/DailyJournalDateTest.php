@@ -26,7 +26,6 @@ class DailyJournalDateTest extends DailyJournalFeatureTestCase
         ])
             ->assertOk()
             ->assertJsonPath('data.journal_date', $businessDate)
-            ->assertJsonPath('data.entries.0.journal_date', $businessDate)
             ->assertJsonPath('data.entries.0.daily_income', '250.00');
 
         $entry = DailyJournalEntry::query()

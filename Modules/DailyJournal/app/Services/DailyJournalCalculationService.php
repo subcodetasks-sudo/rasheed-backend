@@ -219,6 +219,113 @@ class DailyJournalCalculationService
     }
 
     /**
+     * Full signed fund balance, Case 1, and Stage 3 pipeline.
+     *
+     * Case 1 and Stage 3 apply to today's operating balance only; carried fund_balance is
+     * added afterward. Administrative expense is covered from same-day surplus first; prior
+     * outstanding tips are settled from combined (carried + today) surplus before Case 1.
+     *
+     * @param  Collection<int, DailyJournalEntry>  $entries
+     * @param  array<int, array{fund_balance: float, accumulated_administrative_debt: float, outstanding_project_administration: float}>  $previousBalances
+     * @return array{entries: Collection<int, DailyJournalEntry>, remainingDeficits: array<int, float>, allocations: list<array{source_project_id: int, beneficiary_project_id: int, relief_entry_id: int, amount: float}>}
+     */
+    public function applyFundBalanceDebtAndReliefPipeline(
+        Collection $entries,
+        array $previousBalances,
+    ): array {
+        $remainingDeficits = [];
+        $settledByProject = [];
+
+        foreach ($entries as $entry) {
+            $previousFundBalance = round(
+                (float) ($previousBalances[$entry->project_id]['fund_balance'] ?? 0),
+                2
+            );
+            $previousOutstanding = round(
+                (float) ($previousBalances[$entry->project_id]['outstanding_project_administration'] ?? 0),
+                2
+            );
+
+            $isZeroActivity = $entry->incomeAmount() === 0.0 && $entry->expenseAmount() === 0.0;
+
+            if ($isZeroActivity) {
+                $expense = round(max(0, (float) $entry->administrative_expense), 2);
+
+                $entry->uncovered_administrative_expense = $expense;
+                $entry->project_administration_settled = 0.0;
+                $entry->outstanding_project_administration = round($previousOutstanding + $expense, 2);
+                $entry->administrative_debt = $entry->contributionAmount();
+                $entry->fund_balance = round($previousFundBalance + (float) $entry->daily_total, 2);
+
+                $combinedBeforeCaseOne = round($previousFundBalance + (float) $entry->daily_total, 2);
+                $remainingDeficits[$entry->project_id] = $combinedBeforeCaseOne < 0
+                    ? abs($combinedBeforeCaseOne)
+                    : 0.0;
+
+                continue;
+            }
+
+            $todayBalance = round((float) $entry->daily_total, 2);
+
+            $coverage = $this->calculateAdministrativeExpenseCoverage(
+                $todayBalance,
+                (float) $entry->administrative_expense,
+            );
+
+            $todayBalance = $coverage['fund_balance'];
+            $uncovered = $coverage['uncovered'];
+
+            $combinedBeforeCaseOne = round($previousFundBalance + $todayBalance, 2);
+            $remainingSurplus = max(0.0, $combinedBeforeCaseOne);
+            $settled = round(min($remainingSurplus, $previousOutstanding), 2);
+            $combinedBeforeCaseOne = round($combinedBeforeCaseOne - $settled, 2);
+            $outstanding = round($previousOutstanding + $uncovered - $settled, 2);
+
+            $remainingDeficits[$entry->project_id] = $combinedBeforeCaseOne < 0
+                ? abs($combinedBeforeCaseOne)
+                : 0.0;
+
+            $contribution = $entry->contributionAmount();
+            $fundConsumptionDebt = $this->calculateAdministrativeDebt(
+                round($todayBalance - $contribution, 2),
+                (float) $entry->administrative_fee,
+            );
+
+            $todayBalance = round($todayBalance + $fundConsumptionDebt, 2);
+
+            $entry->uncovered_administrative_expense = $uncovered;
+            $entry->project_administration_settled = $settled;
+            $entry->outstanding_project_administration = $outstanding;
+            $entry->administrative_debt = round($fundConsumptionDebt + $contribution, 2);
+            // Today-only balance until Stage 3 completes; carry and settlement applied afterward.
+            $entry->fund_balance = $todayBalance;
+            $settledByProject[$entry->project_id] = $settled;
+        }
+
+        $reliefResult = $this->applyAdministrativePoolRelief($entries);
+
+        foreach ($reliefResult['entries'] as $entry) {
+            if ($entry->incomeAmount() === 0.0 && $entry->expenseAmount() === 0.0) {
+                continue;
+            }
+
+            $previousFundBalance = round(
+                (float) ($previousBalances[$entry->project_id]['fund_balance'] ?? 0),
+                2
+            );
+            $settled = round((float) ($settledByProject[$entry->project_id] ?? 0), 2);
+
+            $entry->fund_balance = round($previousFundBalance + (float) $entry->fund_balance - $settled, 2);
+        }
+
+        return [
+            'entries' => $reliefResult['entries'],
+            'remainingDeficits' => $remainingDeficits,
+            'allocations' => $reliefResult['allocations'],
+        ];
+    }
+
+    /**
      * @param  Collection<int, DailyJournalEntry>  $entries
      * @param  array<int, array{fund_balance: float, accumulated_administrative_debt: float, outstanding_project_administration: float}>  $previousBalances
      * @return Collection<int, DailyJournalEntry>
@@ -297,12 +404,11 @@ class DailyJournalCalculationService
      * deficit. A project still in deficit after Case 1 has, by construction, remainingFee = 0 (Case 1
      * would have consumed its entire fee), so a project can never be both a source and a beneficiary.
      *
-     * Beneficiaries (fund_balance < 0) are covered with today's operating deficit first
-     * (`daily_total < 0`), then carried-only deficits from days with income, and within each group
-     * by project_id ascending. A project with zero daily_income that day is never a beneficiary,
-     * regardless of expense or how negative its carried fund_balance is — administrative_fee is a
-     * percentage of income, so a project earning nothing that day has no fee-generating activity to
-     * justify drawing on other projects' fee capacity; it simply carries its deficit forward. Each
+     * Beneficiaries must have a same-day operating deficit (`daily_total < 0`) and a negative
+     * today-only fund_balance after Case 1. Carried-only deficits on non-deficit days are never
+     * relieved. A project with zero daily_income that day is never a beneficiary — administrative_fee
+     * is a percentage of income, so a project earning nothing that day has no fee-generating activity
+     * to justify drawing on other projects' fee capacity; it simply carries its deficit forward. Each
      * beneficiary draws from sources (remaining fee > 0) in project_id ascending order,
      * greedily, until its deficit is met or sources run out. Exactly like Case 1, the amount drawn is
      * recorded as administrative_debt on the beneficiary (not left as an untracked fund top-up) and
@@ -330,12 +436,10 @@ class DailyJournalCalculationService
         }
 
         $beneficiaries = $entries
-            ->filter(fn (DailyJournalEntry $entry) => (float) $entry->fund_balance < 0
+            ->filter(fn (DailyJournalEntry $entry) => (float) $entry->daily_total < 0
+                && (float) $entry->fund_balance < 0
                 && $entry->incomeAmount() !== 0.0)
-            ->sortBy(fn (DailyJournalEntry $entry) => [
-                (float) $entry->daily_total < 0 ? 0 : 1,
-                (int) $entry->project_id,
-            ])
+            ->sortBy('project_id')
             ->values();
 
         $sources = $entries

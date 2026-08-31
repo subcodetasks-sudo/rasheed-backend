@@ -119,8 +119,8 @@ class RashidWorkbookGoldenPathTest extends TestCase
         }
 
         $rates = app(BuildAdministrationRatesAction::class)->execute(4, 2026);
-        $this->assertSame(sprintf('%.2f', $expectedTotalIncome), $rates['monthly_totals']['month_total_income']);
-        $this->assertSame(sprintf('%.2f', $expectedTotalCollected), $rates['monthly_totals']['month_total_administrative_percentage']);
+        $this->assertSame((string) (int) round($expectedTotalIncome), $rates['monthly_totals']['month_total_income']);
+        $this->assertSame((string) (int) round($expectedTotalCollected), $rates['monthly_totals']['month_total_administrative_percentage']);
 
         // Row-count sanity. +1 project accounts for the synthetic inventory-owner
         // project, which EnsureDailyJournalEntriesForActiveProjectsAction also

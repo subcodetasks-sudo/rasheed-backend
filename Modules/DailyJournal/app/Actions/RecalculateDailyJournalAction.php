@@ -4,7 +4,6 @@ namespace Modules\DailyJournal\Actions;
 
 use Carbon\CarbonInterface;
 use Modules\DailyJournal\DTOs\DailyJournalRecalculationResult;
-use Modules\DailyJournal\Models\DailyJournalEntry;
 
 class RecalculateDailyJournalAction
 {
@@ -14,10 +13,7 @@ class RecalculateDailyJournalAction
         private readonly CalculateOperationalDeductionsAction $calculateOperationalDeductionsAction,
         private readonly ResolveAdministrativeExpenseAction $resolveAdministrativeExpenseAction,
         private readonly CalculateDailyTotalsAction $calculateDailyTotalsAction,
-        private readonly CalculateFundBalancesAction $calculateFundBalancesAction,
-        private readonly CalculateAdministrativeExpenseCoverageAction $calculateAdministrativeExpenseCoverageAction,
-        private readonly CalculateAdministrativeDebtAction $calculateAdministrativeDebtAction,
-        private readonly ApplyAdministrativePoolReliefAction $applyAdministrativePoolReliefAction,
+        private readonly ApplyFundBalanceDebtAndReliefPipelineAction $applyFundBalanceDebtAndReliefPipelineAction,
         private readonly UpdateAccumulatedAdministrativeDebtAction $updateAccumulatedAdministrativeDebtAction,
         private readonly PersistCalculatedDailyJournalFieldsAction $persistCalculatedFieldsAction,
         private readonly ReapplyDailyJournalOverlaysAction $reapplyDailyJournalOverlaysAction,
@@ -41,20 +37,11 @@ class RecalculateDailyJournalAction
         }
 
         $entries = $this->calculateDailyTotalsAction->execute($entries);
-        $entries = $this->calculateFundBalancesAction->execute($entries, $date);
-        $entries = $this->calculateAdministrativeExpenseCoverageAction->execute($entries, $date);
 
-        // Remaining Deficit = abs(negative signed fund balance) for contribution validation.
-        // Captured before Case 1 fund restore so contribution rules stay unchanged.
-        $remainingDeficits = [];
-        foreach ($entries as $entry) {
-            /** @var DailyJournalEntry $entry */
-            $balance = (float) $entry->fund_balance;
-            $remainingDeficits[$entry->project_id] = $balance < 0 ? abs($balance) : 0.0;
-        }
+        $pipelineResult = $this->applyFundBalanceDebtAndReliefPipelineAction->execute($entries, $date);
+        $entries = $pipelineResult['entries'];
+        $remainingDeficits = $pipelineResult['remainingDeficits'];
 
-        $entries = $this->calculateAdministrativeDebtAction->execute($entries);
-        $entries = $this->applyAdministrativePoolReliefAction->execute($entries, $date);
         $entries = $this->updateAccumulatedAdministrativeDebtAction->execute($entries, $date);
         $entries = $this->persistCalculatedFieldsAction->execute($entries);
         $entries = $this->reapplyDailyJournalOverlaysAction->execute($entries, $date);

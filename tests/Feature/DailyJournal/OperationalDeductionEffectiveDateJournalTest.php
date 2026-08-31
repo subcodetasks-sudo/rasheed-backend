@@ -45,7 +45,7 @@ class OperationalDeductionEffectiveDateJournalTest extends DailyJournalFeatureTe
                 ],
             ],
         ])->assertOk()
-            ->assertJsonPath('data.entries.0.operational_deduction', '1081.00');
+            ->assertJsonPath('data.entries.0.operational_deduction', $this->roundedMoney(1081));
     }
 
     public function test_new_deduction_starts_on_next_calendar_day(): void
@@ -73,7 +73,7 @@ class OperationalDeductionEffectiveDateJournalTest extends DailyJournalFeatureTe
                 ],
             ],
         ])->assertOk()
-            ->assertJsonPath('data.entries.0.operational_deduction', '2000.00');
+            ->assertJsonPath('data.entries.0.operational_deduction', $this->roundedMoney(2000));
     }
 
     public function test_recalculating_historical_journal_keeps_original_pool(): void
@@ -97,7 +97,7 @@ class OperationalDeductionEffectiveDateJournalTest extends DailyJournalFeatureTe
                 ],
             ],
         ])->assertOk()
-            ->assertJsonPath('data.entries.0.operational_deduction', '1081.00');
+            ->assertJsonPath('data.entries.0.operational_deduction', $this->roundedMoney(1081));
 
         $this->upsertRelativePool(2000);
 
@@ -111,14 +111,15 @@ class OperationalDeductionEffectiveDateJournalTest extends DailyJournalFeatureTe
                 ],
             ],
         ])->assertOk()
-            ->assertJsonPath('data.entries.0.operational_deduction', '1081.00');
+            ->assertJsonPath('data.entries.0.operational_deduction', $this->roundedMoney(1081));
 
-        $this->assertSame(
-            '1081.00',
-            (string) DailyJournalEntry::query()
+        $this->assertEqualsWithDelta(
+            1081.0,
+            (float) DailyJournalEntry::query()
                 ->where('project_id', $project->id)
                 ->whereDate('journal_date', '2026-07-29')
-                ->value('operational_deduction')
+                ->value('operational_deduction'),
+            0.001,
         );
     }
 
@@ -161,8 +162,8 @@ class OperationalDeductionEffectiveDateJournalTest extends DailyJournalFeatureTe
 
         $byId = collect($response->json('data.entries'))->keyBy('project.id');
 
-        $this->assertSame('1000.00', $byId[$oldProject->id]['operational_deduction']);
-        $this->assertSame('1000.00', $byId[$newProject->id]['operational_deduction']);
+        $this->assertSame($this->roundedMoney(1000), $byId[$oldProject->id]['operational_deduction']);
+        $this->assertSame($this->roundedMoney(1000), $byId[$newProject->id]['operational_deduction']);
     }
 
     private function upsertRelativePool(float $relative): void

@@ -444,12 +444,12 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
             ['project_id' => $beneficiary->id, 'daily_income' => 1000, 'daily_expense' => 1200],
             ['project_id' => $source->id, 'daily_income' => 5000],
         ]);
-        // Day 2: fee 200; daily_total -400; fund -100(prev)-400=-500; Case1 uses 200 -> fund -300, debt 200.
-        // Stage 3 relieves the remaining 300 (source has 600 available) -> fund 0; debt 200+300=500.
+        // Day 2: fee 200; daily_total -400; today after Case 1 -200; Stage 3 relieves 200 -> today 0;
+        // fund_balance = previous -100 + today 0 = -100; debt 200+200=400; accumulated 40+400=440.
         $dayTwoEntry = $this->entryFor($beneficiary->id, self::OTHER_DATE);
-        $this->assertEqualsWithDelta(0.0, (float) $dayTwoEntry->fund_balance, 0.001);
-        $this->assertEqualsWithDelta(500.0, (float) $dayTwoEntry->administrative_debt, 0.001);
-        $this->assertEqualsWithDelta(540.0, (float) $dayTwoEntry->accumulated_administrative_debt, 0.001);
+        $this->assertEqualsWithDelta(-100.0, (float) $dayTwoEntry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(400.0, (float) $dayTwoEntry->administrative_debt, 0.001);
+        $this->assertEqualsWithDelta(440.0, (float) $dayTwoEntry->accumulated_administrative_debt, 0.001);
 
         // Day 1's own accumulated debt is untouched by day 2's Stage 3 relief.
         $dayOneEntry->refresh();
@@ -665,16 +665,16 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
         ]);
         $this->assertEqualsWithDelta(-200.0, (float) $this->entryFor($chainProject->id)->fund_balance, 0.001);
 
-        // Day 2: chainProject has real (non-zero-activity) activity netting to 0, tip carried -200 -> need 200.
-        // source fee 200 on day 2 fully covers it.
+        // Day 2: chainProject has real activity netting to ~0; carried tip stays -200 — Stage 3 no longer
+        // relieves carried-only deficits on non-deficit days.
         $this->saveJournal(self::OTHER_DATE, [
             ['project_id' => $chainProject->id, 'daily_income' => 50, 'daily_expense' => 50],
             ['project_id' => $source->id, 'daily_income' => 1000],
         ]);
 
         $day2Entry = $this->entryFor($chainProject->id, self::OTHER_DATE);
-        $this->assertEqualsWithDelta(0.0, (float) $day2Entry->fund_balance, 0.001);
-        $this->assertEqualsWithDelta(200.0, (float) $day2Entry->administrative_pool_relief, 0.001);
+        $this->assertEqualsWithDelta(-200.0, (float) $day2Entry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $day2Entry->administrative_pool_relief, 0.001);
 
         // Re-save Day 1 only, raising chainProject's expense from 200 to 500 (source's day-1 entry
         // is not resent; partial-payload saves leave other same-date entries untouched).
@@ -685,14 +685,12 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
         $day1Entry = $this->entryFor($chainProject->id);
         $this->assertEqualsWithDelta(-500.0, (float) $day1Entry->fund_balance, 0.001);
 
-        // Forward-chain recalculation must have updated Day 2: need is now 500, source capacity is
-        // still only 200 -> only partial coverage, worse fund_balance than before.
+        // Forward-chain recalculation must have updated Day 2 carry only — still no Stage 3 relief.
         $day2Entry = $this->entryFor($chainProject->id, self::OTHER_DATE);
-        $this->assertEqualsWithDelta(200.0, (float) $day2Entry->administrative_pool_relief, 0.001);
-        $this->assertEqualsWithDelta(-300.0, (float) $day2Entry->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $day2Entry->administrative_pool_relief, 0.001);
+        $this->assertEqualsWithDelta(-500.0, (float) $day2Entry->fund_balance, 0.001);
 
         $allocations = AdminPercentagePoolReliefAllocation::query()->forDate(self::OTHER_DATE)->get();
-        $this->assertCount(1, $allocations);
-        $this->assertEqualsWithDelta(200.0, (float) $allocations->first()->amount, 0.001);
+        $this->assertCount(0, $allocations);
     }
 }

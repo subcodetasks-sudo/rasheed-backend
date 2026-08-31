@@ -209,7 +209,7 @@ class DailyJournalCalculationTest extends TestCase
 
         $result = $this->service->applyOperationalDeductions($entries)->keyBy('project_id');
 
-        $this->assertEquals(1081.0, (float) $result[$relative->id]->operational_deduction);
+        $this->assertEquals(927.0, (float) $result[$relative->id]->operational_deduction);
         $this->assertEquals(154.0, (float) $result[$fixed->id]->operational_deduction);
         $this->assertEquals(0.0, (float) $result[$exempt->id]->operational_deduction);
     }
@@ -255,24 +255,25 @@ class DailyJournalCalculationTest extends TestCase
             'accumulated_administrative_debt' => 10,
         ]);
 
+        $previous = $this->service->previousBalances([$project->id], $date);
+
         $entry = DailyJournalEntry::factory()->make([
             'project_id' => $project->id,
             'journal_date' => $date->toDateString(),
             'daily_total' => -100,
             'administrative_fee' => 24,
             'administrative_expense' => 0,
+            'daily_income' => 0,
+            'daily_expense' => 100,
         ]);
 
-        $previous = $this->service->previousBalances([$project->id], $date);
-        $entries = $this->service->applyFundBalances(collect([$entry]), $previous);
-        $this->assertEquals(-60.0, (float) $entries->first()->fund_balance);
+        $pipeline = $this->service->applyFundBalanceDebtAndReliefPipeline(collect([$entry]), $previous);
+        $entry = $pipeline['entries']->first();
 
-        $entries = $this->service->applyAdministrativeExpenseCoverage($entries);
-        $entries = $this->service->applyAdministrativeDebt($entries);
-        $this->assertEquals(-36.0, (float) $entries->first()->fund_balance);
-        $this->assertEquals(24.0, (float) $entries->first()->administrative_debt);
+        $this->assertEquals(-36.0, (float) $entry->fund_balance);
+        $this->assertEquals(24.0, (float) $entry->administrative_debt);
 
-        $entries = $this->service->applyAccumulatedAdministrativeDebt($entries, $previous);
+        $entries = $this->service->applyAccumulatedAdministrativeDebt($pipeline['entries'], $previous);
         $this->assertEquals(34.0, (float) $entries->first()->accumulated_administrative_debt);
     }
 

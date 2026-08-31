@@ -56,13 +56,17 @@ class ExpectedDailyJournalCalculator
                 ? 0.0
                 : round($income * ($def['administrative_fee_percentage'] / 100), 2);
 
-            $operationalDeduction = match ($def['operational_deduction_type']) {
-                'relative' => $relativeIncomeTotal > 0
-                    ? round(($income / $relativeIncomeTotal) * $relativePool, 2)
-                    : 0.0,
-                'fixed' => (float) $def['operational_fixed_amount'],
-                'exempt' => 0.0,
-            };
+            $isZeroActivity = $income === 0.0 && $expense === 0.0;
+
+            $operationalDeduction = $isZeroActivity
+                ? 0.0
+                : match ($def['operational_deduction_type']) {
+                    'relative' => $relativeIncomeTotal > 0
+                        ? round(($income / $relativeIncomeTotal) * $relativePool, 2)
+                        : 0.0,
+                    'fixed' => (float) $def['operational_fixed_amount'],
+                    'exempt' => 0.0,
+                };
 
             $administrativeExpense = 0.0;
 
@@ -72,19 +76,21 @@ class ExpectedDailyJournalCalculator
             );
 
             $previousFundBalance = $this->fundBalance[$name] ?? 0.0;
-            $intermediateFundBalance = round($previousFundBalance + $dailyTotal, 2);
+            $todayBalance = round($dailyTotal, 2);
 
-            $surplus = max(0, $intermediateFundBalance);
-            $covered = round(min($surplus, $administrativeExpense), 2);
-            $fundBalance = round($intermediateFundBalance - $covered, 2);
+            if (! $isZeroActivity) {
+                $surplus = max(0, $todayBalance);
+                $covered = round(min($surplus, $administrativeExpense), 2);
+                $todayBalance = round($todayBalance - $covered, 2);
+            }
 
             $contribution = 0.0;
-            $balanceBeforeContribution = round($fundBalance - $contribution, 2);
+            $balanceBeforeContribution = round($todayBalance - $contribution, 2);
             $deficitDebt = $balanceBeforeContribution < 0
                 ? min(abs($balanceBeforeContribution), $administrativeFee)
                 : 0.0;
             $administrativeDebt = round($deficitDebt + $contribution, 2);
-            $fundBalance = round($fundBalance + $deficitDebt, 2);
+            $todayBalance = round($todayBalance + $deficitDebt, 2);
 
             $result[$name] = [
                 'daily_income' => $income,
@@ -93,21 +99,25 @@ class ExpectedDailyJournalCalculator
                 'operational_deduction' => $operationalDeduction,
                 'administrative_expense' => $administrativeExpense,
                 'daily_total' => $dailyTotal,
-                'fund_balance' => $fundBalance,
+                'fund_balance' => $todayBalance,
                 'administrative_debt' => $administrativeDebt,
                 'remaining_fee' => round(max(0, $administrativeFee - $deficitDebt), 2),
+                'previous_fund_balance' => $previousFundBalance,
             ];
         }
 
         $result = $this->applyAdministrativePoolRelief($result);
 
         foreach ($result as $name => $row) {
+            $fundBalance = round($row['previous_fund_balance'] + $row['fund_balance'], 2);
+            $result[$name]['fund_balance'] = $fundBalance;
+
             $previousAccumulatedDebt = $this->accumulatedDebt[$name] ?? 0.0;
             $accumulatedDebt = round($previousAccumulatedDebt + $row['administrative_debt'], 2);
 
             $result[$name]['accumulated_administrative_debt'] = $accumulatedDebt;
 
-            $this->fundBalance[$name] = $row['fund_balance'];
+            $this->fundBalance[$name] = $fundBalance;
             $this->accumulatedDebt[$name] = $accumulatedDebt;
         }
 
@@ -116,15 +126,8 @@ class ExpectedDailyJournalCalculator
 
     /**
      * Same-day Administrative Percentage Pool relief (Stage 3, EQUATIONS.md §6a): a project still in
-     * deficit after Case 1 draws from OTHER projects' unused same-day fee only. Beneficiaries are
-     * walked with today's operating deficit first (`daily_total < 0`), then carried-only deficits,
-     * and within each group in $projectDefs iteration order (mirrors app project_id ascending because
-     * WorkbookScenarioBuilder::seedProjects() creates projects in that array order). Sources are walked
-     * in the same definition order. Exactly like Case 1, the amount drawn is recorded as
-     * administrative_debt (which then flows into accumulated_administrative_debt) and added onto the
-     * beneficiary's fund_balance - the only difference from Case 1 is the funding source (another
-     * project's unused same-day fee, not the project's own). The source's fund_balance is not reduced
-     * (fee already deducted in daily_total); only capacity / given audit fields move.
+     * deficit after Case 1 draws from OTHER projects' unused same-day fee only when it also has a
+     * same-day operating deficit (`daily_total < 0`). Carried-only deficits are never relieved.
      *
      * @param  array<string, array{fund_balance: float, administrative_debt: float, remaining_fee: float, daily_total: float}>  $result
      * @return array<string, array{fund_balance: float, administrative_debt: float, remaining_fee: float, daily_total: float}>
@@ -138,18 +141,10 @@ class ExpectedDailyJournalCalculator
 
         $beneficiaryNames = array_keys(array_filter(
             $result,
-            fn (array $row) => $row['fund_balance'] < 0,
+            fn (array $row) => $row['daily_total'] < 0 && $row['fund_balance'] < 0,
         ));
 
         usort($beneficiaryNames, function (string $a, string $b) use ($result) {
-            $priorityA = $result[$a]['daily_total'] < 0 ? 0 : 1;
-            $priorityB = $result[$b]['daily_total'] < 0 ? 0 : 1;
-
-            if ($priorityA !== $priorityB) {
-                return $priorityA <=> $priorityB;
-            }
-
-            // Preserve definition order (insertion order of $result) as project_id proxy.
             $order = array_flip(array_keys($result));
 
             return $order[$a] <=> $order[$b];

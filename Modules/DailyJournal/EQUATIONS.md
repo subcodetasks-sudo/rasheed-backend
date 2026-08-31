@@ -189,7 +189,7 @@ net = total_income − total_expenses
 Administrative Debt has two sources: **Case 1** (deficit cover from that day's full `administrative_fee`) and **Contribution**. Administrative expense is handled in §5a and never creates debt. **Case 2 (fee-for-expense) is removed.** The two procedures are independent.
 
 ```
-balance_before_contribution = round(fund_balance − contribution, 2)
+balance_before_contribution = round(today_balance − contribution, 2)
 
 deficit_debt = balance_before_contribution < 0
     ? min(|balance_before_contribution|, administrative_fee)
@@ -197,10 +197,11 @@ deficit_debt = balance_before_contribution < 0
 
 fund_consumption_debt = round(deficit_debt, 2)
 administrative_debt = round(fund_consumption_debt + contribution, 2)
-fund_balance = round(fund_balance + fund_consumption_debt, 2)
+today_balance = round(today_balance + fund_consumption_debt, 2)
+fund_balance = round(previous_day_fund_balance + today_balance − project_administration_settled, 2)
 ```
 
-**Case 1 — deficit cover:** when post-coverage, pre-contribution `fund_balance < 0`, debt equals `min(|balance|, full same-day administrative_fee)`. That Case 1 amount is then added back onto **that day's** `fund_balance` (the journal fund is the source of truth for the next day). Contribution is **not** added here — it is already in `daily_total`. Unused fee from prior days is **not** carried forward as a coverage pool; a later day's fee must not cover an earlier day's deficit. If there is no same-day deficit, Case 1 is 0 and `fund_balance` is unchanged.
+**Case 1 — deficit cover:** when post-coverage, pre-contribution **today's** balance is negative, debt equals `min(|today_balance|, full same-day administrative_fee)`. Stage 3 (§6a) and the carry addition run on that today-only balance. Unused fee from prior days is **not** carried forward as a coverage pool; a later day's fee must not cover an earlier day's carried deficit. If there is no same-day operating deficit, Case 1 is 0.
 
 **Contribution — additive debt + deficit reduction:** requires Pass-1 fund deficit (super-admin + amount ≤ remaining deficit). Re-saving recomputes from the same fund-consumption base (never compounds).
 
@@ -225,9 +226,7 @@ never be both a source and a beneficiary on the same day. As a defensive rule, a
 `source_project_id === beneficiary_project_id`.
 
 **Allocation (deterministic, greedy):**
-- Beneficiaries (`fund_balance < 0` after Case 1) are processed with **today's operating deficit first**
-  (`daily_total < 0`), then **carried-only** deficits from days with income netting to `daily_total >= 0` plus a
-  negative tip from a prior day. Within each group, order is `project_id` ascending. A project with **zero
+- Beneficiaries must have a same-day operating deficit (`daily_total < 0`) and a negative today-only balance after Case 1. **Carried-only** deficits on days with `daily_total >= 0` are never relieved. Within beneficiaries, order is `project_id` ascending. A project with **zero
   `daily_income`** that day is never a Stage 3 beneficiary at all, regardless of `daily_expense` or how negative
   its carried `fund_balance` is — `administrative_fee` is a percentage of income, so a project earning nothing
   that day has no fee-generating activity to justify drawing on other projects' fee capacity; it is simply
@@ -307,16 +306,10 @@ fund_balance = surplus
 3. Calculate operational deductions
 4. Resolve administrative expense (inventory)
 5. Calculate daily totals
-6. Calculate intermediate fund balances (using previous day; signed carry-forward)
-7. Apply administrative expense coverage from surplus → settle prior project_administration tip → final `fund_balance`, `uncovered_administrative_expense`, `project_administration_settled`, `outstanding_project_administration`
-8. Capture `remainingDeficits = |fund_balance| if < 0 else 0` (for contribution validation; **before** Case 1 fund restore)
-9. Calculate administrative debt (Case 1 fund consumption + contribution) and restore Case 1 onto `fund_balance`
-9a. Apply same-day Administrative Percentage Pool relief (Stage 3, §6a) — delete that date's prior allocation rows,
-    recompute source/beneficiary capacity from the current entries, reallocate, and add the relief onto the
-    beneficiary's `administrative_debt` and `fund_balance` (same treatment as Case 1, different funding source);
-    source `fund_balance` is left unchanged (fee already deducted in `daily_total`)
-10. Update accumulated administrative debt
-11. Persist calculated fields
+6. Apply today's administrative expense coverage; settle prior outstanding tip from combined surplus; capture `remainingDeficits` from combined balance **before** Case 1 restore
+7. Calculate administrative debt (Case 1 on **today's** balance + contribution) and apply Stage 3 pool relief on today's remaining deficit; persist `fund_balance = previous + today_after_relief − project_administration_settled`
+8. Update accumulated administrative debt
+9. Persist calculated fields
 
 ---
 
