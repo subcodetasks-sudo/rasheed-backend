@@ -790,6 +790,62 @@ class InventoryApiTest extends InventoryFeatureTestCase
         $this->assertSame('100', $after);
     }
 
+    public function test_list_items_summary_reports_low_stock_and_depleted_items(): void
+    {
+        $this->actAsInventoryUser();
+        $project = $this->createActiveProject();
+        $categoryId = $this->createInventoryCategory(['name' => 'office'])->id;
+
+        // Low: balance (2) <= minimum (10), still above zero.
+        $this->postJson('/api/v1/inventory/items', [
+            'name' => 'Low Item',
+            'category_id' => $categoryId,
+            'project_id' => $project->id,
+            'unit' => 'pc',
+            'opening_price' => 5,
+            'opening_quantity' => 2,
+            'minimum_stock_level' => 10,
+        ])->assertCreated();
+
+        // Depleted: balance (0) <= minimum (3).
+        $this->postJson('/api/v1/inventory/items', [
+            'name' => 'Empty Item',
+            'category_id' => $categoryId,
+            'project_id' => $project->id,
+            'unit' => 'pc',
+            'opening_price' => 5,
+            'opening_quantity' => 0,
+            'minimum_stock_level' => 3,
+        ])->assertCreated();
+
+        // Healthy: balance (50) > minimum (10).
+        $this->postJson('/api/v1/inventory/items', [
+            'name' => 'Healthy Item',
+            'category_id' => $categoryId,
+            'project_id' => $project->id,
+            'unit' => 'pc',
+            'opening_price' => 5,
+            'opening_quantity' => 50,
+            'minimum_stock_level' => 10,
+        ])->assertCreated();
+
+        $summary = $this->getJson('/api/v1/inventory/items?filter[search]=Healthy')
+            ->assertOk()
+            ->json('summary');
+
+        // Global counts, unaffected by the list search filter.
+        $this->assertSame(2, $summary['low_stock_count']);
+        $this->assertSame(1, $summary['depleted_count']);
+
+        $names = array_column($summary['low_stock_items'], 'name');
+        $this->assertEqualsCanonicalizing(['Low Item', 'Empty Item'], $names);
+
+        $empty = collect($summary['low_stock_items'])->firstWhere('name', 'Empty Item');
+        $this->assertTrue($empty['depleted']);
+        $low = collect($summary['low_stock_items'])->firstWhere('name', 'Low Item');
+        $this->assertFalse($low['depleted']);
+    }
+
     public function test_opening_price_backfilled_from_opening_batch(): void
     {
         $this->actAsInventoryUser();
