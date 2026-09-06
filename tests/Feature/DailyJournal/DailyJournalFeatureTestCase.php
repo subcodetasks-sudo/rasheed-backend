@@ -29,7 +29,19 @@ abstract class DailyJournalFeatureTestCase extends TestCase
         return $user;
     }
 
+    /**
+     * Historically the finance role could save journal rows (just not
+     * contributions). Journal writes are now super-admin only, so the generic
+     * "a user who can write the journal" helper resolves to super-admin. Tests
+     * that specifically exercise finance's (read-only) access use
+     * {@see actAsFinanceViewer()}.
+     */
     protected function actAsFinanceUser(): User
+    {
+        return $this->actAsRole('super-admin');
+    }
+
+    protected function actAsFinanceViewer(): User
     {
         return $this->actAsRole('finance');
     }

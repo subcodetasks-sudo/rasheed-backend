@@ -29,9 +29,11 @@ class FinancialMonthFreezeTest extends TestCase
 
     private function actAsFinance(): User
     {
-        Role::findOrCreate('finance', 'web');
+        // Journal writes are super-admin only; this suite drives journal writes
+        // through the API, so it acts as super-admin.
+        Role::findOrCreate('super-admin', 'web');
         $user = User::factory()->create();
-        $user->assignRole('finance');
+        $user->assignRole('super-admin');
         Sanctum::actingAs($user);
 
         return $user;

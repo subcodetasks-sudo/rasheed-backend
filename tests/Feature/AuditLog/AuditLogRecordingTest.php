@@ -164,7 +164,7 @@ class AuditLogRecordingTest extends TestCase
 
     public function test_saving_daily_journal_records_saved_and_does_not_change_calculations(): void
     {
-        $this->actAsRole('finance');
+        $this->actAsRole('super-admin');
         app(SettingService::class)->update('total_operational_deduction', 1081, 'decimal', true);
 
         $project = Project::factory()->create([

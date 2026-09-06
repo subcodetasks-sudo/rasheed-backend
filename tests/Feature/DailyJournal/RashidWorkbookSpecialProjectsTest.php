@@ -54,9 +54,9 @@ class RashidWorkbookSpecialProjectsTest extends TestCase
         $date = '2026-04-01';
         $incomeExpenseForDay = $dailyIncomeExpense[$date];
 
-        Role::findOrCreate('finance', 'web');
+        Role::findOrCreate('super-admin', 'web');
         $user = User::factory()->create(['status' => 'active']);
-        $user->assignRole('finance');
+        $user->assignRole('super-admin');
         Sanctum::actingAs($user);
 
         $projectsByName = (new WorkbookScenarioBuilder)->seedProjects($projectDefs);

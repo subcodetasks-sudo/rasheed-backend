@@ -363,21 +363,39 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
         ])->assertForbidden();
     }
 
-    public function test_finance_and_super_admin_can_access_journal(): void
+    public function test_finance_can_view_but_not_edit_journal(): void
     {
         $project = $this->createActiveProject([
             'operational_deduction_type' => OperationalDeductionType::Exempt,
             'administrative_exempt' => true,
         ]);
 
-        $this->actAsFinanceUser();
+        $this->actAsFinanceViewer();
+        $this->getJson('/api/v1/daily-journals')->assertOk();
+        $this->putJson('/api/v1/daily-journals', [
+            'entries' => [['project_id' => $project->id, 'daily_income' => 10]],
+        ])->assertForbidden();
+        $this->patchJson('/api/v1/daily-journals', [
+            'entries' => [['project_id' => $project->id, 'daily_income' => 10]],
+        ])->assertForbidden();
+        $this->postJson('/api/v1/daily-journals/repay-debt', [
+            'project_id' => $project->id,
+            'amount' => 1,
+        ])->assertForbidden();
+    }
+
+    public function test_super_admin_can_view_and_edit_journal(): void
+    {
+        $project = $this->createActiveProject([
+            'operational_deduction_type' => OperationalDeductionType::Exempt,
+            'administrative_exempt' => true,
+        ]);
+
+        $this->actAsSuperAdmin();
         $this->getJson('/api/v1/daily-journals')->assertOk();
         $this->putJson('/api/v1/daily-journals', [
             'entries' => [['project_id' => $project->id, 'daily_income' => 10]],
         ])->assertOk();
-
-        $this->actAsSuperAdmin();
-        $this->getJson('/api/v1/daily-journals')->assertOk();
         $this->patchJson('/api/v1/daily-journals', [
             'entries' => [['project_id' => $project->id, 'daily_income' => 20]],
         ])->assertOk();
