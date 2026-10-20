@@ -573,21 +573,21 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
         $this->assertEqualsWithDelta(500.0, (float) $allocations->first()->amount, 0.001);
     }
 
-    /** Rounding safety: a 3-way split with asymmetric cent amounts must sum exactly, with no drift. */
-    public function test_rounding_safety_across_three_way_split_sums_exactly_to_the_cent(): void
+    /** Rounding safety: a 3-way split with asymmetric whole amounts (33, 33, 34) must sum exactly, with no drift. */
+    public function test_rounding_safety_across_three_way_split_sums_exactly_to_the_unit(): void
     {
         $this->actAsFinanceUser();
 
         $beneficiary = $this->subjectProject(['administrative_exempt' => true]);
-        $s1 = $this->subjectProject(['administrative_fee_percentage' => 10]); // fee 33.33
-        $s2 = $this->subjectProject(['administrative_fee_percentage' => 10]); // fee 33.33
-        $s3 = $this->subjectProject(['administrative_fee_percentage' => 10]); // fee 33.34
+        $s1 = $this->subjectProject(['administrative_fee_percentage' => 10]); // fee 33
+        $s2 = $this->subjectProject(['administrative_fee_percentage' => 10]); // fee 33
+        $s3 = $this->subjectProject(['administrative_fee_percentage' => 10]); // fee 34
 
         $this->saveJournal(self::DATE, [
             ['project_id' => $beneficiary->id, 'daily_income' => 1, 'daily_expense' => 101],
-            ['project_id' => $s1->id, 'daily_income' => 333.30],
-            ['project_id' => $s2->id, 'daily_income' => 333.30],
-            ['project_id' => $s3->id, 'daily_income' => 333.40],
+            ['project_id' => $s1->id, 'daily_income' => 330],
+            ['project_id' => $s2->id, 'daily_income' => 330],
+            ['project_id' => $s3->id, 'daily_income' => 340],
         ]);
 
         $beneficiaryEntry = $this->entryFor($beneficiary->id);
@@ -597,18 +597,18 @@ class AdministrativePoolDeficitReliefTest extends DailyJournalFeatureTestCase
         $s1Entry = $this->entryFor($s1->id);
         $s2Entry = $this->entryFor($s2->id);
         $s3Entry = $this->entryFor($s3->id);
-        $this->assertEqualsWithDelta(33.33, (float) $s1Entry->administrative_pool_relief_given, 0.001);
-        $this->assertEqualsWithDelta(33.33, (float) $s2Entry->administrative_pool_relief_given, 0.001);
-        $this->assertEqualsWithDelta(33.34, (float) $s3Entry->administrative_pool_relief_given, 0.001);
+        $this->assertEqualsWithDelta(33.0, (float) $s1Entry->administrative_pool_relief_given, 0.001);
+        $this->assertEqualsWithDelta(33.0, (float) $s2Entry->administrative_pool_relief_given, 0.001);
+        $this->assertEqualsWithDelta(34.0, (float) $s3Entry->administrative_pool_relief_given, 0.001);
         $this->assertEqualsWithDelta(0.0, (float) $s1Entry->administrative_fee_remaining, 0.001);
         $this->assertEqualsWithDelta(0.0, (float) $s2Entry->administrative_fee_remaining, 0.001);
         $this->assertEqualsWithDelta(0.0, (float) $s3Entry->administrative_fee_remaining, 0.001);
 
         $allocations = AdminPercentagePoolReliefAllocation::query()->forDate(self::DATE)->orderBy('source_project_id')->get();
         $this->assertCount(3, $allocations);
-        $this->assertEqualsWithDelta(33.33, (float) $allocations[0]->amount, 0.001);
-        $this->assertEqualsWithDelta(33.33, (float) $allocations[1]->amount, 0.001);
-        $this->assertEqualsWithDelta(33.34, (float) $allocations[2]->amount, 0.001);
+        $this->assertEqualsWithDelta(33.0, (float) $allocations[0]->amount, 0.001);
+        $this->assertEqualsWithDelta(33.0, (float) $allocations[1]->amount, 0.001);
+        $this->assertEqualsWithDelta(34.0, (float) $allocations[2]->amount, 0.001);
         $this->assertEqualsWithDelta(100.0, (float) $allocations->sum('amount'), 0.001);
     }
 

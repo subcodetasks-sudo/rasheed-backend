@@ -307,9 +307,9 @@ class SameDayAdminFeeDeficitCoverageTest extends DailyJournalFeatureTestCase
             'daily_income' => 60,
         ]);
 
-        // fee 7.2; daily_total 52.8; surplus covers 52.8 of expense 100
+        // fee 7; daily_total 53; surplus covers 53 of expense 100
         $this->assertEqualsWithDelta(100.0, (float) $entry->administrative_expense, 0.001);
-        $this->assertEqualsWithDelta(47.2, (float) $entry->uncovered_administrative_expense, 0.001);
+        $this->assertEqualsWithDelta(47.0, (float) $entry->uncovered_administrative_expense, 0.001);
         $this->assertEqualsWithDelta(0.0, (float) $entry->fund_balance, 0.001);
         $this->assertEqualsWithDelta(0.0, (float) $entry->administrative_debt, 0.001);
     }

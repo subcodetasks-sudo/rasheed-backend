@@ -156,14 +156,14 @@ class AdministrativeExpenseCoverageTest extends DailyJournalFeatureTestCase
 
         $entry = $this->saveJournal(self::DAY_ONE, $beneficiary->id, ['daily_income' => 60]);
 
-        // daily_total 52.8; covers 52.8; uncovered 47.2; fund 0; tip 47.2
-        $this->assertEqualsWithDelta(47.2, (float) $entry->uncovered_administrative_expense, 0.001);
+        // daily_total 53; covers 53; uncovered 47.0; fund 0; tip 47.0
+        $this->assertEqualsWithDelta(47.0, (float) $entry->uncovered_administrative_expense, 0.001);
         $this->assertEqualsWithDelta(0.0, (float) $entry->project_administration_settled, 0.001);
-        $this->assertEqualsWithDelta(47.2, (float) $entry->outstanding_project_administration, 0.001);
+        $this->assertEqualsWithDelta(47.0, (float) $entry->outstanding_project_administration, 0.001);
         $this->assertEqualsWithDelta(0.0, (float) $entry->fund_balance, 0.001);
 
         $day = $this->adminFundDay(self::DAY_ONE);
-        $this->assertRoundedMoneyEquals(47.2, $day['project_administration']);
+        $this->assertRoundedMoneyEquals(47.0, $day['project_administration']);
         $this->assertRoundedMoneyEquals(-40.0, $day['total_income']);
     }
 
@@ -264,8 +264,8 @@ class AdministrativeExpenseCoverageTest extends DailyJournalFeatureTestCase
 
         $entry = $this->saveJournal(self::DAY_ONE, $beneficiary->id, ['daily_income' => 60]);
 
-        $this->assertEqualsWithDelta(7.2, (float) $entry->administrative_fee, 0.001);
-        $this->assertEqualsWithDelta(47.2, (float) $entry->uncovered_administrative_expense, 0.001);
+        $this->assertEqualsWithDelta(7.0, (float) $entry->administrative_fee, 0.001);
+        $this->assertEqualsWithDelta(47.0, (float) $entry->uncovered_administrative_expense, 0.001);
         $this->assertEqualsWithDelta(0.0, (float) $entry->administrative_debt, 0.001);
     }
 
@@ -316,7 +316,7 @@ class AdministrativeExpenseCoverageTest extends DailyJournalFeatureTestCase
         $this->postAdministrativeOutgoing($owner, $beneficiary, 100);
 
         $this->saveJournal(self::DAY_ONE, $beneficiary->id, ['daily_income' => 60]);
-        $this->assertRoundedMoneyEquals(47.2, $this->adminFundDay(self::DAY_ONE)['project_administration']);
+        $this->assertRoundedMoneyEquals(47.0, $this->adminFundDay(self::DAY_ONE)['project_administration']);
 
         $this->saveJournal(self::DAY_ONE, $beneficiary->id, ['daily_income' => 1000]);
         $this->assertRoundedMoneyEquals(0.0, $this->adminFundDay(self::DAY_ONE)['project_administration']);
@@ -334,16 +334,16 @@ class AdministrativeExpenseCoverageTest extends DailyJournalFeatureTestCase
         $dayTwo = $this->saveJournal(self::DAY_TWO, $beneficiary->id, ['daily_income' => 5000]);
 
         $dayOne->refresh();
-        $this->assertEqualsWithDelta(47.2, (float) $dayOne->uncovered_administrative_expense, 0.001);
-        $this->assertEqualsWithDelta(47.2, (float) $dayOne->outstanding_project_administration, 0.001);
+        $this->assertEqualsWithDelta(47.0, (float) $dayOne->uncovered_administrative_expense, 0.001);
+        $this->assertEqualsWithDelta(47.0, (float) $dayOne->outstanding_project_administration, 0.001);
 
-        // Day 2: fee 600; daily_total 4400; cover 0 expense; settle full prior 47.2
+        // Day 2: fee 600; daily_total 4400; cover 0 expense; settle full prior 47.0
         $this->assertEqualsWithDelta(0.0, (float) $dayTwo->uncovered_administrative_expense, 0.001);
-        $this->assertEqualsWithDelta(47.2, (float) $dayTwo->project_administration_settled, 0.001);
+        $this->assertEqualsWithDelta(47.0, (float) $dayTwo->project_administration_settled, 0.001);
         $this->assertEqualsWithDelta(0.0, (float) $dayTwo->outstanding_project_administration, 0.001);
-        $this->assertEqualsWithDelta(4352.8, (float) $dayTwo->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(4353.0, (float) $dayTwo->fund_balance, 0.001);
 
-        $this->assertRoundedMoneyEquals(47.2, $this->adminFundDay(self::DAY_ONE)['project_administration']);
+        $this->assertRoundedMoneyEquals(47.0, $this->adminFundDay(self::DAY_ONE)['project_administration']);
         $this->assertRoundedMoneyEquals(0.0, $this->adminFundDay(self::DAY_TWO)['project_administration']);
         $this->assertRoundedMoneyEquals(600.0, $this->adminFundDay(self::DAY_TWO)['total_income']);
     }

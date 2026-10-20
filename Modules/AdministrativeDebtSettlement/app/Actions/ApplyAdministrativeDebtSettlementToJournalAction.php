@@ -8,12 +8,13 @@ use Modules\DailyJournal\Models\DailyJournalEntry;
 class ApplyAdministrativeDebtSettlementToJournalAction
 {
     /**
-     * Reduce the project's journal debt chain so later days inherit the settled balance.
+     * Reduce the project's journal debt chain and net fund so later days inherit the settled balance.
      *
-     * Mutates the latest entry on/before the settlement month end (accumulated only),
-     * then reduces `accumulated_administrative_debt` on later entries by the same amount.
-     * Does not change `administrative_debt` or `fund_balance` (preserves Monthly Total / Net Cash;
-     * pool credit is separate).
+     * Mutates the latest entry on/before the settlement month end, then the same fields on later
+     * entries: `accumulated_administrative_debt` drops by the debt allocated, and `fund_balance`
+     * (the Net Cash tip every report reads) drops by the surplus consumed (`recoverable_amount`).
+     * Does not change the day's `administrative_debt` (Cash Station collected admin % stays as
+     * calculated); the pool credit is separate.
      */
     public function execute(AdministrativeDebtSettlement $settlement): void
     {
@@ -21,8 +22,9 @@ class ApplyAdministrativeDebtSettlementToJournalAction
             (float) $settlement->allocated_current_debt + (float) $settlement->allocated_carried_debt,
             2,
         );
+        $fundDebit = round((float) $settlement->recoverable_amount, 2);
 
-        if ($debtApplied <= 0) {
+        if ($debtApplied <= 0 && $fundDebit <= 0) {
             return;
         }
 
@@ -45,13 +47,7 @@ class ApplyAdministrativeDebtSettlementToJournalAction
             return;
         }
 
-        // Only accumulated is reduced. Day `administrative_debt` stays as calculated so Cash Station
-        // collected admin % (fee − debt + contribution) and Net Cash are unchanged.
-        $anchor->accumulated_administrative_debt = round(
-            max(0, (float) $anchor->accumulated_administrative_debt - $debtApplied),
-            2,
-        );
-        $anchor->save();
+        $this->reduce($anchor, $debtApplied, $fundDebit);
 
         $laterEntries = DailyJournalEntry::query()
             ->where('project_id', $settlement->project_id)
@@ -68,11 +64,17 @@ class ApplyAdministrativeDebtSettlementToJournalAction
             ->get();
 
         foreach ($laterEntries as $entry) {
-            $entry->accumulated_administrative_debt = round(
-                max(0, (float) $entry->accumulated_administrative_debt - $debtApplied),
-                2,
-            );
-            $entry->save();
+            $this->reduce($entry, $debtApplied, $fundDebit);
         }
+    }
+
+    private function reduce(DailyJournalEntry $entry, float $debtApplied, float $fundDebit): void
+    {
+        $entry->accumulated_administrative_debt = round(
+            max(0, (float) $entry->accumulated_administrative_debt - $debtApplied),
+            2,
+        );
+        $entry->fund_balance = round((float) $entry->fund_balance - $fundDebit, 2);
+        $entry->save();
     }
 }

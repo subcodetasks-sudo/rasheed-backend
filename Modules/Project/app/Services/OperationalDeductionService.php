@@ -53,6 +53,54 @@ class OperationalDeductionService
             );
         }
 
+        return $this->reconcileRelativeShares(
+            $deductions,
+            $relativeProjects,
+            $incomes,
+            $totalParticipatingIncome,
+            $totalOperationalDeduction,
+        );
+    }
+
+    /**
+     * Relative shares are whole numbers, so independently rounded shares can drift from the pool by a
+     * few units. Largest-remainder allocation keeps every share whole while the shares sum to the pool
+     * exactly (ties go to the lower project id).
+     *
+     * @param  array<int, float>  $deductions
+     * @param  Collection<int, Project>  $relativeProjects
+     * @param  array<int|string, float|int>  $incomes
+     * @return array<int, float>
+     */
+    private function reconcileRelativeShares(
+        array $deductions,
+        Collection $relativeProjects,
+        array $incomes,
+        float $totalParticipatingIncome,
+        float $pool,
+    ): array {
+        if ($totalParticipatingIncome <= 0 || $pool <= 0 || $relativeProjects->isEmpty()) {
+            return $deductions;
+        }
+
+        $floors = [];
+        $fractions = [];
+
+        foreach ($relativeProjects as $project) {
+            $exact = ((float) ($incomes[$project->id] ?? 0) / $totalParticipatingIncome) * $pool;
+            $floors[$project->id] = floor($exact);
+            $fractions[$project->id] = $exact - floor($exact);
+        }
+
+        $remainder = (int) round(round($pool, 0) - array_sum($floors));
+
+        $ids = array_keys($fractions);
+        usort($ids, fn (int $a, int $b) => [$fractions[$b], $a] <=> [$fractions[$a], $b]);
+
+        foreach ($ids as $position => $projectId) {
+            $deductions[$projectId] = $floors[$projectId] + ($position < $remainder ? 1.0 : 0.0);
+        }
+
         return $deductions;
     }
 
@@ -67,7 +115,7 @@ class OperationalDeductionService
 
         return match ($project->operational_deduction_type) {
             OperationalDeductionType::Relative => $totalParticipatingIncome > 0
-                ? round(($projectIncome / $totalParticipatingIncome) * $pool, 2)
+                ? round(($projectIncome / $totalParticipatingIncome) * $pool, 0)
                 : 0.0,
             OperationalDeductionType::Fixed => (float) ($project->operational_fixed_amount ?? 0),
             OperationalDeductionType::Exempt => 0.0,

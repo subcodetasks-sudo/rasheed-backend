@@ -23,10 +23,11 @@ class ResolveAdministrativeExpenseAction
     {
         foreach ($entries as $entry) {
             /** @var DailyJournalEntry $entry */
-            $entry->administrative_expense = $this->sumAdministrativeExpenseForProjectDateAction->execute(
+            // Whole-number money: FIFO cost cents are rounded to the nearest unit here (inventory keeps its own cost).
+            $entry->administrative_expense = round((float) $this->sumAdministrativeExpenseForProjectDateAction->execute(
                 (int) $entry->project_id,
                 $entry->journal_date,
-            );
+            ), 0);
         }
 
         return $entries;

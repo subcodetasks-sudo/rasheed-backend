@@ -235,7 +235,8 @@ class DailyJournalApiTest extends DailyJournalFeatureTestCase
         $byProject = collect($response->json('data.entries'))->keyBy('project.id');
 
         $this->assertSame($this->roundedMoney(464), $byProject[$relativeA->id]['operational_deduction']);
-        $this->assertSame($this->roundedMoney(464), $byProject[$relativeB->id]['operational_deduction']);
+        // Pool 927 splits 463.5 / 463.5; largest remainder gives 464 + 463 so the shares sum to the pool.
+        $this->assertSame($this->roundedMoney(463), $byProject[$relativeB->id]['operational_deduction']);
         $this->assertSame($this->roundedMoney(154), $byProject[$fixed->id]['operational_deduction']);
         $this->assertSame($this->roundedMoney(0), $byProject[$exempt->id]['operational_deduction']);
     }

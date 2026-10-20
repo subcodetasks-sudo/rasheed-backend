@@ -145,8 +145,9 @@ class BuildAdministrativeDebtSettlementAction
         }
 
         $grossSurplus = round(max(0, $netCashFund), 2);
-        // Cumulative surplus capacity: prior ADS settlements this month consume surplus without mutating Net Cash.
-        $surplus = round(max(0, $grossSurplus - $settledSurplusThisMonth), 2);
+        // Settlements already deducted their recoverable_amount from the journal fund_balance tip,
+        // so $netCashFund is net of prior settlements; subtracting them again would double-count.
+        $surplus = $grossSurplus;
 
         $openingDeficit = round(max(0, -$previousMonthlyTotal), 2);
         $currentActivity = round($monthlyTotal + $addedContribution - $deductedContribution, 2);

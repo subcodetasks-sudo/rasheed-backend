@@ -46,6 +46,29 @@ class ExpectedDailyJournalCalculator
 
         $relativePool = round(max(0, self::EMPLOYEE_TOTAL_POOL - $fixedSum), 2);
 
+        // Whole-number shares via largest remainder (ties: earlier project first), summing to the pool.
+        $relativeShares = [];
+        if ($relativeIncomeTotal > 0 && $relativePool > 0) {
+            $floors = [];
+            $fractions = [];
+            $order = [];
+            foreach ($projectDefs as $name => $def) {
+                if ($def['operational_deduction_type'] !== 'relative') {
+                    continue;
+                }
+                $exact = ($incomeExpenseForDay[$name]['income'] / $relativeIncomeTotal) * $relativePool;
+                $floors[$name] = floor($exact);
+                $fractions[$name] = $exact - floor($exact);
+                $order[$name] = count($order);
+            }
+            $remainder = (int) round(round($relativePool, 0) - array_sum($floors));
+            $names = array_keys($fractions);
+            usort($names, fn ($a, $b) => [$fractions[$b], $order[$a]] <=> [$fractions[$a], $order[$b]]);
+            foreach ($names as $position => $name) {
+                $relativeShares[$name] = $floors[$name] + ($position < $remainder ? 1.0 : 0.0);
+            }
+        }
+
         $result = [];
 
         foreach ($projectDefs as $name => $def) {
@@ -54,16 +77,14 @@ class ExpectedDailyJournalCalculator
 
             $administrativeFee = $def['administrative_exempt']
                 ? 0.0
-                : round($income * ($def['administrative_fee_percentage'] / 100), 2);
+                : round($income * ($def['administrative_fee_percentage'] / 100), 0);
 
             $isZeroActivity = $income === 0.0 && $expense === 0.0;
 
             $operationalDeduction = $isZeroActivity
                 ? 0.0
                 : match ($def['operational_deduction_type']) {
-                    'relative' => $relativeIncomeTotal > 0
-                        ? round(($income / $relativeIncomeTotal) * $relativePool, 2)
-                        : 0.0,
+                    'relative' => $relativeShares[$name] ?? 0.0,
                     'fixed' => (float) $def['operational_fixed_amount'],
                     'exempt' => 0.0,
                 };

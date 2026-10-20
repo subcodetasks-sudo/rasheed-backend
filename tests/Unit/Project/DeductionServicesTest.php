@@ -32,8 +32,10 @@ class DeductionServicesTest extends TestCase
             $b->id => 1000,
         ]);
 
-        $this->assertEquals(540.5, $deductions[$a->id]);
-        $this->assertEquals(540.5, $deductions[$b->id]);
+        // 540.5 each is not whole; largest remainder gives 541 + 540 (lower project id first) and sums to the pool.
+        $this->assertEquals(541.0, $deductions[$a->id]);
+        $this->assertEquals(540.0, $deductions[$b->id]);
+        $this->assertEquals(1081.0, $deductions[$a->id] + $deductions[$b->id]);
     }
 
     public function test_fixed_and_exempt_operational_deductions(): void

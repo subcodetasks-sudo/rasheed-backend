@@ -185,9 +185,10 @@ class ReapplyDailyJournalOverlaysAction
                             ->where('month', '>=', $journalMonth);
                     });
             })
-            ->get(['project_id', 'year', 'month', 'allocated_current_debt', 'allocated_carried_debt']);
+            ->get(['project_id', 'year', 'month', 'allocated_current_debt', 'allocated_carried_debt', 'recoverable_amount']);
 
         $adsDebtAppliedByProjectId = [];
+        $adsFundDebitByProjectId = [];
         foreach ($adsSettlements as $settlement) {
             $endOfMonth = sprintf(
                 '%04d-%02d-%02d',
@@ -217,12 +218,18 @@ class ReapplyDailyJournalOverlaysAction
                 2,
             );
 
-            if ($debtApplied <= 0) {
+            $fundDebit = round((float) $settlement->recoverable_amount, 2);
+
+            if ($debtApplied <= 0 && $fundDebit <= 0) {
                 continue;
             }
 
             $adsDebtAppliedByProjectId[$projectId] = round(
                 (float) ($adsDebtAppliedByProjectId[$projectId] ?? 0) + $debtApplied,
+                2,
+            );
+            $adsFundDebitByProjectId[$projectId] = round(
+                (float) ($adsFundDebitByProjectId[$projectId] ?? 0) + $fundDebit,
                 2,
             );
         }
@@ -235,6 +242,12 @@ class ReapplyDailyJournalOverlaysAction
 
             $entry->accumulated_administrative_debt = round(
                 max(0, (float) $entry->accumulated_administrative_debt - $amount),
+                2,
+            );
+            // Settlement surplus consumed leaves Net Cash (fund_balance) at the anchor entry;
+            // later entries inherit it through the carried previous balance.
+            $entry->fund_balance = round(
+                (float) $entry->fund_balance - (float) ($adsFundDebitByProjectId[$projectId] ?? 0),
                 2,
             );
             $entry->save();

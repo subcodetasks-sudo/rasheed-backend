@@ -200,7 +200,8 @@ class AdministrativeDebtSettlementApiTest extends TestCase
 
         $csAfter = $this->getJson(self::CS_ENDPOINT.'?month=7&year=2026')->assertOk();
         $projectCs = collect($csAfter->json('data.projects'))->firstWhere('project_id', $project->id);
-        $this->assertSame($netBefore, $projectCs['net_cash_fund']);
+        // Settling consumes surplus: the 20 leaves Net Cash (fund_balance tip) everywhere.
+        $this->assertSame((string) ((int) $netBefore - 20), $projectCs['net_cash_fund']);
         $this->assertSame('80.00', $projectCs['remaining_administrative_debt']);
         $this->assertSame('surplus', $projectCs['status']);
 
@@ -210,6 +211,10 @@ class AdministrativeDebtSettlementApiTest extends TestCase
             ->first();
         $this->assertSame('80.00', number_format((float) $entryAfterPartial->accumulated_administrative_debt, 2, '.', ''));
         $this->assertSame('100.00', number_format((float) $entryAfterPartial->administrative_debt, 2, '.', ''));
+        $this->assertSame(
+            number_format((float) $netBefore - 20, 2, '.', ''),
+            number_format((float) $entryAfterPartial->fund_balance, 2, '.', ''),
+        );
 
         $afterPartial = $this->getJson(self::ENDPOINT.'?month=7&year=2026')->assertOk()->json('data.projects.0');
         $this->assertSame('80.00', $afterPartial['administrative_debt']);

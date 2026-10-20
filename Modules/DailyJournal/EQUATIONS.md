@@ -1,6 +1,6 @@
 # Daily Journal — Equations, Validation & Business Rules
 
-You are implementing or reviewing the Daily Journal calculation engine for Rashid Financial (Laravel API). Follow these rules exactly. All money values use `decimal(15,2)` and `round(..., 2)`. Null income/expense/contribution are treated as `0` in math (nulls may still be stored for editable fields).
+You are implementing or reviewing the Daily Journal calculation engine for Rashid Financial (Laravel API). Follow these rules exactly. All money values are stored as `decimal(15,2)` and combined with `round(..., 2)`, but the three places that introduce fractions are rounded to **whole units** (nearest, half away from zero): the administrative fee, the relative operational deduction share, and the administrative expense (FIFO cost). Everything else is sums and differences of those, so balances are whole numbers unless a user types cents. Null income/expense/contribution are treated as `0` in math (nulls may still be stored for editable fields).
 
 ---
 
@@ -35,7 +35,7 @@ Unique key per row: `(project_id, journal_date)`. Only **Active** projects are a
 ### 1. Administrative fee (from Project + Settings)
 ```
 if project.administrative_exempt → 0
-else → round(daily_income × (effective_admin_fee_percentage / 100), 2)
+else → round(daily_income × (effective_admin_fee_percentage / 100), 0)   // whole units
 ```
 
 Percentage = **effective** `admin_fee_percentage` for the journal date (not the live settings value,
@@ -71,7 +71,7 @@ Relative base = sum of incomes of projects with type `Relative` only.
 
 | Type | Formula |
 |------|---------|
-| `relative` | `totalParticipatingIncome > 0 ? round((projectIncome / totalParticipatingIncome) × pool, 2) : 0` |
+| `relative` | `totalParticipatingIncome > 0 ? share : 0` where shares are whole units from largest-remainder allocation of `pool` (floor of the exact share, then the leftover units go to the largest fractions, ties to the lower project id), so the shares sum to the pool exactly |
 | `fixed` | `project.operational_fixed_amount` |
 | `exempt` | `0` |
 
@@ -355,10 +355,11 @@ available = SUM(administrative_fee) − SUM(admin_percentage_balance_debits.amou
 - On save, any increase above prior permanent debits creates a new debit row (`admin_percentage_balance_debits`).
 - Debits are **non-refundable**: lowering or clearing `contribution` never reduces prior debits.
 - Monthly Cash Station settlements never restore these debits.
-- Administrative Debt Settlement (month/org-pool recovery) permanently **credits** the pool via `admin_percentage_balance_credits` for the **debt-allocated** portion (`allocated_current_debt + allocated_carried_debt`) when surplus-based debt is recovered. That path does **not** reduce Net Cash or `fund_balance` (distinct from day-level `POST /daily-journals/repay-debt`).
-- On settle, the same debt-allocated amount reduces `accumulated_administrative_debt` on the latest journal entry on/before month-end (and later entries), so a new journal day inherits the settled balance. Day `administrative_debt` and `fund_balance` are not changed (preserves Monthly Total / Net Cash).
-- Settlement updates Administrative Percentage Balance, remaining administrative debt, and related Cash Station / ADS indicators immediately; **it does not deduct the settlement amount from Net Cash Fund** (debt was already charged against the pool when formed; settle only restores the pool).
-- Available surplus capacity for ADS in a month = `max(0, net_cash_fund) − Σ prior ADS recoverable_amount for that project/month` (cumulative cap without mutating Net Cash).
+- Administrative Debt Settlement (month/org-pool recovery) permanently **credits** the pool via `admin_percentage_balance_credits` for the **debt-allocated** portion (`allocated_current_debt + allocated_carried_debt`) when surplus-based debt is recovered. That path also **deducts the settled surplus from Net Cash** (see below), unlike the pool-only credit side (distinct from day-level `POST /daily-journals/repay-debt`).
+- On settle, the debt-allocated amount reduces `accumulated_administrative_debt`, and the whole `recoverable_amount` (surplus consumed, incl. any cash-box allocation) reduces `fund_balance`, on the latest journal entry on/before month-end and on every later entry, so a new journal day inherits both. Day `administrative_debt` is not changed (Cash Station collected admin % stays as calculated).
+- `fund_balance` is the single Net Cash source (Cash Station, Monthly Summary, Reports, Dashboard all read the journal tip), so the deduction shows everywhere at once. Recalculating the anchor day re-applies it through `ReapplyDailyJournalOverlaysAction`.
+- Settlement updates Administrative Percentage Balance, remaining administrative debt, Net Cash, and related Cash Station / ADS indicators immediately.
+- Available surplus capacity for ADS in a month = `max(0, net_cash_fund)`. Prior settlements are already deducted from Net Cash, so they are **not** subtracted again.
 - Allocation priority on execute: Cash Box capacity → Current Admin Debt → Carried Admin Debt.
 - ADS list / Cash Station remaining debt read month-end journal `accumulated_administrative_debt` after mutation (do not also subtract settlement ledger totals — that would double-count).
 
