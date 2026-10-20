@@ -63,10 +63,10 @@ class BuildAdministrativeDebtSettlementAction
             $rows[] = [
                 'project_id' => $projectId,
                 'project_name' => $project['project_name'],
-                'net_cash_balance' => FormatMoneyDecimal::formatRounded($snapshot['net_cash_balance']),
-                'administrative_debt' => FormatMoneyDecimal::formatRounded($snapshot['administrative_debt']),
-                'recoverable_amount' => FormatMoneyDecimal::formatRounded($snapshot['recoverable_amount']),
-                'remaining_debt' => FormatMoneyDecimal::formatRounded($snapshot['remaining_debt']),
+                'net_cash_balance' => FormatMoneyDecimal::format($snapshot['net_cash_balance']),
+                'administrative_debt' => FormatMoneyDecimal::format($snapshot['administrative_debt']),
+                'recoverable_amount' => FormatMoneyDecimal::format($snapshot['recoverable_amount']),
+                'remaining_debt' => FormatMoneyDecimal::format($snapshot['remaining_debt']),
                 'settlement_status' => $snapshot['settlement_status']->value,
                 'can_settle' => $snapshot['can_settle'],
             ];
