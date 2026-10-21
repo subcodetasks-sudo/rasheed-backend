@@ -206,7 +206,7 @@ class BuildAdministrativeFundAction
             ->get();
 
         foreach ($adsRows as $row) {
-            $dateKey = $this->dateKey((string) $row->created_at);
+            $dateKey = $this->dateKeyWithinMonth((string) $row->created_at, $year, $month);
             $keyed[$dateKey] = round(($keyed[$dateKey] ?? 0) + (float) $row->debt_recovery, 2);
         }
 
@@ -220,7 +220,7 @@ class BuildAdministrativeFundAction
             ->get();
 
         foreach ($contributionRows as $row) {
-            $dateKey = $this->dateKey((string) $row->created_at);
+            $dateKey = $this->dateKeyWithinMonth((string) $row->created_at, $year, $month);
             $keyed[$dateKey] = round(($keyed[$dateKey] ?? 0) + (float) $row->debt_recovery, 2);
         }
 
@@ -284,6 +284,23 @@ class BuildAdministrativeFundAction
     private function dateKey(string $raw): string
     {
         return strlen($raw) >= 10 ? substr($raw, 0, 10) : $raw;
+    }
+
+    /**
+     * Keeps the created_at day when it falls inside the settlement's month; a settlement made
+     * later for an earlier month (e.g. in October for January) lands on that month's last day
+     * so it still shows up in the month it settles.
+     */
+    private function dateKeyWithinMonth(string $raw, int $year, int $month): string
+    {
+        $key = $this->dateKey($raw);
+        $monthStart = Carbon::create($year, $month, 1)->startOfMonth();
+
+        if ($key >= $monthStart->toDateString() && $key <= $monthStart->copy()->endOfMonth()->toDateString()) {
+            return $key;
+        }
+
+        return $monthStart->copy()->endOfMonth()->toDateString();
     }
 
     private function decimal(mixed $value): string

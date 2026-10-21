@@ -415,6 +415,32 @@ class AdministrativeFundApiTest extends TestCase
         $this->assertRoundedMoneyEquals(80.0, $data['summary']['debt_recovery']);
     }
 
+    public function test_debt_recovery_for_earlier_month_settled_later_appears_in_that_month(): void
+    {
+        $this->actAs('finance');
+        $project = $this->createProject();
+
+        $settlement = AdministrativeDebtSettlement::query()->create([
+            'year' => 2026,
+            'month' => 1,
+            'project_id' => $project->id,
+            'surplus_at_settlement' => 500,
+            'recoverable_amount' => 80,
+            'allocated_cash_box' => 0,
+            'allocated_current_debt' => 50,
+            'allocated_carried_debt' => 30,
+            'status' => AdministrativeDebtSettlementStatus::Paid,
+            'settled_by' => null,
+        ]);
+        $settlement->forceFill(['created_at' => Carbon::parse('2026-10-21 09:00:00')])->save();
+
+        $data = $this->getJson(self::ENDPOINT.'?month=1&year=2026')->assertOk()->json('data');
+        $day = $this->findDay($data, '2026-01-31');
+
+        $this->assertRoundedMoneyEquals(80.0, $day['debt_recovery']);
+        $this->assertRoundedMoneyEquals(80.0, $data['summary']['debt_recovery']);
+    }
+
     public function test_debt_recovery_includes_applied_monthly_admin_debt_contribution(): void
     {
         $this->actAs('finance');
