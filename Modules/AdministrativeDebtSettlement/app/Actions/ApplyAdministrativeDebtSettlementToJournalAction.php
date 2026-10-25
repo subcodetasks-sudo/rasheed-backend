@@ -47,6 +47,11 @@ class ApplyAdministrativeDebtSettlementToJournalAction
             return;
         }
 
+        // Remember which entry carries the overlay, so a day added later inside the settled month
+        // inherits the reduction through the chain instead of being reduced a second time.
+        $settlement->journal_anchor_date = $anchor->journal_date;
+        $settlement->save();
+
         $this->reduce($anchor, $debtApplied, $fundDebit);
 
         $laterEntries = DailyJournalEntry::query()

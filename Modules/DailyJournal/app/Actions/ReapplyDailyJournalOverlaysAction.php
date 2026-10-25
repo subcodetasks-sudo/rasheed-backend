@@ -185,30 +185,33 @@ class ReapplyDailyJournalOverlaysAction
                             ->where('month', '>=', $journalMonth);
                     });
             })
-            ->get(['project_id', 'year', 'month', 'allocated_current_debt', 'allocated_carried_debt', 'recoverable_amount']);
+            ->get(['project_id', 'year', 'month', 'allocated_current_debt', 'allocated_carried_debt', 'recoverable_amount', 'journal_anchor_date']);
 
         $adsDebtAppliedByProjectId = [];
         $adsFundDebitByProjectId = [];
         foreach ($adsSettlements as $settlement) {
-            $endOfMonth = sprintf(
-                '%04d-%02d-%02d',
-                (int) $settlement->year,
-                (int) $settlement->month,
-                (int) date('t', mktime(0, 0, 0, (int) $settlement->month, 1, (int) $settlement->year)),
-            );
+            // The overlay stays on the entry the settlement was applied to. A day added later inside
+            // the settled month inherits the reduction through the carried balances and must not be
+            // reduced again. Rows without a stored anchor fall back to the month-end entry.
+            $anchorDate = $settlement->journal_anchor_date?->toDateString();
 
-            $anchor = DailyJournalEntry::query()
-                ->where('project_id', $settlement->project_id)
-                ->whereDate('journal_date', '<=', $endOfMonth)
-                ->orderByDesc('journal_date')
-                ->orderByDesc('id')
-                ->first(['journal_date']);
+            if ($anchorDate === null) {
+                $endOfMonth = sprintf(
+                    '%04d-%02d-%02d',
+                    (int) $settlement->year,
+                    (int) $settlement->month,
+                    (int) date('t', mktime(0, 0, 0, (int) $settlement->month, 1, (int) $settlement->year)),
+                );
 
-            if ($anchor === null) {
-                continue;
+                $anchorDate = DailyJournalEntry::query()
+                    ->where('project_id', $settlement->project_id)
+                    ->whereDate('journal_date', '<=', $endOfMonth)
+                    ->orderByDesc('journal_date')
+                    ->orderByDesc('id')
+                    ->first(['journal_date'])?->journal_date?->toDateString();
             }
 
-            if ($anchor->journal_date?->toDateString() !== $dateString) {
+            if ($anchorDate === null || $anchorDate !== $dateString) {
                 continue;
             }
 

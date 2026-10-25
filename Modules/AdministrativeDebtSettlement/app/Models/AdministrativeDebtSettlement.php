@@ -23,6 +23,7 @@ class AdministrativeDebtSettlement extends Model
         'allocated_carried_debt',
         'status',
         'settled_by',
+        'journal_anchor_date',
     ];
 
     protected function casts(): array
@@ -36,6 +37,7 @@ class AdministrativeDebtSettlement extends Model
             'allocated_current_debt' => 'decimal:2',
             'allocated_carried_debt' => 'decimal:2',
             'status' => AdministrativeDebtSettlementStatus::class,
+            'journal_anchor_date' => 'date',
         ];
     }
 
