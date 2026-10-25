@@ -189,7 +189,8 @@ net = total_income − total_expenses
 Administrative Debt has two sources: **Case 1** (deficit cover from that day's full `administrative_fee`) and **Contribution**. Administrative expense is handled in §5a and never creates debt. **Case 2 (fee-for-expense) is removed.** The two procedures are independent.
 
 ```
-balance_before_contribution = round(today_balance − contribution, 2)
+carry_cover = max(previous_day_fund_balance, 0)          // carried SURPLUS pays first; a carried deficit is ignored
+balance_before_contribution = round(carry_cover + today_balance − contribution, 2)
 
 deficit_debt = balance_before_contribution < 0
     ? min(|balance_before_contribution|, administrative_fee)
@@ -201,7 +202,7 @@ today_balance = round(today_balance + fund_consumption_debt, 2)
 fund_balance = round(previous_day_fund_balance + today_balance − project_administration_settled, 2)
 ```
 
-**Case 1 — deficit cover:** when post-coverage, pre-contribution **today's** balance is negative, debt equals `min(|today_balance|, full same-day administrative_fee)`. Stage 3 (§6a) and the carry addition run on that today-only balance. Unused fee from prior days is **not** carried forward as a coverage pool; a later day's fee must not cover an earlier day's carried deficit. If there is no same-day operating deficit, Case 1 is 0.
+**Case 1 — deficit cover (surplus first, then fee):** the deficit is paid first from the carried fund surplus (`carry_cover`); only what that surplus cannot cover reaches the fee: debt = `min(|carry_cover + today_balance − contribution|, full same-day administrative_fee)` when that base is negative. A carried **deficit** never joins the base, so today's fee pays today's deficit only. Stage 3 (§6a) runs on `carry_cover + today_balance`; a carried deficit is added afterward. Unused fee from prior days is **not** carried forward as a coverage pool; a later day's fee must not cover an earlier day's carried deficit. If there is no same-day operating deficit, Case 1 is 0.
 
 **Contribution — additive debt + deficit reduction:** requires Pass-1 fund deficit (super-admin + amount ≤ remaining deficit). Re-saving recomputes from the same fund-consumption base (never compounds).
 
@@ -307,7 +308,7 @@ fund_balance = surplus
 4. Resolve administrative expense (inventory)
 5. Calculate daily totals
 6. Apply today's administrative expense coverage; settle prior outstanding tip from combined surplus; capture `remainingDeficits` from combined balance **before** Case 1 restore
-7. Calculate administrative debt (Case 1 on **today's** balance + contribution) and apply Stage 3 pool relief on today's remaining deficit; persist `fund_balance = previous + today_after_relief − project_administration_settled`
+7. Calculate administrative debt (Case 1 on `max(previous fund, 0) + today's balance` + contribution) and apply Stage 3 pool relief on today's remaining deficit; persist `fund_balance = previous + today_after_relief − project_administration_settled`
 8. Update accumulated administrative debt
 9. Persist calculated fields
 

@@ -285,9 +285,13 @@ class DailyJournalCalculationService
                 ? abs($combinedBeforeCaseOne)
                 : 0.0;
 
+            // A carried surplus pays the day's deficit first; only the remainder reaches the fee (Case 1).
+            // A carried deficit is ignored here: today's fee never pays earlier days' deficit.
+            $carryCover = max(0.0, $previousFundBalance);
+
             $contribution = $entry->contributionAmount();
             $fundConsumptionDebt = $this->calculateAdministrativeDebt(
-                round($todayBalance - $contribution, 2),
+                round($carryCover + $todayBalance - $contribution, 2),
                 (float) $entry->administrative_fee,
             );
 
@@ -297,8 +301,9 @@ class DailyJournalCalculationService
             $entry->project_administration_settled = $settled;
             $entry->outstanding_project_administration = $outstanding;
             $entry->administrative_debt = round($fundConsumptionDebt + $contribution, 2);
-            // Today-only balance until Stage 3 completes; carry and settlement applied afterward.
-            $entry->fund_balance = $todayBalance;
+            // Working balance until Stage 3 completes: today's balance plus the carried surplus that
+            // already covered it. A carried deficit and the settlement are applied afterward.
+            $entry->fund_balance = round($carryCover + $todayBalance, 2);
             $settledByProject[$entry->project_id] = $settled;
         }
 
@@ -315,7 +320,8 @@ class DailyJournalCalculationService
             );
             $settled = round((float) ($settledByProject[$entry->project_id] ?? 0), 2);
 
-            $entry->fund_balance = round($previousFundBalance + (float) $entry->fund_balance - $settled, 2);
+            // The working balance already contains max(previous, 0); add only a carried deficit here.
+            $entry->fund_balance = round(min($previousFundBalance, 0.0) + (float) $entry->fund_balance - $settled, 2);
         }
 
         return [

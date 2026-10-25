@@ -106,7 +106,9 @@ class ExpectedDailyJournalCalculator
             }
 
             $contribution = 0.0;
-            $balanceBeforeContribution = round($todayBalance - $contribution, 2);
+            // Carried surplus pays the day first; a carried deficit is ignored (mirrors the engine).
+            $carryCover = max(0.0, $previousFundBalance);
+            $balanceBeforeContribution = round($carryCover + $todayBalance - $contribution, 2);
             $deficitDebt = $balanceBeforeContribution < 0
                 ? min(abs($balanceBeforeContribution), $administrativeFee)
                 : 0.0;
@@ -120,7 +122,7 @@ class ExpectedDailyJournalCalculator
                 'operational_deduction' => $operationalDeduction,
                 'administrative_expense' => $administrativeExpense,
                 'daily_total' => $dailyTotal,
-                'fund_balance' => $todayBalance,
+                'fund_balance' => round($carryCover + $todayBalance, 2),
                 'administrative_debt' => $administrativeDebt,
                 'remaining_fee' => round(max(0, $administrativeFee - $deficitDebt), 2),
                 'previous_fund_balance' => $previousFundBalance,
@@ -130,7 +132,7 @@ class ExpectedDailyJournalCalculator
         $result = $this->applyAdministrativePoolRelief($result);
 
         foreach ($result as $name => $row) {
-            $fundBalance = round($row['previous_fund_balance'] + $row['fund_balance'], 2);
+            $fundBalance = round(min($row['previous_fund_balance'], 0.0) + $row['fund_balance'], 2);
             $result[$name]['fund_balance'] = $fundBalance;
 
             $previousAccumulatedDebt = $this->accumulatedDebt[$name] ?? 0.0;

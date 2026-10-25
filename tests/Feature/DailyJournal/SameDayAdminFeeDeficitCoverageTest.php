@@ -204,9 +204,9 @@ class SameDayAdminFeeDeficitCoverageTest extends DailyJournalFeatureTestCase
             ->whereDate('journal_date', self::DAY_TWO)
             ->firstOrFail();
 
-        // Day 1 fund 8800 carries; Day 2 daily_total -924 → Case 1 24 on today only → fund 7900, debt 24
-        $this->assertEqualsWithDelta(7900.0, (float) $dayTwoAfter->fund_balance, 0.001);
-        $this->assertEqualsWithDelta(24.0, (float) $dayTwoAfter->administrative_debt, 0.001);
+        // Day 1 fund 8800 carries; Day 2 daily_total -924 is paid from the carried surplus first → base 7876 ≥ 0, no debt, fund 7876
+        $this->assertEqualsWithDelta(7876.0, (float) $dayTwoAfter->fund_balance, 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $dayTwoAfter->administrative_debt, 0.001);
     }
 
     /** 9. Historical dates stay isolated from current-day saves. */
